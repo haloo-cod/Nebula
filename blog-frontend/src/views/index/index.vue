@@ -12,9 +12,9 @@
       </h1>
     </div>
 
-    <!-- 内容面板区域 -->
-    <div class="panels-container" :class="showContent ? 'panels-visible' : 'panels-hidden'">
-      <div class="flex flex-col md:flex-row gap-6">
+    <!-- 面板区域：max-height 裁剪隐藏，面板始终 opacity:1，backdrop-filter 已预合成 -->
+    <div class="panels-wrapper" :class="showContent ? 'panels-expanded' : 'panels-collapsed'">
+      <div class="panels-inner flex flex-col md:flex-row gap-6">
         <!-- 左侧面板 - 个人信息（改 md:w-[25%] 调整宽度） -->
         <div class="panel w-full md:w-[25%] flex flex-col items-center text-center">
           <img :src="avatarImage" alt="avatar" class="avatar" />
@@ -232,19 +232,6 @@ onUnmounted(() => {
   transform: translateY(-2px); /* hover 时上浮距离 */
 }
 
-.panel-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.panel-body {
-  color: rgba(255, 255, 255, 0.7);
-}
-
 /* 上滑按钮 */
 .arrow-text {
   font-size: 0.875rem;
@@ -276,9 +263,9 @@ button:hover .arrow-icon {
 }
 
 /* ============================================
-   面板容器 - 始终渲染，CSS 控制显隐（避免 backdrop-filter 首次合成延迟）
+   面板包装器 - max-height 裁剪隐藏（面板始终 opaque，backdrop-filter 不丢）
    ============================================ */
-.panels-container {
+.panels-wrapper {
   position: relative;
   z-index: 10;
   width: 100%;
@@ -288,20 +275,21 @@ button:hover .arrow-icon {
   max-width: 90rem; /* 面板区域最大宽度 */
   padding-left: 2rem; /* 距屏幕左边 */
   padding-right: 2rem; /* 距屏幕右边 */
-  transition:
-    opacity 0.5s ease 0.2s,
-    transform 0.5s ease 0.2s;
+  overflow: hidden;
+  transition: max-height 2s ease; /* 展开速度，越大越慢 */
 }
 
-.panels-hidden {
-  opacity: 0;
-  transform: translateY(30px);
-  pointer-events: none; /* 隐藏时不可交互 */
+.panels-collapsed {
+  max-height: 0;
 }
 
-.panels-visible {
-  opacity: 1;
-  transform: translateY(0);
+.panels-expanded {
+  max-height: 800px; /* 足够容纳面板内容 */
+}
+
+.panels-inner {
+  opacity: 1; /* 始终不透明，backdrop-filter 预合成 */
+  padding-bottom: 1rem; /* 底部留白，防止 max-height 刚好裁到内容 */
 }
 
 /* 箭头淡出 */
