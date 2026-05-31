@@ -1,11 +1,12 @@
 <template>
   <PageBackground>
     <div
-      class="relative flex flex-col items-center justify-start pt-24 md:pt-0 md:justify-center min-h-screen w-full"
+      class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full"
+      :class="!isMobile && !showContent ? 'h-screen overflow-hidden' : ''"
     >
       <!-- 桌面端标题 -->
       <div
-        class="hidden md:block relative z-20 w-full text-center"
+        class="hidden md:block absolute left-0 right-0 z-20 w-full text-center title-pos"
         :class="showContent ? 'title-up' : ''"
         translate="no"
       >
@@ -21,54 +22,56 @@
         class="panels-wrapper"
         :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
       >
-        <div class="panels-inner flex flex-col md:flex-row gap-6 items-start">
-          <!-- 移动端标题 -->
-          <div class="md:hidden text-center mb-4" translate="no">
-            <h1 class="text-3xl font-bold text-white tracking-wider select-none">
-              {{ displayedText }}<span class="animate-pulse">|</span>
-            </h1>
-          </div>
-          <!-- 左侧列 -->
-          <div class="left-column w-full md:w-[20%] flex flex-col gap-6">
-            <!-- 个人信息面板 -->
-            <div class="panel panel-compact flex flex-col items-center text-center">
-              <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
-              <h2 class="name">Starlit</h2>
-              <p class="bio">分享技术、生活和思考的个人博客</p>
-              <div class="social-links" translate="no">
-                <a
-                  v-for="link in socialLinks"
-                  :key="link.label"
-                  :href="link.url"
-                  :title="link.label"
-                  target="_blank"
-                  rel="noopener"
-                  class="social-icon"
-                  >{{ link.icon }}</a
-                >
+        <div class="panels-container md:flex md:gap-6">
+          <!-- 左侧列 (现在是独立的) -->
+          <div class="left-column sticky-panel w-full md:w-[20%] flex-shrink-0">
+            <div class="flex flex-col gap-6">
+              <!-- 个人信息面板 -->
+              <div class="panel panel-compact flex flex-col items-center text-center">
+                <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
+                <h2 class="name">Starlit</h2>
+                <p class="bio">分享技术、生活和思考的个人博客</p>
+                <div class="social-links" translate="no">
+                  <a
+                    v-for="link in socialLinks"
+                    :key="link.label"
+                    :href="link.url"
+                    :title="link.label"
+                    target="_blank"
+                    rel="noopener"
+                    class="social-icon"
+                    >{{ link.icon }}</a
+                  >
+                </div>
               </div>
-            </div>
-            <!-- 占位面板 -->
-            <div
-              class="panel panel-placeholder flex flex-col items-center justify-center text-center"
-            >
-              <span class="placeholder-icon">✦</span>
-              <span class="placeholder-text">更多内容</span>
+              <!-- 占位面板 -->
+              <div class="panel panel-placeholder flex flex-col items-center justify-center text-center">
+                <span class="placeholder-icon">✦</span>
+                <span class="placeholder-text">更多内容</span>
+              </div>
             </div>
           </div>
           <!-- 右侧面板 - 博文列表 -->
-          <div class="panel w-full md:w-[80%]">
-            <div class="panel-body">
-              <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
-              <ul class="post-list">
-                <li v-for="post in posts" :key="post.slug">
-                  <RouterLink :to="`/post/${post.slug}`" class="post-item">
-                    <span class="post-title">{{ post.title }}</span>
-                    <span class="post-date" v-if="post.date">{{ post.date }}</span>
-                    <span class="post-desc" v-if="post.description">{{ post.description }}</span>
-                  </RouterLink>
-                </li>
-              </ul>
+          <div class="right-panel-wrapper w-full md:w-[80%]">
+            <!-- 移动端标题 -->
+            <div class="md:hidden text-center mb-4" translate="no">
+              <h1 class="text-3xl font-bold text-white tracking-wider select-none">
+                {{ displayedText }}<span class="animate-pulse">|</span>
+              </h1>
+            </div>
+            <div class="panel right-panel">
+              <div class="panel-body">
+                <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
+                <ul class="post-list">
+                  <li v-for="post in posts" :key="post.slug">
+                    <RouterLink :to="`/post/${post.slug}`" class="post-item">
+                      <span class="post-title">{{ post.title }}</span>
+                      <span class="post-date" v-if="post.date">{{ post.date }}</span>
+                      <span class="post-desc" v-if="post.description">{{ post.description }}</span>
+                    </RouterLink>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -178,6 +181,7 @@ onUnmounted(() => {
     ============================================ */
 .panel-body {
   color: rgba(255, 255, 255, 0.7);
+  padding-bottom: 800px;
 }
 
 /* 博文列表 */
@@ -200,6 +204,15 @@ onUnmounted(() => {
 
 .post-item:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+/* 右侧面板 - 桌面端独立滚动 */
+@media (min-width: 768px) {
+  .sticky-panel {
+    position: sticky;
+    top: 120px; /* 导航栏高度 + 间距 */
+    align-self: flex-start; /* 防止被拉伸 */
+  }
 }
 
 .post-title {
@@ -226,9 +239,15 @@ onUnmounted(() => {
 /* ============================================
    标题上移动画
    ============================================ */
+.title-pos {
+  top: 42vh;
+  transform: translateY(-50%) translateZ(0);
+  transition: transform 2s ease;
+  will-change: transform;
+}
+
 .title-up {
-  transform: translateY(-100px); /* 标题上移距离 */
-  transition: transform 0.6s ease;
+  transform: translateY(calc(-50% - 160px));
 }
 
 /* ============================================
@@ -297,7 +316,7 @@ onUnmounted(() => {
 
 /* 个人信息面板 - 紧凑版 */
 .panel-compact {
-  padding: 1rem;
+  padding: 1.5rem;
 }
 
 .panel-compact .avatar {
@@ -372,30 +391,27 @@ button:hover .arrow-icon {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 0rem;
+  margin-top: calc(42vh - 80px);
+  max-height: 2000px;
   max-width: 90rem; /* 面板区域最大宽度 */
   padding-left: 0.5rem; /* 距屏幕左边 */
   padding-right: 0.5rem; /* 距屏幕右边 */
-  overflow: hidden;
-  transition:
-    max-height 2s ease,
-    margin-top 2s ease; /* 展开速度，越大越慢 */
-  will-change: max-height, margin-top;
+  transition: transform 2s ease; /* 展开速度，越大越慢 */
+  will-change: transform;
 }
 
 .panels-collapsed {
-  max-height: 0;
+  opacity: 0;
+  transform: translateY(200px);
+  pointer-events: none;
 }
 
 .panels-expanded {
-  max-height: 800px;
-  margin-top: -3rem;
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.panels-inner {
-  opacity: 1; /* 始终不透明，backdrop-filter 预合成 */
-  padding-bottom: 1rem; /* 底部留白，防止 max-height 刚好裁到内容 */
-}
+
 
 /* 箭头淡出 */
 .arrow-fade-leave-active {
