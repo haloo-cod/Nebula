@@ -4,19 +4,25 @@ import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 
 onMounted(() => {
-  document.getElementById('app').style.opacity = '1'
+  const splash = document.getElementById('splash')
+  const app = document.getElementById('app')
+  if (app) app.style.opacity = '1'
+  if (splash) {
+    splash.classList.add('hide')
+    setTimeout(() => splash.remove(), 400)
+  }
 })
 </script>
 
 <template>
-  <div id="app">
+  <div class="app-shell">
     <NavBar />
     <RouterView />
   </div>
 </template>
 
 <style scoped>
-#app {
+.app-shell {
   min-height: 100vh;
 }
 </style>

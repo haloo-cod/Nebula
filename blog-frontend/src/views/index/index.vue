@@ -5,7 +5,7 @@
     >
       <!-- 桌面端标题 -->
       <div
-        class="hidden md:block relative z-10 w-full text-center"
+        class="hidden md:block relative z-20 w-full text-center"
         :class="showContent ? 'title-up' : ''"
         translate="no"
       >
@@ -21,34 +21,43 @@
         class="panels-wrapper"
         :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
       >
-        <div class="panels-inner flex flex-col md:flex-row gap-6">
+        <div class="panels-inner flex flex-col md:flex-row gap-6 items-start">
           <!-- 移动端标题 -->
           <div class="md:hidden text-center mb-4" translate="no">
             <h1 class="text-3xl font-bold text-white tracking-wider select-none">
               {{ displayedText }}<span class="animate-pulse">|</span>
             </h1>
           </div>
-          <!-- 左侧面板 - 个人信息 -->
-          <div class="panel w-full md:w-[20%] flex flex-col items-center text-center">
-            <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
-            <h2 class="name">Starlit</h2>
-            <p class="bio">分享技术、生活和思考的个人博客</p>
-            <div class="social-links" translate="no">
-              <a
-                v-for="link in socialLinks"
-                :key="link.label"
-                :href="link.url"
-                :title="link.label"
-                target="_blank"
-                rel="noopener"
-                class="social-icon"
-                >{{ link.icon }}</a
-              >
+          <!-- 左侧列 -->
+          <div class="left-column w-full md:w-[20%] flex flex-col gap-6">
+            <!-- 个人信息面板 -->
+            <div class="panel panel-compact flex flex-col items-center text-center">
+              <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
+              <h2 class="name">Starlit</h2>
+              <p class="bio">分享技术、生活和思考的个人博客</p>
+              <div class="social-links" translate="no">
+                <a
+                  v-for="link in socialLinks"
+                  :key="link.label"
+                  :href="link.url"
+                  :title="link.label"
+                  target="_blank"
+                  rel="noopener"
+                  class="social-icon"
+                  >{{ link.icon }}</a
+                >
+              </div>
+            </div>
+            <!-- 占位面板 -->
+            <div
+              class="panel panel-placeholder flex flex-col items-center justify-center text-center"
+            >
+              <span class="placeholder-icon">✦</span>
+              <span class="placeholder-text">更多内容</span>
             </div>
           </div>
           <!-- 右侧面板 - 博文列表 -->
           <div class="panel w-full md:w-[80%]">
-            <h2 class="panel-title">博文</h2>
             <div class="panel-body">
               <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
               <ul class="post-list">
@@ -146,6 +155,9 @@ function onWheel(e) {
 
 onMounted(() => {
   posts.value = getPosts()
+  if (history.state?.showContent) {
+    showContent.value = true
+  }
   if (!isMobile.value) {
     window.addEventListener('wheel', onWheel, { passive: true })
     window.addEventListener('mousedown', onStart)
@@ -162,17 +174,8 @@ onUnmounted(() => {
 
 <style scoped>
 /* ============================================
-   右侧面板 - 博文内容
-   ============================================ */
-.panel-title {
-  font-size: 1.125rem; /* 标题字号 */
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
+    右侧面板 - 博文内容
+    ============================================ */
 .panel-body {
   color: rgba(255, 255, 255, 0.7);
 }
@@ -224,7 +227,7 @@ onUnmounted(() => {
    标题上移动画
    ============================================ */
 .title-up {
-  transform: translateY(30px); /* 标题上移距离 */
+  transform: translateY(-100px); /* 标题上移距离 */
   transition: transform 0.6s ease;
 }
 
@@ -292,6 +295,44 @@ onUnmounted(() => {
   transform: translateY(-2px); /* hover 时上浮距离 */
 }
 
+/* 个人信息面板 - 紧凑版 */
+.panel-compact {
+  padding: 1rem;
+}
+
+.panel-compact .avatar {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 0.75rem;
+}
+
+.panel-compact .name {
+  font-size: 1.1rem;
+}
+
+.panel-compact .bio {
+  font-size: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ============================================
+    占位面板
+    ============================================ */
+.panel-placeholder {
+  min-height: 200px;
+}
+
+.placeholder-icon {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.15);
+  margin-bottom: 0.5rem;
+}
+
+.placeholder-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.25);
+}
+
 /* 上滑按钮 */
 .arrow-text {
   font-size: 0.875rem;
@@ -331,12 +372,15 @@ button:hover .arrow-icon {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 8rem;
+  margin-top: 0rem;
   max-width: 90rem; /* 面板区域最大宽度 */
-  padding-left: 2rem; /* 距屏幕左边 */
-  padding-right: 2rem; /* 距屏幕右边 */
+  padding-left: 0.5rem; /* 距屏幕左边 */
+  padding-right: 0.5rem; /* 距屏幕右边 */
   overflow: hidden;
-  transition: max-height 2s ease; /* 展开速度，越大越慢 */
+  transition:
+    max-height 2s ease,
+    margin-top 2s ease; /* 展开速度，越大越慢 */
+  will-change: max-height, margin-top;
 }
 
 .panels-collapsed {
@@ -344,7 +388,8 @@ button:hover .arrow-icon {
 }
 
 .panels-expanded {
-  max-height: 800px; /* 足够容纳面板内容 */
+  max-height: 800px;
+  margin-top: -3rem;
 }
 
 .panels-inner {
