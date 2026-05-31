@@ -8,13 +8,8 @@
       <div
         class="hidden md:block absolute left-0 right-0 z-20 w-full text-center title-pos"
         :class="showContent ? 'title-up' : ''"
-        translate="no"
       >
-        <h1
-          class="text-4xl sm:text-5xl md:text-7xl font-bold text-white tracking-wider select-none"
-        >
-          {{ displayedText }}<span class="animate-pulse">|</span>
-        </h1>
+        <SiteTitle :instant="instantTitle" />
       </div>
 
       <!-- 面板区域 -->
@@ -22,44 +17,27 @@
         class="panels-wrapper"
         :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
       >
+        <!-- 移动端标题（打字机），位于面板上方 -->
+        <div class="md:hidden mb-4">
+          <SiteTitle size="sm" :instant="instantTitle" />
+        </div>
         <div class="panels-container md:flex md:gap-6">
-          <!-- 左侧列 (现在是独立的) -->
+          <!-- 左侧列 -->
           <div class="left-column sticky-panel w-full md:w-[20%] flex-shrink-0">
             <div class="flex flex-col gap-6">
-              <!-- 个人信息面板 -->
-              <div class="panel panel-compact flex flex-col items-center text-center">
-                <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
-                <h2 class="name">Starlit</h2>
-                <p class="bio">分享技术、生活和思考的个人博客</p>
-                <div class="social-links" translate="no">
-                  <a
-                    v-for="link in socialLinks"
-                    :key="link.label"
-                    :href="link.url"
-                    :title="link.label"
-                    target="_blank"
-                    rel="noopener"
-                    class="social-icon"
-                    >{{ link.icon }}</a
-                  >
-                </div>
-              </div>
-              <!-- 占位面板 -->
-              <div class="panel panel-placeholder flex flex-col items-center justify-center text-center">
-                <span class="placeholder-icon">✦</span>
-                <span class="placeholder-text">更多内容</span>
-              </div>
+              <ProfilePanel
+                :avatar="avatar"
+                :name="profile.name"
+                :bio="profile.bio"
+                :links="socialLinks"
+                compact
+              />
+              <PlaceholderPanel class="hidden md:flex" />
             </div>
           </div>
-          <!-- 右侧面板 - 博文列表 -->
-          <div class="right-panel-wrapper w-full md:w-[80%]">
-            <!-- 移动端标题 -->
-            <div class="md:hidden text-center mb-4" translate="no">
-              <h1 class="text-3xl font-bold text-white tracking-wider select-none">
-                {{ displayedText }}<span class="animate-pulse">|</span>
-              </h1>
-            </div>
-            <div class="panel right-panel">
+          <!-- 中间面板 - 博文列表 -->
+          <div class="right-panel-wrapper w-full md:w-[60%]">
+            <GlassPanel class="right-panel">
               <div class="panel-body">
                 <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
                 <ul class="post-list">
@@ -72,6 +50,13 @@
                   </li>
                 </ul>
               </div>
+            </GlassPanel>
+          </div>
+          <!-- 右侧列 (与左侧对称，移动端隐藏) -->
+          <div class="right-column sticky-panel hidden md:block w-full md:w-[20%] flex-shrink-0">
+            <div class="flex flex-col gap-6">
+              <PlaceholderPanel />
+              <PlaceholderPanel />
             </div>
           </div>
         </div>
@@ -97,21 +82,23 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
-import avatarImage from '@/assets/img/test2.jpg'
+import SiteTitle from '@/components/SiteTitle.vue'
+import GlassPanel from '@/components/panels/GlassPanel.vue'
+import ProfilePanel from '@/components/panels/ProfilePanel.vue'
+import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
+import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
 
-const fullText = "Starlitn'blog"
-const displayedText = ref(fullText)
-const showContent = ref(false)
-const posts = ref([])
 const isMobile = ref(window.innerWidth < 768)
 
-const socialLinks = [
-  { label: 'GitHub', icon: '🐙', url: 'https://github.com' },
-  { label: 'Twitter', icon: '🐦', url: 'https://twitter.com' },
-  { label: 'Email', icon: '✉️', url: 'mailto:example@example.com' },
-  { label: 'RSS', icon: '📡', url: '/rss' },
-]
+// 是否从站内其它页面跳转进来（router 会写入 history.state.back）
+// 刷新或直接打开首页时 back 为 null，此时才需要上滑进入动画
+const cameFromInApp = !!history.state?.back || history.state?.showContent === true
+const showContent = ref(isMobile.value || cameFromInApp)
+// 仅站内跳转时直接显示完整标题；刷新/直接进入则播放打字机
+const instantTitle = cameFromInApp
+
+const posts = ref([])
 
 function handleSlideUp() {
   if (showContent.value) return
@@ -158,10 +145,8 @@ function onWheel(e) {
 
 onMounted(() => {
   posts.value = getPosts()
-  if (history.state?.showContent) {
-    showContent.value = true
-  }
-  if (!isMobile.value) {
+  // 仅当需要上滑进入时（桌面 + 全新加载）才挂载监听
+  if (!isMobile.value && !showContent.value) {
     window.addEventListener('wheel', onWheel, { passive: true })
     window.addEventListener('mousedown', onStart)
     window.addEventListener('mouseup', onEnd)
@@ -189,14 +174,14 @@ onUnmounted(() => {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .post-item {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem 1rem;
+  gap: 0.4rem;
+  padding: 1.25rem 1.25rem;
   border-radius: 0.75rem;
   transition: background 0.2s ease;
   text-decoration: none;
@@ -210,26 +195,27 @@ onUnmounted(() => {
 @media (min-width: 768px) {
   .sticky-panel {
     position: sticky;
-    top: 120px; /* 导航栏高度 + 间距 */
+    top: 160px; /* 导航栏高度 + 间距，离顶部更远 */
     align-self: flex-start; /* 防止被拉伸 */
   }
 }
 
 .post-title {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
 }
 
 .post-date {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .post-desc {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.4;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.65;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -242,114 +228,12 @@ onUnmounted(() => {
 .title-pos {
   top: 42vh;
   transform: translateY(-50%) translateZ(0);
-  transition: transform 2s ease;
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
 .title-up {
   transform: translateY(calc(-50% - 160px));
-}
-
-/* ============================================
-   内容面板 - 公共样式
-   ============================================ */
-.panel {
-  background: rgba(0, 0, 0, 0.35); /* 面板背景透明度，越大越不透明 */
-  backdrop-filter: blur(12px); /* 毛玻璃模糊程度 */
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1rem; /* 圆角大小 */
-  padding: 1.5rem; /* 面板内边距 */
-  min-height: 200px; /* 面板最小高度 */
-  transform: translateZ(0); /* 强制 GPU 合成层，消除模糊延迟 */
-  will-change: backdrop-filter;
-}
-
-/* ============================================
-   头像、名字、简介、社交图标
-   ============================================ */
-.avatar {
-  width: 100px; /* 头像尺寸 */
-  height: 100px;
-  border-radius: 50%; /* 50% = 圆形，0 = 方形 */
-  object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  margin-bottom: 1rem; /* 头像与名字的间距 */
-}
-
-/* 名字 */
-.name {
-  font-size: 1.25rem; /* 名字字号 */
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 0.25rem; /* 名字与简介的间距 */
-}
-
-/* 简介 */
-.bio {
-  font-size: 0.8rem; /* 简介字号 */
-  color: rgba(255, 255, 255, 0.55); /* 简介颜色透明度 */
-  margin-bottom: 1rem; /* 简介与图标的间距 */
-  line-height: 1.5;
-}
-
-/* 社交图标容器 */
-.social-links {
-  display: flex;
-  gap: 0.75rem; /* 图标之间的间距 */
-  justify-content: center;
-  margin-top: auto;
-}
-
-.social-icon {
-  font-size: 1.25rem; /* 图标大小 */
-  color: rgba(255, 255, 255, 0.5); /* 图标颜色透明度 */
-  transition:
-    color 0.3s ease,
-    transform 0.3s ease;
-}
-
-.social-icon:hover {
-  color: rgba(255, 255, 255, 0.9); /* hover 时的图标颜色 */
-  transform: translateY(-2px); /* hover 时上浮距离 */
-}
-
-/* 个人信息面板 - 紧凑版 */
-.panel-compact {
-  padding: 1.5rem;
-}
-
-.panel-compact .avatar {
-  width: 80px;
-  height: 80px;
-  margin-bottom: 0.75rem;
-}
-
-.panel-compact .name {
-  font-size: 1.1rem;
-}
-
-.panel-compact .bio {
-  font-size: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-/* ============================================
-    占位面板
-    ============================================ */
-.panel-placeholder {
-  min-height: 200px;
-}
-
-.placeholder-icon {
-  font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.15);
-  margin-bottom: 0.5rem;
-}
-
-.placeholder-text {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.25);
 }
 
 /* 上滑按钮 */
@@ -393,16 +277,18 @@ button:hover .arrow-icon {
   margin-right: auto;
   margin-top: calc(42vh - 80px);
   max-height: 2000px;
-  max-width: 90rem; /* 面板区域最大宽度 */
-  padding-left: 0.5rem; /* 距屏幕左边 */
-  padding-right: 0.5rem; /* 距屏幕右边 */
-  transition: transform 2s ease; /* 展开速度，越大越慢 */
-  will-change: transform;
+  max-width: 96rem; /* 面板区域最大宽度 */
+  padding-left: 0.25rem; /* 距屏幕左边 */
+  padding-right: 0.25rem; /* 距屏幕右边 */
+  transition:
+    transform 1.1s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1); /* 展开动画：位移+淡入同步 */
+  will-change: transform, opacity;
 }
 
 .panels-collapsed {
   opacity: 0;
-  transform: translateY(200px);
+  transform: translateY(60px);
   pointer-events: none;
 }
 
