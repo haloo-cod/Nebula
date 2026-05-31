@@ -1,6 +1,11 @@
 <script setup>
+import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
+
+onMounted(() => {
+  document.getElementById('app').style.opacity = '1'
+})
 </script>
 
 <template>

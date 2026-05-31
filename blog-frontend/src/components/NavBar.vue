@@ -1,5 +1,27 @@
 <template>
   <nav class="nav-bar">
+    <!-- 翻译切换按钮 + 下拉 -->
+    <div ref="translateRef" class="translate-wrap" translate="no">
+      <button class="translate-btn" @click.stop="langOpen = !langOpen">
+        <span>🌐</span>
+        <span>{{ currentLabel }}</span>
+        <span class="translate-arrow" :class="{ 'is-open': langOpen }">▼</span>
+      </button>
+      <Transition name="lang-drop">
+        <ul v-if="langOpen" class="lang-menu">
+          <li
+            v-for="lang in languages"
+            :key="lang.code"
+            class="lang-item"
+            :class="currentLang === lang.code ? 'lang-item-active' : ''"
+            @click="switchLang(lang.code)"
+          >
+            {{ lang.label }}
+          </li>
+        </ul>
+      </Transition>
+    </div>
+
     <!-- 桌面端导航 -->
     <ul ref="navListRef" class="nav-list">
       <li class="nav-indicator" :style="indicatorStyle"></li>
@@ -48,14 +70,35 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { languages } from '@/i18n/languages'
+import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
+
+const currentLang = ref(getCurrentLang())
+const langOpen = ref(false)
+const translateRef = ref(null)
+
+const currentLabel = computed(() => getLangLabel(currentLang.value))
+
+function switchLang(code) {
+  currentLang.value = code
+  setLang(code)
+  langOpen.value = false
+}
+
+function onDocumentClick(e) {
+  if (!langOpen.value) return
+  if (translateRef.value && !translateRef.value.contains(e.target)) {
+    langOpen.value = false
+  }
+}
 
 const navItems = [
   { label: '首页', path: '/', icon: '🏠' },
-  { label: '文章', path: '/post', icon: '📄' },
-  { label: '图库', path: '/gallery', icon: '🖼️' },
-  { label: '其他', path: '/other', icon: '📌' },
+  { label: '归档', path: '/archive', icon: '📦' },
+  { label: '友链', path: '/friends', icon: '🔗' },
+  { label: '藏宝阁', path: '/treasure', icon: '💎' },
   { label: '关于', path: '/about', icon: '👤' },
 ]
 
@@ -97,7 +140,7 @@ onMounted(() => {
   nextTick(updateIndicator)
   observer = new ResizeObserver(updateIndicator)
   if (navListRef.value) observer.observe(navListRef.value)
-  window.addEventListener('resize', updateIndicator)
+  document.addEventListener('click', onDocumentClick)
 })
 
 watch(
@@ -105,9 +148,14 @@ watch(
   () => nextTick(updateIndicator),
 )
 
+// 语言切换后 translate.js 会异步替换 DOM 文本，延迟刷新指示器
+watch(currentLang, () => {
+  setTimeout(() => nextTick(updateIndicator), 300)
+})
+
 onUnmounted(() => {
   observer?.disconnect()
-  window.removeEventListener('resize', updateIndicator)
+  document.removeEventListener('click', onDocumentClick)
 })
 </script>
 
@@ -125,6 +173,136 @@ onUnmounted(() => {
   padding-right: 1rem;
 }
 
+/* 翻译按钮容器 */
+.translate-wrap {
+  position: absolute;
+  top: 3rem;
+  left: 8rem;
+  z-index: 55;
+}
+
+.translate-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 14px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  font-weight: 500;
+  transition:
+    color 0.3s ease,
+    background 0.3s ease;
+}
+
+.translate-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.translate-arrow {
+  font-size: 10px;
+  transition: transform 0.3s ease;
+}
+
+.translate-arrow.is-open {
+  transform: rotate(180deg);
+}
+
+/* 语言下拉菜单 */
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  border-radius: 1rem;
+  background: rgba(30, 30, 50, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* 移动端菜单 */
+.mobile-menu {
+  position: fixed;
+  top: 6rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 1.5rem;
+  background: rgba(30, 30, 50, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+@media (min-width: 768px) {
+  .mobile-menu {
+    display: none;
+  }
+}
+
+.lang-item {
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.lang-item:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lang-item-active {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 下拉动画 */
+.lang-drop-enter-active {
+  transition: all 0.25s ease;
+}
+
+.lang-drop-leave-active {
+  transition: all 0.15s ease;
+}
+
+.lang-drop-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.lang-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+@media (max-width: 767px) {
+  .translate-wrap {
+    top: 2rem;
+    left: 1rem;
+  }
+
+  .translate-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}
+
 /* 桌面导航列表 */
 .nav-list {
   display: none;
@@ -135,8 +313,8 @@ onUnmounted(() => {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 3rem;
-    padding: 1rem;
+    gap: 1.5rem;
+    padding: 1rem 2.5rem;
     border-radius: 9999px;
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(20px);
@@ -166,12 +344,21 @@ onUnmounted(() => {
   z-index: 10;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
-  padding: 14px 32px;
+  padding: 14px 28px;
   font-size: 29px;
   font-weight: 600;
   border-radius: 9999px;
   transition: color 0.3s ease;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.nav-link span:last-child {
+  max-width: 120px;
+  word-break: keep-all;
 }
 
 .nav-link-inactive {
@@ -244,54 +431,6 @@ onUnmounted(() => {
 
 .mobile-toggle.is-open span:nth-child(3) {
   transform: translateY(-8px) rotate(-45deg);
-}
-
-/* 移动端菜单 */
-.mobile-menu {
-  position: fixed;
-  top: 6rem;
-  left: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 1.5rem;
-  background: rgba(30, 30, 50, 0.85);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
-}
-
-@media (min-width: 768px) {
-  .mobile-menu {
-    display: none;
-  }
-}
-
-.mobile-link {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 16px 24px;
-  font-size: 20px;
-  font-weight: 600;
-  border-radius: 1rem;
-  transition: all 0.3s ease;
-}
-
-.mobile-link-inactive {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.mobile-link-inactive:hover {
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.mobile-link-active {
-  color: #1a1a2e;
-  background: rgba(255, 255, 255, 0.5);
 }
 
 /* 菜单动画 */

@@ -1,72 +1,98 @@
 <template>
-  <div
-    class="relative min-h-screen w-full flex flex-col items-center justify-center bg-cover bg-center bg-no-repeat"
-    :style="{ backgroundImage: `url(${bgImage})` }"
-  >
-    <div class="absolute inset-0 bg-black/45"></div>
+  <PageBackground>
+    <div
+      class="relative flex flex-col items-center justify-start pt-24 md:pt-0 md:justify-center min-h-screen w-full"
+    >
+      <!-- 桌面端标题 -->
+      <div
+        class="hidden md:block relative z-10 w-full text-center"
+        :class="showContent ? 'title-up' : ''"
+        translate="no"
+      >
+        <h1
+          class="text-4xl sm:text-5xl md:text-7xl font-bold text-white tracking-wider select-none"
+        >
+          {{ displayedText }}<span class="animate-pulse">|</span>
+        </h1>
+      </div>
 
-    <!-- 标题 -->
-    <div class="relative z-10 w-full text-center" :class="showContent ? 'title-up' : ''">
-      <h1 class="text-4xl sm:text-5xl md:text-7xl font-bold text-white tracking-wider select-none">
-        {{ displayedText }}<span class="animate-pulse">|</span>
-      </h1>
-    </div>
-
-    <!-- 面板区域：max-height 裁剪隐藏，面板始终 opacity:1，backdrop-filter 已预合成 -->
-    <div class="panels-wrapper" :class="showContent ? 'panels-expanded' : 'panels-collapsed'">
-      <div class="panels-inner flex flex-col md:flex-row gap-6">
-        <!-- 左侧面板 - 个人信息（改 md:w-[25%] 调整宽度） -->
-        <div class="panel w-full md:w-[25%] flex flex-col items-center text-center">
-          <img :src="avatarImage" alt="avatar" class="avatar" />
-          <h2 class="name">Starlit</h2>
-          <p class="bio">分享技术、生活和思考的个人博客</p>
-          <div class="social-links">
-            <a
-              v-for="link in socialLinks"
-              :key="link.label"
-              :href="link.url"
-              :title="link.label"
-              target="_blank"
-              rel="noopener"
-              class="social-icon"
-              >{{ link.icon }}</a
-            >
+      <!-- 面板区域 -->
+      <div
+        class="panels-wrapper"
+        :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
+      >
+        <div class="panels-inner flex flex-col md:flex-row gap-6">
+          <!-- 移动端标题 -->
+          <div class="md:hidden text-center mb-4" translate="no">
+            <h1 class="text-3xl font-bold text-white tracking-wider select-none">
+              {{ displayedText }}<span class="animate-pulse">|</span>
+            </h1>
           </div>
-        </div>
-        <!-- 右侧面板 - 博文内容（改 md:w-[75%] 调整宽度，与左侧合计 100%） -->
-        <div class="panel w-full md:w-[75%]">
-          <h2 class="panel-title">博文标题</h2>
-          <div class="panel-body">
-            <p class="text-white/50 text-sm">博文标题列表将显示在这里...</p>
+          <!-- 左侧面板 - 个人信息 -->
+          <div class="panel w-full md:w-[20%] flex flex-col items-center text-center">
+            <img :src="avatarImage" alt="avatar" class="avatar" translate="no" />
+            <h2 class="name">Starlit</h2>
+            <p class="bio">分享技术、生活和思考的个人博客</p>
+            <div class="social-links" translate="no">
+              <a
+                v-for="link in socialLinks"
+                :key="link.label"
+                :href="link.url"
+                :title="link.label"
+                target="_blank"
+                rel="noopener"
+                class="social-icon"
+                >{{ link.icon }}</a
+              >
+            </div>
+          </div>
+          <!-- 右侧面板 - 博文列表 -->
+          <div class="panel w-full md:w-[80%]">
+            <h2 class="panel-title">博文</h2>
+            <div class="panel-body">
+              <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
+              <ul class="post-list">
+                <li v-for="post in posts" :key="post.slug">
+                  <RouterLink :to="`/post/${post.slug}`" class="post-item">
+                    <span class="post-title">{{ post.title }}</span>
+                    <span class="post-date" v-if="post.date">{{ post.date }}</span>
+                    <span class="post-desc" v-if="post.description">{{ post.description }}</span>
+                  </RouterLink>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- 上滑按钮 -->
-    <Transition name="arrow-fade">
-      <button
-        v-if="!showContent"
-        class="absolute bottom-8 z-10 flex flex-col items-center gap-2 cursor-pointer bg-transparent border-none"
-        @click="handleSlideUp"
-        aria-label="向上滑动"
-      >
-        <span class="arrow-text">向上滑动</span>
-        <span class="arrow-icon">▲</span>
-      </button>
-    </Transition>
-  </div>
+      <!-- 上滑按钮（仅桌面端） -->
+      <Transition name="arrow-fade">
+        <button
+          v-if="!isMobile && !showContent"
+          class="absolute bottom-8 z-10 hidden md:flex flex-col items-center gap-2 cursor-pointer bg-transparent border-none"
+          @click="handleSlideUp"
+          aria-label="向上滑动"
+        >
+          <span class="arrow-text">向上滑动</span>
+          <span class="arrow-icon">▲</span>
+        </button>
+      </Transition>
+    </div>
+  </PageBackground>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import bgImage from '@/assets/img/test.jfif'
+import { RouterLink } from 'vue-router'
+import PageBackground from '@/components/PageBackground.vue'
 import avatarImage from '@/assets/img/test2.jpg'
+import { getPosts } from '@/data/posts'
 
 const fullText = "Starlitn'blog"
-const displayedText = ref('')
+const displayedText = ref(fullText)
 const showContent = ref(false)
-let timer = null
+const posts = ref([])
+const isMobile = ref(window.innerWidth < 768)
 
 const socialLinks = [
   { label: 'GitHub', icon: '🐙', url: 'https://github.com' },
@@ -75,22 +101,18 @@ const socialLinks = [
   { label: 'RSS', icon: '📡', url: '/rss' },
 ]
 
-function startTyping() {
-  let index = 0
-  timer = setInterval(() => {
-    if (index < fullText.length) {
-      displayedText.value += fullText[index]
-      index++
-    } else {
-      clearInterval(timer)
-      timer = null
-    }
-  }, 100)
-}
-
 function handleSlideUp() {
   if (showContent.value) return
   showContent.value = true
+  removeListeners()
+}
+
+function removeListeners() {
+  window.removeEventListener('wheel', onWheel)
+  window.removeEventListener('mousedown', onStart)
+  window.removeEventListener('mouseup', onEnd)
+  window.removeEventListener('touchstart', onStart)
+  window.removeEventListener('touchend', onEnd)
 }
 
 let startY = 0
@@ -123,23 +145,18 @@ function onWheel(e) {
 }
 
 onMounted(() => {
-  startTyping()
-  window.addEventListener('wheel', onWheel, { passive: true })
-  window.addEventListener('mousedown', onStart)
-  window.addEventListener('mouseup', onEnd)
-  window.addEventListener('touchstart', onStart, { passive: true })
-  window.addEventListener('touchend', onEnd, { passive: true })
+  posts.value = getPosts()
+  if (!isMobile.value) {
+    window.addEventListener('wheel', onWheel, { passive: true })
+    window.addEventListener('mousedown', onStart)
+    window.addEventListener('mouseup', onEnd)
+    window.addEventListener('touchstart', onStart, { passive: true })
+    window.addEventListener('touchend', onEnd, { passive: true })
+  }
 })
 
 onUnmounted(() => {
-  if (timer) {
-    clearInterval(timer)
-  }
-  window.removeEventListener('wheel', onWheel)
-  window.removeEventListener('mousedown', onStart)
-  window.removeEventListener('mouseup', onEnd)
-  window.removeEventListener('touchstart', onStart)
-  window.removeEventListener('touchend', onEnd)
+  removeListeners()
 })
 </script>
 
@@ -160,11 +177,54 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* 博文列表 */
+.post-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.post-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  transition: background 0.2s ease;
+  text-decoration: none;
+}
+
+.post-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.post-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.post-date {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.post-desc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ============================================
    标题上移动画
    ============================================ */
 .title-up {
-  transform: translateY(-60px); /* 标题上移距离 */
+  transform: translateY(30px); /* 标题上移距离 */
   transition: transform 0.6s ease;
 }
 
@@ -271,7 +331,7 @@ button:hover .arrow-icon {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 3rem;
+  margin-top: 8rem;
   max-width: 90rem; /* 面板区域最大宽度 */
   padding-left: 2rem; /* 距屏幕左边 */
   padding-right: 2rem; /* 距屏幕右边 */

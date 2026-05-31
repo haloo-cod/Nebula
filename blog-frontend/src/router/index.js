@@ -1,9 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import index from '../views/index/index.vue'
-import post from '../views/posts/post.vue'
-import gallery from '../views/gallery/gallery.vue'
-import other from '../views/other/other.vue'
-import about from '../views/about/about.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,27 +6,32 @@ const router = createRouter({
     {
       path: '/',
       name: 'index',
-      component: index,
+      component: () => import('../views/index/index.vue'),
     },
     {
-      path: '/post',
-      name: 'post',
-      component: post,
+      path: '/archive',
+      name: 'archive',
+      component: () => import('../views/archive/archive.vue'),
     },
     {
-      path: '/gallery',
-      name: 'gallery',
-      component: gallery,
+      path: '/friends',
+      name: 'friends',
+      component: () => import('../views/friends/friends.vue'),
     },
     {
-      path: '/other',
-      name: 'other',
-      component: other,
+      path: '/treasure',
+      name: 'treasure',
+      component: () => import('../views/treasure/treasure.vue'),
     },
     {
       path: '/about',
       name: 'about',
-      component: about,
+      component: () => import('../views/about/about.vue'),
+    },
+    {
+      path: '/post/:slug',
+      name: 'post',
+      component: () => import('../views/post/post.vue'),
     },
   ],
 })
