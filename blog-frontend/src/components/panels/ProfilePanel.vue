@@ -1,6 +1,12 @@
 <template>
   <GlassPanel :compact="compact" class="flex flex-col items-center text-center">
-    <img :src="avatar" alt="avatar" class="avatar" :class="{ 'avatar-sm': compact }" translate="no" />
+    <img
+      :src="avatar"
+      alt="avatar"
+      class="avatar"
+      :class="{ 'avatar-sm': compact }"
+      translate="no"
+    />
     <h2 class="name" :class="{ 'name-sm': compact }">{{ name }}</h2>
     <p class="bio" :class="{ 'bio-sm': compact }">{{ bio }}</p>
     <div class="social-links" translate="no">

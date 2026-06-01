@@ -23,7 +23,7 @@
         </div>
         <div class="panels-container md:flex md:gap-6">
           <!-- 左侧列 -->
-          <div class="left-column sticky-panel w-full md:w-[20%] flex-shrink-0">
+          <div class="left-column sticky-panel w-full md:w-[22%] flex-shrink-0">
             <div class="flex flex-col gap-6">
               <ProfilePanel
                 :avatar="avatar"
@@ -36,7 +36,7 @@
             </div>
           </div>
           <!-- 中间面板 - 博文列表 -->
-          <div class="right-panel-wrapper w-full md:w-[60%]">
+          <div class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0">
             <GlassPanel class="right-panel">
               <div class="panel-body">
                 <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
@@ -53,9 +53,9 @@
             </GlassPanel>
           </div>
           <!-- 右侧列 (与左侧对称，移动端隐藏) -->
-          <div class="right-column sticky-panel hidden md:block w-full md:w-[20%] flex-shrink-0">
+          <div class="right-column sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0">
             <div class="flex flex-col gap-6">
-              <PlaceholderPanel />
+              <CalendarPanel />
               <PlaceholderPanel />
             </div>
           </div>
@@ -86,6 +86,7 @@ import SiteTitle from '@/components/SiteTitle.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import ProfilePanel from '@/components/panels/ProfilePanel.vue'
 import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
+import CalendarPanel from '@/components/panels/CalendarPanel.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
 
@@ -296,8 +297,6 @@ button:hover .arrow-icon {
   opacity: 1;
   transform: translateY(0);
 }
-
-
 
 /* 箭头淡出 */
 .arrow-fade-leave-active {

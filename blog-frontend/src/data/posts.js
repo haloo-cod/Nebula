@@ -34,12 +34,7 @@ function parseFrontmatter(raw) {
 }
 
 function slugify(path) {
-  return path
-    .split('/')
-    .pop()
-    .replace(/\.md$/, '')
-    .replace(/\s+/g, '-')
-    .toLowerCase()
+  return path.split('/').pop().replace(/\.md$/, '').replace(/\s+/g, '-').toLowerCase()
 }
 
 const posts = Object.entries(rawFiles)

@@ -1,8 +1,6 @@
 <template>
   <Transition name="fade">
-    <button v-if="visible" class="back-to-top" @click="scrollToTop" aria-label="回到顶部">
-      ▲
-    </button>
+    <button v-if="visible" class="back-to-top" @click="scrollToTop" aria-label="回到顶部">▲</button>
   </Transition>
 </template>
 
