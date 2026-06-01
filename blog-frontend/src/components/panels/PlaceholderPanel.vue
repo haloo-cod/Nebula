@@ -1,5 +1,8 @@
 <template>
-  <GlassPanel class="panel-placeholder flex flex-col items-center justify-center text-center">
+  <GlassPanel
+    :flat="flat"
+    class="panel-placeholder flex flex-col items-center justify-center text-center"
+  >
     <span class="placeholder-icon">{{ icon }}</span>
     <span class="placeholder-text">{{ text }}</span>
   </GlassPanel>
@@ -11,6 +14,7 @@ import GlassPanel from './GlassPanel.vue'
 defineProps({
   icon: { type: String, default: '✦' },
   text: { type: String, default: '更多内容' },
+  flat: { type: Boolean, default: false },
 })
 </script>
 

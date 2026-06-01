@@ -1,5 +1,5 @@
 <template>
-  <GlassPanel :compact="compact" class="flex flex-col items-center text-center">
+  <GlassPanel :compact="compact" :flat="flat" class="flex flex-col items-center text-center">
     <img
       :src="avatar"
       alt="avatar"
@@ -33,6 +33,7 @@ defineProps({
   bio: { type: String, default: '分享技术、生活和思考的个人博客' },
   links: { type: Array, default: () => [] },
   compact: { type: Boolean, default: false },
+  flat: { type: Boolean, default: false },
 })
 </script>
 

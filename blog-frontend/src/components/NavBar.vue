@@ -3,8 +3,8 @@
     <!-- 翻译切换按钮 + 下拉 -->
     <div ref="translateRef" class="translate-wrap" translate="no">
       <button class="translate-btn" @click.stop="langOpen = !langOpen">
-        <span>🌐</span>
-        <span>{{ currentLabel }}</span>
+        <SvgIcon name="international" class="translate-icon" />
+        <span class="translate-label">{{ currentLabel }}</span>
         <span class="translate-arrow" :class="{ 'is-open': langOpen }">▼</span>
       </button>
       <Transition name="lang-drop">
@@ -32,8 +32,8 @@
           :class="route.path === item.path ? 'nav-link-active' : 'nav-link-inactive'"
           @click="closeMenu"
         >
-          <span class="nav-icon">{{ item.icon }}</span>
-          <span>{{ item.label }}</span>
+          <SvgIcon :name="item.icon" class="nav-icon" />
+          <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
       </li>
     </ul>
@@ -60,7 +60,7 @@
             :class="route.path === item.path ? 'mobile-link-active' : 'mobile-link-inactive'"
             @click="closeMenu"
           >
-            <span class="nav-icon">{{ item.icon }}</span>
+            <SvgIcon :name="item.icon" class="nav-icon" />
             <span>{{ item.label }}</span>
           </RouterLink>
         </li>
@@ -74,6 +74,7 @@ import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
+import SvgIcon from '@/components/SvgIcon.vue'
 
 const currentLang = ref(getCurrentLang())
 const langOpen = ref(false)
@@ -95,11 +96,11 @@ function onDocumentClick(e) {
 }
 
 const navItems = [
-  { label: '首页', path: '/', icon: '🏠' },
-  { label: '归档', path: '/archive', icon: '📦' },
-  { label: '友链', path: '/friends', icon: '🔗' },
-  { label: '藏宝阁', path: '/treasure', icon: '💎' },
-  { label: '关于', path: '/about', icon: '👤' },
+  { label: '首页', path: '/', icon: 'home' },
+  { label: '归档', path: '/archive', icon: 'archive' },
+  { label: '友链', path: '/friends', icon: 'friends' },
+  { label: '藏宝阁', path: '/treasure', icon: 'gift' },
+  { label: '关于', path: '/about', icon: 'about' },
 ]
 
 const route = useRoute()
@@ -173,30 +174,39 @@ onUnmounted(() => {
   padding-right: 1rem;
 }
 
-/* 翻译按钮容器 */
+/* 翻译按钮容器：锚定在面板左边缘（面板 max-width 96rem 居中），与面板共享中轴 */
 .translate-wrap {
   position: absolute;
-  top: 3rem;
-  left: 8rem;
+  top: 2rem;
+  left: max(0.25rem, calc(50% - 48rem + 0.25rem));
   z-index: 55;
 }
 
 .translate-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 14px 28px;
+  gap: 0.4rem;
+  padding: 9px 18px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(20px);
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   transition:
     color 0.3s ease,
     background 0.3s ease;
+}
+
+.translate-icon {
+  font-size: 18px;
+}
+
+.translate-label {
+  white-space: nowrap;
 }
 
 .translate-btn:hover {
@@ -313,8 +323,8 @@ onUnmounted(() => {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    padding: 1rem 2.5rem;
+    gap: 1rem;
+    padding: 0.6rem 1.5rem;
     border-radius: 9999px;
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(20px);
@@ -324,8 +334,8 @@ onUnmounted(() => {
 
 .nav-indicator {
   position: absolute;
-  top: 16px;
-  height: calc(100% - 32px);
+  top: 10px;
+  height: calc(100% - 20px);
   border-radius: 9999px;
   pointer-events: none;
   background: rgba(255, 255, 255, 0.4);
@@ -345,20 +355,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 14px 28px;
-  font-size: 29px;
+  gap: 0.5rem;
+  padding: 10px 20px;
+  font-size: 18px;
   font-weight: 600;
   border-radius: 9999px;
   transition: color 0.3s ease;
-  white-space: normal;
+  white-space: nowrap;
   text-align: center;
   line-height: 1.2;
 }
 
-.nav-link span:last-child {
-  max-width: 120px;
-  word-break: keep-all;
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 9em;
 }
 
 .nav-link-inactive {
@@ -374,7 +386,7 @@ onUnmounted(() => {
 }
 
 .nav-icon {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 

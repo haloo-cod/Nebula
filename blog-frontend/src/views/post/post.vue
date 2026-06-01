@@ -4,7 +4,7 @@
       class="relative flex flex-col items-center justify-start pt-24 md:pt-0 md:justify-center min-h-screen w-full"
     >
       <!-- 面板区域 -->
-      <div class="panels-wrapper post-enter">
+      <div class="panels-wrapper">
         <!-- 移动端标题（打字机），位于面板上方 -->
         <div class="md:hidden mb-4">
           <SiteTitle size="sm" instant />
@@ -12,38 +12,47 @@
 
         <div class="panels-inner flex flex-col md:flex-row gap-6 items-start">
           <!-- 左侧列：移动端只保留头像面板 -->
-          <div class="left-column w-full md:w-[20%] flex-shrink-0 flex flex-col gap-6">
+          <div
+            class="left-column post-rise w-full md:w-[22%] flex-shrink-0 flex flex-col gap-6"
+            style="--rise-delay: 0.05s"
+          >
             <ProfilePanel
               :avatar="avatar"
               :name="profile.name"
               :bio="profile.bio"
               :links="socialLinks"
+              flat
             />
-            <PlaceholderPanel class="hidden md:flex" />
+            <PlaceholderPanel class="hidden md:flex" flat />
           </div>
 
-          <!-- 中间面板 - 博文内容 -->
-          <div class="w-full md:w-[60%]">
+          <!-- 中间面板 - 博文内容（玻璃面板本身不做动画，避免 backdrop-filter 失效，仅内部内容滑入） -->
+          <div class="w-full md:w-[56%] flex-shrink-0">
             <GlassPanel class="panel-right">
-              <!-- 顶行：返回按钮（标题不显示） -->
-              <div class="post-header">
-                <button class="back-btn" @click="goBack" aria-label="返回首页">
-                  <span class="back-arrow">◀</span>
-                  <span>返回</span>
-                </button>
-              </div>
+              <div class="post-rise-inner">
+                <!-- 顶行：返回按钮（标题不显示） -->
+                <div class="post-header">
+                  <button class="back-btn" @click="goBack" aria-label="返回首页">
+                    <span class="back-arrow">◀</span>
+                    <span>返回</span>
+                  </button>
+                </div>
 
-              <!-- 文章内容 -->
-              <div v-if="loading" class="text-white/50 mt-8">加载中...</div>
-              <div v-else-if="html" class="prose" v-html="html"></div>
-              <div v-else class="text-white/50 mt-8">文章不存在</div>
+                <!-- 文章内容 -->
+                <div v-if="loading" class="text-white/50 mt-8">加载中...</div>
+                <div v-else-if="html" class="prose" v-html="html"></div>
+                <div v-else class="text-white/50 mt-8">文章不存在</div>
+              </div>
             </GlassPanel>
           </div>
 
-          <!-- 右侧列：移动端隐藏 -->
-          <div class="right-column hidden md:flex w-full md:w-[20%] flex-shrink-0 flex-col gap-6">
-            <PlaceholderPanel />
-            <PlaceholderPanel />
+          <!-- 右侧列：移动端隐藏，复用日历 -->
+          <div
+            class="right-column post-rise hidden md:flex w-full md:w-[22%] flex-shrink-0 flex-col gap-6"
+            style="--rise-delay: 0.1s"
+          >
+            <CalendarPanel flat />
+            <PlaceholderPanel flat />
           </div>
         </div>
       </div>
@@ -59,6 +68,7 @@ import SiteTitle from '@/components/SiteTitle.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import ProfilePanel from '@/components/panels/ProfilePanel.vue'
 import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
+import CalendarPanel from '@/components/panels/CalendarPanel.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPost, renderPost } from '@/data/posts'
 
@@ -111,24 +121,35 @@ function goBack() {
 }
 
 /* ============================================
-   进入博文动画：仅淡入，不在毛玻璃祖先上做 transform
-   （transform 会创建 backdrop 根，导致 backdrop-filter 取不到固定背景而失效）
+   进入博文动画：从下向上滑入 + 淡入
+   关键：玻璃面板（.panel-right）本身不做任何 opacity/transform 动画，
+   否则会破坏 backdrop-filter（出现延迟后突然显现）。
+   - 两侧扁平面板（无毛玻璃）：整体滑入 .post-rise
+   - 中间玻璃面板：玻璃保持静止，仅内部内容 .post-rise-inner 滑入
    ============================================ */
-.post-enter {
-  animation: postEnter 0.6s ease both;
+.post-rise {
+  animation: postRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--rise-delay, 0s);
 }
 
-@keyframes postEnter {
+.post-rise-inner {
+  animation: postRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes postRise {
   from {
     opacity: 0;
+    transform: translateY(40px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .post-enter {
+  .post-rise,
+  .post-rise-inner {
     animation: none;
   }
 }

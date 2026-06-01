@@ -1,5 +1,5 @@
 <template>
-  <div class="panel" :class="{ 'panel-compact': compact }">
+  <div class="panel" :class="{ 'panel-compact': compact, 'panel-flat': flat }">
     <slot />
   </div>
 </template>
@@ -7,6 +7,11 @@
 <script setup>
 defineProps({
   compact: {
+    type: Boolean,
+    default: false,
+  },
+  // flat: 去掉毛玻璃（backdrop-filter blur），仅保留半透明底色，用于两侧面板
+  flat: {
     type: Boolean,
     default: false,
   },
@@ -29,5 +34,11 @@ defineProps({
 
 .panel-compact {
   padding: 1.5rem;
+}
+
+/* 扁平变体：去掉毛玻璃模糊，保持主题一致的半透明底色 */
+.panel-flat {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 </style>

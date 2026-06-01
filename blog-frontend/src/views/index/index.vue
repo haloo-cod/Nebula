@@ -15,7 +15,10 @@
       <!-- 面板区域 -->
       <div
         class="panels-wrapper"
-        :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
+        :class="[
+          isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed',
+          cameFromInApp ? 'panels-arrive' : '',
+        ]"
       >
         <!-- 移动端标题（打字机），位于面板上方 -->
         <div class="md:hidden mb-4">
@@ -31,8 +34,9 @@
                 :bio="profile.bio"
                 :links="socialLinks"
                 compact
+                flat
               />
-              <PlaceholderPanel class="hidden md:flex" />
+              <PlaceholderPanel class="hidden md:flex" flat />
             </div>
           </div>
           <!-- 中间面板 - 博文列表 -->
@@ -55,8 +59,8 @@
           <!-- 右侧列 (与左侧对称，移动端隐藏) -->
           <div class="right-column sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0">
             <div class="flex flex-col gap-6">
-              <CalendarPanel />
-              <PlaceholderPanel />
+              <CalendarPanel flat />
+              <PlaceholderPanel flat />
             </div>
           </div>
         </div>
@@ -296,6 +300,26 @@ button:hover .arrow-icon {
 .panels-expanded {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* 从站内（如博文页）返回首页时的淡入动画，仅用 opacity 不影响毛玻璃 */
+.panels-arrive {
+  animation: panelsArrive 0.5s ease both;
+}
+
+@keyframes panelsArrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panels-arrive {
+    animation: none;
+  }
 }
 
 /* 箭头淡出 */

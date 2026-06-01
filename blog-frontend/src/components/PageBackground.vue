@@ -15,12 +15,12 @@
 </template>
 
 <script setup>
-import bgImage from '@/assets/img/test.jfif'
+import bgImage from '@/assets/img/test3.jpg'
 
 defineProps({
   overlay: {
     type: Number,
-    default: 0.45,
+    default: 0.25,
   },
 })
 </script>

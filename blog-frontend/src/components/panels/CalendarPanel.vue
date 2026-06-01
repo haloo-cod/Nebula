@@ -1,5 +1,5 @@
 <template>
-  <GlassPanel class="calendar-panel">
+  <GlassPanel :flat="flat" class="calendar-panel">
     <!-- 头部：年月 + 切换 -->
     <div class="cal-header">
       <button class="cal-nav" @click="prevMonth" aria-label="上个月">‹</button>
@@ -53,6 +53,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import GlassPanel from './GlassPanel.vue'
 import { getSolarTerms, getHolidays, pickMonthHolidays } from '@/data/calendar'
+
+defineProps({
+  flat: { type: Boolean, default: false },
+})
 
 const weekLabels = ['日', '一', '二', '三', '四', '五', '六']
 
