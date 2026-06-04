@@ -4,7 +4,7 @@
       :src="avatar"
       alt="avatar"
       class="avatar"
-      :class="{ 'avatar-sm': compact }"
+      :class="{ 'avatar-sm': compact, 'avatar-square': square }"
       translate="no"
     />
     <h2 class="name" :class="{ 'name-sm': compact }">{{ name }}</h2>
@@ -26,7 +26,7 @@
 
 <script setup>
 import GlassPanel from './GlassPanel.vue'
-
+// 定义组件属性 约束父组件传入的数据类型和默认值
 defineProps({
   avatar: { type: String, required: true },
   name: { type: String, default: 'Starlit' },
@@ -34,6 +34,8 @@ defineProps({
   links: { type: Array, default: () => [] },
   compact: { type: Boolean, default: false },
   flat: { type: Boolean, default: false },
+  // square: 头像使用方形（圆角矩形）而非圆形
+  square: { type: Boolean, default: false },
 })
 </script>
 
@@ -79,6 +81,19 @@ defineProps({
 .social-icon:hover {
   color: rgba(255, 255, 255, 0.9); /* hover 时的图标颜色 */
   transform: translateY(-2px); /* hover 时上浮距离 */
+}
+
+/* 方形头像版本：占满整个面板宽度（面板自带 1.5rem 内边距形成间隙），
+   1:1 方形圆角 + 阴影 */
+.avatar-square {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 /* 紧凑版（首页左列） */

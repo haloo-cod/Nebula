@@ -5,15 +5,10 @@
     >
       <!-- 面板区域 -->
       <div class="panels-wrapper">
-        <!-- 移动端标题（打字机），位于面板上方 -->
-        <div class="md:hidden mb-4">
-          <SiteTitle size="sm" instant />
-        </div>
-
         <div class="panels-inner flex flex-col md:flex-row gap-6 items-start">
-          <!-- 左侧列：移动端只保留头像面板 -->
+          <!-- 左侧列：移动端隐藏（进入文章后不再需要头像面板） -->
           <div
-            class="left-column post-rise w-full md:w-[22%] flex-shrink-0 flex flex-col gap-6"
+            class="left-column post-rise hidden md:flex w-full md:w-[22%] flex-shrink-0 flex-col gap-6"
             style="--rise-delay: 0.05s"
           >
             <ProfilePanel
@@ -52,7 +47,7 @@
             style="--rise-delay: 0.1s"
           >
             <CalendarPanel flat />
-            <PlaceholderPanel flat />
+            <PostStatsChart flat />
           </div>
         </div>
       </div>
@@ -64,11 +59,11 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
-import SiteTitle from '@/components/SiteTitle.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import ProfilePanel from '@/components/panels/ProfilePanel.vue'
 import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
 import CalendarPanel from '@/components/panels/CalendarPanel.vue'
+import PostStatsChart from '@/components/panels/PostStatsChart.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPost, renderPost } from '@/data/posts'
 
@@ -110,10 +105,16 @@ function goBack() {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: 5rem;
+  margin-top: 0; /* 移动端紧贴顶部（pt-24 已留出导航空间） */
   max-width: 96rem; /* 与首页一致 */
   padding-left: 0.25rem; /* 与首页一致，距屏幕更近 */
   padding-right: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .panels-wrapper {
+    margin-top: 5rem;
+  }
 }
 
 .panels-inner {

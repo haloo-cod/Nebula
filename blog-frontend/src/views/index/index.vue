@@ -33,26 +33,21 @@
                 :name="profile.name"
                 :bio="profile.bio"
                 :links="socialLinks"
-                compact
+                :compact="false"
+                square
                 flat
               />
               <PlaceholderPanel class="hidden md:flex" flat />
             </div>
           </div>
-          <!-- 中间面板 - 博文列表 -->
+          <!-- 中间面板 - 博文列表（卡片样式） -->
           <div class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0">
             <GlassPanel class="right-panel">
               <div class="panel-body">
                 <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
-                <ul class="post-list">
-                  <li v-for="post in posts" :key="post.slug">
-                    <RouterLink :to="`/post/${post.slug}`" class="post-item">
-                      <span class="post-title">{{ post.title }}</span>
-                      <span class="post-date" v-if="post.date">{{ post.date }}</span>
-                      <span class="post-desc" v-if="post.description">{{ post.description }}</span>
-                    </RouterLink>
-                  </li>
-                </ul>
+                <div class="post-list">
+                  <PostCard v-for="post in posts" :key="post.slug" :post="post" />
+                </div>
               </div>
             </GlassPanel>
           </div>
@@ -60,7 +55,7 @@
           <div class="right-column sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0">
             <div class="flex flex-col gap-6">
               <CalendarPanel flat />
-              <PlaceholderPanel flat />
+              <PostStatsChart flat />
             </div>
           </div>
         </div>
@@ -84,13 +79,14 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import SiteTitle from '@/components/SiteTitle.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import ProfilePanel from '@/components/panels/ProfilePanel.vue'
 import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
 import CalendarPanel from '@/components/panels/CalendarPanel.vue'
+import PostCard from '@/components/panels/PostCard.vue'
+import PostStatsChart from '@/components/panels/PostStatsChart.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
 
@@ -174,26 +170,11 @@ onUnmounted(() => {
   padding-bottom: 800px;
 }
 
-/* 博文列表 */
+/* 博文列表（卡片网格） */
 .post-list {
-  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-}
-
-.post-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.25rem 1.25rem;
-  border-radius: 0.75rem;
-  transition: background 0.2s ease;
-  text-decoration: none;
-}
-
-.post-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  gap: 1rem;
 }
 
 /* 右侧面板 - 桌面端独立滚动 */
@@ -205,40 +186,18 @@ onUnmounted(() => {
   }
 }
 
-.post-title {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.5;
-}
-
-.post-date {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.post-desc {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.65;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 /* ============================================
    标题上移动画
    ============================================ */
 .title-pos {
   top: 42vh;
-  transform: translateY(-50%) translateZ(0);
+  transform: translateY(-90%) translateZ(0);
   transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
 .title-up {
-  transform: translateY(calc(-50% - 160px));
+  transform: translateY(calc(-90% - 160px));
 }
 
 /* 上滑按钮 */
@@ -280,7 +239,7 @@ button:hover .arrow-icon {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  margin-top: calc(42vh - 80px);
+  margin-top: 4rem; /* 移动端紧贴顶部（pt-24 已留出导航空间） */
   max-height: 2000px;
   max-width: 96rem; /* 面板区域最大宽度 */
   padding-left: 0.25rem; /* 距屏幕左边 */
@@ -289,6 +248,13 @@ button:hover .arrow-icon {
     transform 1.1s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1); /* 展开动画：位移+淡入同步 */
   will-change: transform, opacity;
+}
+
+/* 桌面端：面板从屏幕中部偏下起始，配合上滑展开动画 */
+@media (min-width: 768px) {
+  .panels-wrapper {
+    margin-top: calc(42vh - 80px);
+  }
 }
 
 .panels-collapsed {

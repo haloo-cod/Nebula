@@ -62,6 +62,21 @@ export function getPosts() {
   return posts
 }
 
+// 按年份统计发表博客数量，返回按时间升序排列的 [{ label, count }]
+// 用于右侧折线图：x 轴为时间（年），y 轴为发表数量
+export function getPostStats() {
+  const counts = new Map()
+  for (const p of posts) {
+    if (p.draft || !p.date) continue
+    const year = String(p.date).slice(0, 4)
+    if (!/^\d{4}$/.test(year)) continue
+    counts.set(year, (counts.get(year) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => Number(a.label) - Number(b.label))
+}
+
 export function getPost(slug) {
   return posts.find((p) => p.slug === slug) || null
 }
