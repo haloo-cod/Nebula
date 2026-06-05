@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/archive/archive.vue'),
     },
     {
+      path: '/gallery',
+      name: 'gallery',
+      component: () => import('../views/gallery/gallery.vue'),
+    },
+    {
       path: '/friends',
       name: 'friends',
       component: () => import('../views/friends/friends.vue'),

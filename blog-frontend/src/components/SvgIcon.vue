@@ -5,27 +5,41 @@
 <script setup>
 import { computed } from 'vue'
 
-// 一次性收集 iconfont 下所有 svg 的最终 URL
-// 注意：import.meta.glob 的模式必须是相对路径，不支持 @ 别名
-const iconUrls = import.meta.glob('../assets/iconfont/*.svg', {
+const iconUrls = import.meta.glob('../assets/iconfont/goole/*.svg', {
   query: '?url',
   import: 'default',
   eager: true,
 })
+
+// 短名 → Google 文件名前缀映射
+const nameMap = {
+  home: 'home',
+  archive: 'box',
+  friends: 'group',
+  gift: 'featured_seasonal_and_gifts',
+  about: 'info',
+  gallery: 'account_circle',
+  international: 'globe_asia',
+  menu: 'menu',
+  arrow_up: 'arrow_upward',
+  settings: 'settings',
+}
 
 const props = defineProps({
   name: { type: String, required: true },
 })
 
 const maskUrl = computed(() => {
-  const entry = Object.entries(iconUrls).find(([path]) => path.endsWith(`/${props.name}.svg`))
+  const prefix = nameMap[props.name] ?? props.name
+  const entry = Object.entries(iconUrls).find(([path]) => {
+    const file = path.split('/').pop()
+    return file.startsWith(prefix + '_') || file === prefix + '.svg'
+  })
   return entry ? `url("${entry[1]}")` : 'none'
 })
 </script>
 
 <style scoped>
-/* 用 mask 渲染单色图标，颜色跟随 currentColor，可随选中态变化
-   通过 CSS 变量注入 url，避免 Vue 内联样式无法正确输出 -webkit- 前缀的问题 */
 .svg-icon {
   display: inline-block;
   width: 1em;

@@ -98,6 +98,7 @@ function onDocumentClick(e) {
 const navItems = [
   { label: '首页', path: '/', icon: 'home' },
   { label: '归档', path: '/archive', icon: 'archive' },
+  { label: '展览', path: '/gallery', icon: 'gallery' },
   { label: '友链', path: '/friends', icon: 'friends' },
   { label: '藏宝阁', path: '/treasure', icon: 'gift' },
   { label: '关于', path: '/about', icon: 'about' },

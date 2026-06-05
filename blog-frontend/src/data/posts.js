@@ -6,7 +6,7 @@ const rawFiles = import.meta.glob('../assets/md/*.md', {
 })
 
 function parseFrontmatter(raw) {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  const match = raw.replace(/^\uFEFF/, '').match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (!match) return { data: {}, content: raw }
   const data = {}
   for (const line of match[1].split('\n')) {

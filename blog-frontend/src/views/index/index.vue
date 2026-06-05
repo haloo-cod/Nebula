@@ -15,10 +15,7 @@
       <!-- 面板区域 -->
       <div
         class="panels-wrapper"
-        :class="[
-          isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed',
-          cameFromInApp ? 'panels-arrive' : '',
-        ]"
+        :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
       >
         <!-- 移动端标题（打字机），位于面板上方 -->
         <div class="md:hidden mb-4">
@@ -41,12 +38,23 @@
             </div>
           </div>
           <!-- 中间面板 - 博文列表（卡片样式） -->
-          <div class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0">
+          <div class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0" :class="cameFromInApp ? 'panels-arrive' : ''">
             <GlassPanel class="right-panel">
               <div class="panel-body">
-                <div v-if="posts.length === 0" class="text-white/50 text-sm">加载中...</div>
                 <div class="post-list">
-                  <PostCard v-for="post in posts" :key="post.slug" :post="post" />
+                  <PostCard v-for="post in pagedPosts" :key="post.slug" :post="post" />
+                </div>
+                <!-- 分页栏 -->
+                <div v-if="totalPages > 1" class="pagination">
+                  <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+                  <button
+                    v-for="p in totalPages"
+                    :key="p"
+                    class="page-btn"
+                    :class="{ 'page-btn-active': p === currentPage }"
+                    @click="currentPage = p"
+                  >{{ p }}</button>
+                  <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
                 </div>
               </div>
             </GlassPanel>
@@ -78,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import SiteTitle from '@/components/SiteTitle.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
@@ -100,6 +108,14 @@ const showContent = ref(isMobile.value || cameFromInApp)
 const instantTitle = cameFromInApp
 
 const posts = ref([])
+const currentPage = ref(1)
+const PAGE_SIZE = 8
+
+const totalPages = computed(() => Math.ceil(posts.value.length / PAGE_SIZE))
+const pagedPosts = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return posts.value.slice(start, start + PAGE_SIZE)
+})
 
 function handleSlideUp() {
   if (showContent.value) return
@@ -167,7 +183,7 @@ onUnmounted(() => {
     ============================================ */
 .panel-body {
   color: rgba(255, 255, 255, 0.7);
-  padding-bottom: 800px;
+  padding-bottom: 2rem;
 }
 
 /* 博文列表（卡片网格） */
@@ -177,11 +193,51 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
+/* 分页栏 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+}
+
+.page-btn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(140, 185, 255, 0.12);
+  border-color: rgba(140, 185, 255, 0.35);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.page-btn-active {
+  background: rgba(140, 185, 255, 0.2);
+  border-color: rgba(140, 185, 255, 0.5);
+  color: rgba(200, 225, 255, 1);
+  font-weight: 600;
+}
+
 /* 右侧面板 - 桌面端独立滚动 */
 @media (min-width: 768px) {
   .sticky-panel {
     position: sticky;
-    top: 160px; /* 导航栏高度 + 间距，离顶部更远 */
+    top: 100px; /* 导航栏高度 + 间距 */
     align-self: flex-start; /* 防止被拉伸 */
   }
 }

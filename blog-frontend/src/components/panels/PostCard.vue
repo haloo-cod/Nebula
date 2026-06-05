@@ -27,8 +27,8 @@ defineProps({
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  min-height: 140px; /* 卡片高度可以大一点 */
-  padding: 1.5rem 1.5rem;
+  min-height: 180px;
+  padding: 1.75rem 1.75rem;
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
