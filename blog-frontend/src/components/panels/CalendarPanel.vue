@@ -49,14 +49,25 @@
   </GlassPanel>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import GlassPanel from './GlassPanel.vue'
 import { getSolarTerms, getHolidays, pickMonthHolidays } from '@/data/calendar'
+import type { HolidayDay } from '@/types'
 
-defineProps({
-  flat: { type: Boolean, default: false },
+withDefaults(defineProps<{ flat?: boolean }>(), {
+  flat: false,
 })
+
+/** 单个日期格子的数据(null 表示月初的占位空格) */
+interface DayCell {
+  day: number // 日期数字
+  isToday: boolean // 是否今天
+  isWeekend: boolean // 是否周末
+  holiday: HolidayDay | null // 节假日信息(无则为 null)
+  label: string // 副标题(节气优先,其次节假日名)
+  term: string | undefined // 当天节气名
+}
 
 const weekLabels = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -66,19 +77,19 @@ const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
 const viewYear = ref(now.getFullYear())
 const viewMonth = ref(now.getMonth() + 1) // 1-12
 
-const solarTerms = ref({}) // { day: '节气' }
-const holidays = ref({}) // { day: { name, isOff, isWork } }
+const solarTerms = ref<Record<number, string>>({}) // { day: '节气' }
+const holidays = ref<Record<number, HolidayDay>>({}) // { day: { name, isOff, isWork } }
 
 const isCurrentMonth = computed(
   () => viewYear.value === now.getFullYear() && viewMonth.value === now.getMonth() + 1,
 )
 
-const cells = computed(() => {
+const cells = computed<(DayCell | null)[]>(() => {
   const year = viewYear.value
   const month = viewMonth.value
   const firstWeekday = new Date(year, month - 1, 1).getDay() // 0=周日
   const daysInMonth = new Date(year, month, 0).getDate()
-  const list = []
+  const list: (DayCell | null)[] = []
   for (let i = 0; i < firstWeekday; i++) list.push(null)
   for (let day = 1; day <= daysInMonth; day++) {
     const weekday = new Date(year, month - 1, day).getDay()
@@ -98,8 +109,8 @@ const cells = computed(() => {
   return list
 })
 
-function cellTitle(cell) {
-  const parts = []
+function cellTitle(cell: DayCell): string {
+  const parts: string[] = []
   if (cell.term) parts.push(`节气：${cell.term}`)
   if (cell.holiday)
     parts.push(cell.holiday.isOff ? `放假：${cell.holiday.name}` : `补班：${cell.holiday.name}`)

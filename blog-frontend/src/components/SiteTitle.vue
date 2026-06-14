@@ -6,15 +6,22 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 
-const props = defineProps({
-  text: { type: String, default: "Starlitn'blog" },
-  size: { type: String, default: 'lg' }, // 'lg' 桌面大标题 | 'sm' 移动端
-  instant: { type: Boolean, default: false },
-})
+const props = withDefaults(
+  defineProps<{
+    text?: string // 要显示的标题文本
+    size?: 'lg' | 'sm' // 'lg' 桌面大标题 | 'sm' 移动端
+    instant?: boolean // 是否跳过打字机动画直接显示
+  }>(),
+  {
+    text: "Starlitn'blog",
+    size: 'lg',
+    instant: false,
+  },
+)
 
 const { displayed, done } = useTypewriter(props.text, { instant: props.instant })
 

@@ -1,0 +1,34 @@
+{
+  // 应用源码(src/)的 TS 配置。Node 侧的配置文件(vite/vitest)见 tsconfig.node.json
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+
+    // 严格模式全开,最大化类型安全
+    "strict": true,
+    // 未使用的局部变量/参数会报错,保持代码整洁
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // switch 语句贯穿(缺 break)报错
+    "noFallthroughCasesInSwitch": true,
+
+    // 路径别名,与 vite.config 保持一致(无 baseUrl 时相对 tsconfig 解析)
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    // Vue SFC 需要保留原始语法由 vue-tsc 处理
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    // 只做类型检查,不产出文件(实际打包交给 vite)
+    "noEmit": true,
+    "useDefineForClassFields": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
+  "exclude": ["node_modules", "dist"]
+}

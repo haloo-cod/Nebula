@@ -7,4 +7,5 @@ tags: []
 draft: false
 pinned: false
 ---
+
 用 Pinia 替代 Vuex 的基本用法。

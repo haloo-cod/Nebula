@@ -1,0 +1,15 @@
+{
+  // 构建工具配置文件(运行在 Node 环境)的 TS 配置
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // 允许在配置文件里使用 import.meta.url 等 Node ESM 特性
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}

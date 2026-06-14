@@ -5,7 +5,7 @@
         <div class="panels-container md:flex md:gap-6">
           <!-- 左侧列 -->
           <div
-            class="sticky-panel w-full md:w-[22%] flex-shrink-0"
+            class="sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0"
             :class="fromHome ? '' : 'side-rise'"
             style="--rise-delay: 0s"
           >
@@ -44,7 +44,7 @@
                       :class="i % 2 === 0 ? 'post-row-left' : 'post-row-right'"
                     >
                       <RouterLink
-                        :to="`/post/${post.slug}`"
+                        :to="`/archive/post/${post.slug}`"
                         class="post-card"
                         :class="i % 2 === 0 ? 'card-left' : 'card-invisible'"
                       >
@@ -61,7 +61,7 @@
                       </div>
 
                       <RouterLink
-                        :to="`/post/${post.slug}`"
+                        :to="`/archive/post/${post.slug}`"
                         class="post-card"
                         :class="i % 2 === 1 ? 'card-right' : 'card-invisible'"
                       >
@@ -100,7 +100,7 @@
   </PageBackground>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
@@ -111,28 +111,37 @@ import CalendarPanel from '@/components/panels/CalendarPanel.vue'
 import PostStatsChart from '@/components/panels/PostStatsChart.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
+import type { Post } from '@/types'
 
+// 是否由首页跳转而来(有则跳过侧栏入场动画)
 const fromHome = !!history.state?.back
 
 const posts = getPosts()
 
-const groups = computed(() => {
-  const map = new Map()
+/** 按年份分组的文章 */
+interface YearGroup {
+  year: string // 年份(或 '未知')
+  posts: Post[] // 该年文章
+}
+
+const groups = computed<YearGroup[]>(() => {
+  const map = new Map<string, Post[]>()
   for (const p of posts) {
     if (p.draft) continue
     const year = p.date ? String(p.date).slice(0, 4) : '未知'
     if (!map.has(year)) map.set(year, [])
-    map.get(year).push(p)
+    map.get(year)!.push(p)
   }
   return [...map.entries()]
     .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([year, posts]) => ({ year, posts }))
+    .map(([year, posts]): YearGroup => ({ year, posts }))
 })
 
-function formatDate(dateStr) {
+/** 把日期字符串格式化为 MM-DD,无效则原样返回 */
+function formatDate(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
-  if (isNaN(d)) return dateStr
+  if (isNaN(d.getTime())) return dateStr
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 </script>
@@ -361,20 +370,105 @@ function formatDate(dateStr) {
 }
 
 @media (max-width: 767px) {
-  .post-row {
-    grid-template-columns: 0 2rem 1fr;
+  .panels-wrapper {
+    /* 移动端顶部导航是 fixed，需要额外留白，避免归档面板贴近或压到上方按钮。 */
+    margin-top: 6rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
+
+  .archive-panel {
+    padding: 1.1rem;
+  }
+
+  .archive-heading {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .timeline {
+    padding-bottom: 0.25rem;
+  }
+
+  .year-node {
+    position: relative;
+    align-items: flex-start;
+    padding-left: 2rem;
+  }
+
+  .year-line-top,
+  .year-line-bottom {
+    position: absolute;
+    left: 0.95rem;
+  }
+
+  .year-line-top {
+    top: 0;
+    height: 1.25rem;
+  }
+
+  .year-line-bottom {
+    top: 1.95rem;
+    bottom: 0;
+    height: auto;
+  }
+
+  .year-badge {
+    padding: 0.22rem 0.95rem;
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+  }
+
+  .post-row {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .axis {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
   .card-invisible {
     display: none;
   }
+
   .post-row-left .card-left {
-    display: none;
+    display: flex;
   }
-  .post-row-right .card-right,
-  .post-row-left .card-invisible {
+
+  .post-row-left .card-left,
+  .post-row-right .card-right {
+    grid-column: 2;
+    grid-row: 1;
     display: flex;
     visibility: visible;
     pointer-events: auto;
+    text-align: left;
+    margin: 0.45rem 0 0.45rem 0.25rem;
+  }
+
+  .post-card {
+    padding: 0.8rem 0.9rem;
+    border-radius: 0.85rem;
+  }
+
+  .post-title {
+    font-size: 0.95rem;
+  }
+
+  .post-desc {
+    font-size: 0.78rem;
+  }
+
+  .post-cat,
+  .card-left .post-cat {
+    align-self: flex-start;
+  }
+
+  .timeline-end {
+    align-items: flex-start;
+    padding-left: calc(1rem - 3px);
   }
 }
 </style>

@@ -14,12 +14,12 @@
   </RouterLink>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import type { Post } from '@/types'
 
-defineProps({
-  post: { type: Object, required: true },
-})
+// 文章卡片展示的数据
+defineProps<{ post: Post }>()
 </script>
 
 <style scoped>

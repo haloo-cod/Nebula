@@ -18,7 +18,7 @@
         :class="isMobile ? 'panels-expanded' : showContent ? 'panels-expanded' : 'panels-collapsed'"
       >
         <!-- 移动端标题（打字机），位于面板上方 -->
-        <div class="md:hidden mb-4">
+        <div class="md:hidden mb-4 mt-16">
           <SiteTitle size="sm" :instant="instantTitle" />
         </div>
         <div class="panels-container md:flex md:gap-6">
@@ -38,7 +38,10 @@
             </div>
           </div>
           <!-- 中间面板 - 博文列表（卡片样式） -->
-          <div class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0" :class="cameFromInApp ? 'panels-arrive' : ''">
+          <div
+            class="right-panel-wrapper w-full md:w-[56%] flex-shrink-0"
+            :class="cameFromInApp ? 'panels-arrive' : ''"
+          >
             <GlassPanel class="right-panel">
               <div class="panel-body">
                 <div class="post-list">
@@ -46,15 +49,25 @@
                 </div>
                 <!-- 分页栏 -->
                 <div v-if="totalPages > 1" class="pagination">
-                  <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+                  <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">
+                    ‹
+                  </button>
                   <button
                     v-for="p in totalPages"
                     :key="p"
                     class="page-btn"
                     :class="{ 'page-btn-active': p === currentPage }"
                     @click="currentPage = p"
-                  >{{ p }}</button>
-                  <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+                  >
+                    {{ p }}
+                  </button>
+                  <button
+                    class="page-btn"
+                    :disabled="currentPage === totalPages"
+                    @click="currentPage++"
+                  >
+                    ›
+                  </button>
                 </div>
               </div>
             </GlassPanel>
@@ -85,7 +98,7 @@
   </PageBackground>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import SiteTitle from '@/components/SiteTitle.vue'
@@ -97,6 +110,7 @@ import PostCard from '@/components/panels/PostCard.vue'
 import PostStatsChart from '@/components/panels/PostStatsChart.vue'
 import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
+import type { Post } from '@/types'
 
 const isMobile = ref(window.innerWidth < 768)
 
@@ -107,7 +121,7 @@ const showContent = ref(isMobile.value || cameFromInApp)
 // 仅站内跳转时直接显示完整标题；刷新/直接进入则播放打字机
 const instantTitle = cameFromInApp
 
-const posts = ref([])
+const posts = ref<Post[]>([])
 const currentPage = ref(1)
 const PAGE_SIZE = 8
 
@@ -134,27 +148,28 @@ function removeListeners() {
 let startY = 0
 let isDragging = false
 
-function getClientY(e) {
-  return e.touches ? e.touches[0].clientY : e.clientY
+// 兼容鼠标与触摸事件,取纵向坐标
+function getClientY(e: MouseEvent | TouchEvent): number {
+  return 'touches' in e ? e.touches[0].clientY : e.clientY
 }
 
-function onStart(e) {
+function onStart(e: MouseEvent | TouchEvent) {
   if (showContent.value) return
   startY = getClientY(e)
   isDragging = true
 }
 
-function onEnd(e) {
+function onEnd(e: MouseEvent | TouchEvent) {
   if (!isDragging) return
   isDragging = false
-  const endY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY
+  const endY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY
   const deltaY = startY - endY
   if (deltaY > 50) {
     handleSlideUp()
   }
 }
 
-function onWheel(e) {
+function onWheel(e: WheelEvent) {
   if (e.deltaY < 0) {
     handleSlideUp()
   }
@@ -212,7 +227,10 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .page-btn:hover:not(:disabled) {
@@ -310,6 +328,13 @@ button:hover .arrow-icon {
 @media (min-width: 768px) {
   .panels-wrapper {
     margin-top: calc(42vh - 80px);
+  }
+}
+
+/* 移动端：与归档页起始位置对齐 */
+@media (max-width: 767px) {
+  .panels-wrapper {
+    margin-top: 6rem;
   }
 }
 

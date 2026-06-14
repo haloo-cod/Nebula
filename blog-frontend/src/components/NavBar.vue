@@ -29,7 +29,7 @@
         <RouterLink
           :to="item.path"
           class="nav-link"
-          :class="route.path === item.path ? 'nav-link-active' : 'nav-link-inactive'"
+          :class="isActive(item.path) ? 'nav-link-active' : 'nav-link-inactive'"
           @click="closeMenu"
         >
           <SvgIcon :name="item.icon" class="nav-icon" />
@@ -57,7 +57,7 @@
           <RouterLink
             :to="item.path"
             class="mobile-link"
-            :class="route.path === item.path ? 'mobile-link-active' : 'mobile-link-inactive'"
+            :class="isActive(item.path) ? 'mobile-link-active' : 'mobile-link-inactive'"
             @click="closeMenu"
           >
             <SvgIcon :name="item.icon" class="nav-icon" />
@@ -69,8 +69,16 @@
   </nav>
 </template>
 
-<script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
+<script setup lang="ts">
+import {
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  computed,
+  type ComponentPublicInstance,
+} from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
@@ -78,24 +86,31 @@ import SvgIcon from '@/components/SvgIcon.vue'
 
 const currentLang = ref(getCurrentLang())
 const langOpen = ref(false)
-const translateRef = ref(null)
+const translateRef = ref<HTMLElement | null>(null)
 
 const currentLabel = computed(() => getLangLabel(currentLang.value))
 
-function switchLang(code) {
+function switchLang(code: string) {
   currentLang.value = code
   setLang(code)
   langOpen.value = false
 }
 
-function onDocumentClick(e) {
+function onDocumentClick(e: MouseEvent) {
   if (!langOpen.value) return
-  if (translateRef.value && !translateRef.value.contains(e.target)) {
+  if (translateRef.value && !translateRef.value.contains(e.target as Node)) {
     langOpen.value = false
   }
 }
 
-const navItems = [
+/** 导航项 */
+interface NavItem {
+  label: string // 显示名
+  path: string // 路由路径
+  icon: string // 图标短名(对应 SvgIcon 的 name)
+}
+
+const navItems: NavItem[] = [
   { label: '首页', path: '/', icon: 'home' },
   { label: '归档', path: '/archive', icon: 'archive' },
   { label: '展览', path: '/gallery', icon: 'gallery' },
@@ -106,12 +121,20 @@ const navItems = [
 
 const route = useRoute()
 const menuOpen = ref(false)
-const navListRef = ref(null)
-const itemRefs = ref([])
-const indicatorStyle = ref({ left: '0px', width: '0px', opacity: '0' })
+const navListRef = ref<HTMLElement | null>(null)
+const itemRefs = ref<(HTMLElement | null)[]>([])
+const indicatorStyle = ref<Record<string, string>>({ left: '0px', width: '0px', opacity: '0' })
 
-function setItemRef(el, index) {
-  itemRefs.value[index] = el
+function isActive(path: string): boolean {
+  // 首页:根路径,以及从首页进入的文章(/post/:slug)都锁定「首页」光标
+  if (path === '/') return route.path === '/' || route.path.startsWith('/post/')
+  // 其余项:精确匹配或作为前缀(如 /archive 锁定 /archive/post/:slug、/gallery 锁定 /gallery/:module)
+  return route.path === path || route.path.startsWith(path + '/')
+}
+
+// 模板 ref 回调:Vue 传入的元素类型较宽(元素或组件实例),这里收窄为 HTMLElement
+function setItemRef(el: Element | ComponentPublicInstance | null, index: number) {
+  itemRefs.value[index] = el as HTMLElement | null
 }
 
 function closeMenu() {
@@ -120,7 +143,7 @@ function closeMenu() {
 
 function updateIndicator() {
   if (!navListRef.value) return
-  const idx = navItems.findIndex((item) => item.path === route.path)
+  const idx = navItems.findIndex((item) => isActive(item.path))
   if (idx === -1) {
     indicatorStyle.value = { left: '0px', width: '0px', opacity: '0' }
     return
@@ -136,7 +159,7 @@ function updateIndicator() {
   }
 }
 
-let observer = null
+let observer: ResizeObserver | null = null
 
 onMounted(() => {
   nextTick(updateIndicator)

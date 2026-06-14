@@ -24,19 +24,31 @@
   </GlassPanel>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import GlassPanel from './GlassPanel.vue'
+import type { SocialLink } from '@/types'
+
 // 定义组件属性 约束父组件传入的数据类型和默认值
-defineProps({
-  avatar: { type: String, required: true },
-  name: { type: String, default: 'Starlit' },
-  bio: { type: String, default: '分享技术、生活和思考的个人博客' },
-  links: { type: Array, default: () => [] },
-  compact: { type: Boolean, default: false },
-  flat: { type: Boolean, default: false },
-  // square: 头像使用方形（圆角矩形）而非圆形
-  square: { type: Boolean, default: false },
-})
+withDefaults(
+  defineProps<{
+    avatar: string // 头像 URL(必填)
+    name?: string // 昵称
+    bio?: string // 简介
+    links?: SocialLink[] // 社交链接列表
+    compact?: boolean // 紧凑模式(首页左列)
+    flat?: boolean // 扁平样式(无毛玻璃)
+    // square: 头像使用方形(圆角矩形)而非圆形
+    square?: boolean
+  }>(),
+  {
+    name: 'Starlit',
+    bio: '分享技术、生活和思考的个人博客',
+    links: () => [],
+    compact: false,
+    flat: false,
+    square: false,
+  },
+)
 </script>
 
 <style scoped>

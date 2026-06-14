@@ -4,18 +4,18 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  compact: {
-    type: Boolean,
-    default: false,
+<script setup lang="ts">
+withDefaults(
+  defineProps<{
+    compact?: boolean // 紧凑模式,减小内边距
+    // flat: 去掉毛玻璃(backdrop-filter blur),仅保留半透明底色,用于两侧面板
+    flat?: boolean
+  }>(),
+  {
+    compact: false,
+    flat: false,
   },
-  // flat: 去掉毛玻璃（backdrop-filter blur），仅保留半透明底色，用于两侧面板
-  flat: {
-    type: Boolean,
-    default: false,
-  },
-})
+)
 </script>
 
 <style scoped>

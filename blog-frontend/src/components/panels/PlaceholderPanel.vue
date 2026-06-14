@@ -8,14 +8,21 @@
   </GlassPanel>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import GlassPanel from './GlassPanel.vue'
 
-defineProps({
-  icon: { type: String, default: '✦' },
-  text: { type: String, default: '更多内容' },
-  flat: { type: Boolean, default: false },
-})
+withDefaults(
+  defineProps<{
+    icon?: string // 占位图标
+    text?: string // 占位文案
+    flat?: boolean // 是否使用扁平(无毛玻璃)样式
+  }>(),
+  {
+    icon: '✦',
+    text: '更多内容',
+    flat: false,
+  },
+)
 </script>
 
 <style scoped>

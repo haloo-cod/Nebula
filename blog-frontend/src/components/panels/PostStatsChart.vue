@@ -40,13 +40,13 @@
   </GlassPanel>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import GlassPanel from './GlassPanel.vue'
 import { getPostStats } from '@/data/posts'
 
-defineProps({
-  flat: { type: Boolean, default: false },
+withDefaults(defineProps<{ flat?: boolean }>(), {
+  flat: false,
 })
 
 // SVG 视图坐标系（用 viewBox 自适应面板宽度）
@@ -62,11 +62,25 @@ const total = computed(() => stats.value.reduce((sum, s) => sum + s.count, 0))
 
 const maxCount = computed(() => Math.max(1, ...stats.value.map((s) => s.count)))
 
+/** y 轴刻度 */
+interface YTick {
+  value: number // 刻度数值
+  y: number // 对应的 SVG y 坐标
+}
+
+/** 折线上的一个数据点 */
+interface ChartPoint {
+  x: number
+  y: number
+  label: string // x 轴标签(年份)
+  count: number // 该点数量
+}
+
 // y 轴刻度（0 到 maxCount，最多 4 段）
-const yTicks = computed(() => {
+const yTicks = computed<YTick[]>(() => {
   const max = maxCount.value
   const step = Math.max(1, Math.ceil(max / 4))
-  const ticks = []
+  const ticks: YTick[] = []
   for (let v = 0; v <= max; v += step) {
     const y = padT + (H - padT - padB) * (1 - v / max)
     ticks.push({ value: v, y })
@@ -74,13 +88,13 @@ const yTicks = computed(() => {
   return ticks
 })
 
-const points = computed(() => {
+const points = computed<ChartPoint[]>(() => {
   const list = stats.value
   if (list.length === 0) return []
   const innerW = W - padL - padR
   const innerH = H - padT - padB
   const max = maxCount.value
-  return list.map((s, i) => {
+  return list.map((s, i): ChartPoint => {
     const x = list.length === 1 ? padL + innerW / 2 : padL + (innerW * i) / (list.length - 1)
     const y = padT + innerH * (1 - s.count / max)
     return { x, y, label: s.label, count: s.count }
