@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
+import FloatingPlayer from './components/music/FloatingPlayer.vue'
 
 onMounted(() => {
   const splash = document.getElementById('splash')
@@ -20,6 +21,7 @@ onMounted(() => {
     <NavBar />
     <RouterView />
     <BackToTop />
+    <FloatingPlayer />
   </div>
 </template>
 
