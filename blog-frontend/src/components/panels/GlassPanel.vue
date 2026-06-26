@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+// 玻璃面板组件，提供毛玻璃效果和统一的样式 ,黑色毛玻璃的面板组件
 withDefaults(
   defineProps<{
     compact?: boolean // 紧凑模式,减小内边距

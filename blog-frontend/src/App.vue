@@ -4,6 +4,9 @@ import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
+import { useUIStore } from '@/stores/ui'
+
+const ui = useUIStore()
 
 onMounted(() => {
   const splash = document.getElementById('splash')
@@ -18,10 +21,10 @@ onMounted(() => {
 
 <template>
   <div class="app-shell">
-    <NavBar />
+    <NavBar v-if="ui.showNavbar" />
     <RouterView />
-    <BackToTop />
-    <FloatingPlayer />
+    <BackToTop v-if="ui.showNavbar" />
+    <FloatingPlayer v-if="ui.showNavbar" />
   </div>
 </template>
 
@@ -34,7 +37,7 @@ html {
 /* 隐藏滚动条 - WebKit and old Edge */
 ::-webkit-scrollbar {
   width: 0px;
-  background: transparent; /* make scrollbar transparent */
+  background: transparent;
 }
 
 /* 隐藏滚动条 - Firefox */
@@ -45,6 +48,20 @@ html {
 /* 隐藏滚动条 - IE/Edge */
 html {
   -ms-overflow-style: none;
+}
+
+/* ============================================
+   玻璃表面 - 全站统一的毛玻璃样式
+   ============================================ */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 20px rgba(255, 255, 255, 0.08),
+    0 4px 32px rgba(0, 0, 0, 0.25);
 }
 </style>
 

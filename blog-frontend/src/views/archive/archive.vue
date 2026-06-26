@@ -1,99 +1,102 @@
 <template>
   <PageBackground>
-    <div class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full">
-      <div class="panels-wrapper">
-        <div class="panels-container md:flex md:gap-6">
-          <!-- 左侧列 -->
-          <div
-            class="sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0"
-            :class="fromHome ? '' : 'side-rise'"
-            style="--rise-delay: 0s"
+    <div class="page-wrap">
+      <div class="timeline-wrap post-rise-inner">
+        <div class="timeline-viewport">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="river-svg"
+            :width="svgW"
+            :height="svgH"
+            :viewBox="`0 0 ${svgW} ${svgH}`"
           >
-            <div class="flex flex-col gap-6">
-              <ProfilePanel
-                :avatar="avatar"
-                :name="profile.name"
-                :bio="profile.bio"
-                :links="socialLinks"
-                square
-                flat
-              />
-              <PlaceholderPanel class="hidden md:flex" flat />
-            </div>
-          </div>
+            <defs>
+              <linearGradient id="river-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="rgba(56,189,248,0.08)" />
+                <stop offset="20%" stop-color="rgba(99,179,237,0.6)" />
+                <stop offset="50%" stop-color="rgba(129,140,248,0.7)" />
+                <stop offset="80%" stop-color="rgba(167,139,250,0.5)" />
+                <stop offset="100%" stop-color="rgba(56,189,248,0.08)" />
+              </linearGradient>
+            </defs>
 
-          <!-- 中间面板 - 时间轴归档 -->
-          <div class="w-full md:w-[56%] flex-shrink-0">
-            <GlassPanel class="archive-panel">
-              <div class="post-rise-inner">
-                <h2 class="archive-heading">归档</h2>
-                <div class="timeline">
-                  <template v-for="group in groups" :key="group.year">
-                    <!-- 年份节点 -->
-                    <div class="year-node">
-                      <div class="year-line-top"></div>
-                      <div class="year-badge">{{ group.year }}</div>
-                      <div class="year-line-bottom"></div>
-                    </div>
+            <!-- 外层大发光 -->
+            <path :d="riverPath" class="river-glow-outer" />
+            <!-- 中层发光 -->
+            <path :d="riverPath" class="river-glow-mid" />
+            <!-- 内层发光 -->
+            <path :d="riverPath" class="river-glow-inner" />
+            <!-- 主曲线 -->
+            <path :d="riverPath" class="river-path" />
+            <!-- 流动粒子 -->
+            <circle class="particle" r="4">
+              <animateMotion dur="14s" repeatCount="indefinite" :path="riverPath" begin="0s" />
+            </circle>
+            <circle class="particle" r="3.5">
+              <animateMotion dur="18s" repeatCount="indefinite" :path="riverPath" begin="5s" />
+            </circle>
+            <circle class="particle" r="3">
+              <animateMotion dur="16s" repeatCount="indefinite" :path="riverPath" begin="9s" />
+            </circle>
 
-                    <!-- 该年文章：左右交替 -->
-                    <div
-                      v-for="(post, i) in group.posts"
-                      :key="post.slug"
-                      class="post-row"
-                      :class="i % 2 === 0 ? 'post-row-left' : 'post-row-right'"
-                    >
-                      <RouterLink
-                        :to="`/archive/post/${post.slug}`"
-                        class="post-card"
-                        :class="i % 2 === 0 ? 'card-left' : 'card-invisible'"
-                      >
-                        <span class="post-date">{{ formatDate(post.date) }}</span>
-                        <h3 class="post-title">{{ post.title }}</h3>
-                        <p v-if="post.description" class="post-desc">{{ post.description }}</p>
-                        <div v-if="post.category" class="post-cat">{{ post.category }}</div>
-                      </RouterLink>
+            <!-- 连接线 -->
+            <line
+              v-for="(n, i) in nodes"
+              :key="'cl' + i"
+              :x1="n.x"
+              :y1="n.y"
+              :x2="n.x"
+              :y2="i % 2 === 0 ? n.y - connLen : n.y + connLen"
+              class="conn-line"
+            />
+            <!-- 节点 -->
+            <circle
+              v-for="(n, i) in nodes"
+              :key="'nd' + i"
+              :cx="n.x"
+              :cy="n.y"
+              r="6"
+              class="node-dot"
+            />
+            <circle
+              v-for="(n, i) in nodes"
+              :key="'ng' + i"
+              :cx="n.x"
+              :cy="n.y"
+              r="14"
+              class="node-glow"
+            />
 
-                      <div class="axis">
-                        <div class="axis-line axis-line-top"></div>
-                        <div class="axis-dot"></div>
-                        <div class="axis-line axis-line-bottom"></div>
-                      </div>
-
-                      <RouterLink
-                        :to="`/archive/post/${post.slug}`"
-                        class="post-card"
-                        :class="i % 2 === 1 ? 'card-right' : 'card-invisible'"
-                      >
-                        <span class="post-date">{{ formatDate(post.date) }}</span>
-                        <h3 class="post-title">{{ post.title }}</h3>
-                        <p v-if="post.description" class="post-desc">{{ post.description }}</p>
-                        <div v-if="post.category" class="post-cat">{{ post.category }}</div>
-                      </RouterLink>
-                    </div>
-                  </template>
-
-                  <!-- 底部收尾线 -->
-                  <div class="timeline-end">
-                    <div class="end-line"></div>
-                    <div class="end-dot"></div>
-                  </div>
+            <!-- 卡片(foreignObject) -->
+            <foreignObject
+              v-for="(post, i) in posts"
+              :key="'fo' + post.slug"
+              :x="nodes[i].x - cardW / 2"
+              :y="i % 2 === 0 ? nodes[i].y - connLen - cardH : nodes[i].y + connLen"
+              :width="cardW"
+              :height="cardH"
+            >
+              <RouterLink
+                :to="`/archive/post/${post.slug}`"
+                class="post-card"
+                xmlns="http://www.w3.org/1999/xhtml"
+              >
+                <div class="card-cover" :style="{ background: coverGradient(i) }">
+                  <span class="card-cover-date">{{ formatDate(post.date) }}</span>
                 </div>
-              </div>
-            </GlassPanel>
-          </div>
-
-          <!-- 右侧列 -->
-          <div
-            class="sticky-panel hidden md:block w-full md:w-[22%] flex-shrink-0"
-            :class="fromHome ? '' : 'side-rise'"
-            style="--rise-delay: 0.05s"
-          >
-            <div class="flex flex-col gap-6">
-              <CalendarPanel flat />
-              <PostStatsChart flat />
-            </div>
-          </div>
+                <div class="card-body">
+                  <h3 class="card-title">{{ post.title }}</h3>
+                  <p v-if="post.description" class="card-desc">{{ post.description }}</p>
+                  <span
+                    v-if="post.category"
+                    class="card-cat"
+                    :class="'cat-' + catColorKey(post.category)"
+                    >{{ post.category }}</span
+                  >
+                </div>
+              </RouterLink>
+            </foreignObject>
+          </svg>
         </div>
       </div>
     </div>
@@ -104,40 +107,102 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
-import GlassPanel from '@/components/panels/GlassPanel.vue'
-import ProfilePanel from '@/components/panels/ProfilePanel.vue'
-import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
-import CalendarPanel from '@/components/panels/CalendarPanel.vue'
-import PostStatsChart from '@/components/panels/PostStatsChart.vue'
-import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPosts } from '@/data/posts'
-import type { Post } from '@/types'
 
-// 是否由首页跳转而来(有则跳过侧栏入场动画)
-const fromHome = !!history.state?.back
+const posts = getPosts().filter((p) => !p.draft)
 
-const posts = getPosts()
+// ============ 封面渐变池 ============
+const gradients = [
+  'linear-gradient(135deg, #1e293b, #334155)',
+  'linear-gradient(135deg, #1e293b, #0f3460)',
+  'linear-gradient(135deg, #1e293b, #1a365d)',
+  'linear-gradient(135deg, #0f172a, #1e3a5f)',
+  'linear-gradient(135deg, #1e293b, #2d1b4e)',
+]
 
-/** 按年份分组的文章 */
-interface YearGroup {
-  year: string // 年份(或 '未知')
-  posts: Post[] // 该年文章
+function coverGradient(i: number): string {
+  return gradients[i % gradients.length]
 }
 
-const groups = computed<YearGroup[]>(() => {
-  const map = new Map<string, Post[]>()
-  for (const p of posts) {
-    if (p.draft) continue
-    const year = p.date ? String(p.date).slice(0, 4) : '未知'
-    if (!map.has(year)) map.set(year, [])
-    map.get(year)!.push(p)
+// ============ 分类色标 ============
+const categoryColors: Record<string, string> = {
+  技术: 'cyan',
+  生活: 'violet',
+  随笔: 'pink',
+  项目: 'emerald',
+  教程: 'blue',
+  前端: 'sky',
+  后端: 'indigo',
+  AI: 'purple',
+  Rust: 'orange',
+  工具: 'teal',
+  算法: 'rose',
+  日记: 'amber',
+}
+
+function catColorKey(cat: string): string {
+  return categoryColors[cat] || 'slate'
+}
+
+// ============ 布局参数 ============
+const cardW = 280
+const cardH = 310
+const cardGap = 40
+const sidePad = 24
+const riverYTop = 40
+const riverYBot = 40
+const connLen = 18
+const riverAmplitude = 46
+
+const postX = (i: number) => sidePad + i * (cardW + cardGap)
+
+const trackW = computed(() =>
+  posts.length > 0 ? sidePad * 2 + posts.length * (cardW + cardGap) - cardGap : 600,
+)
+
+const riverCenterY = computed(() => riverYTop + cardH + connLen)
+const svgH = computed(() => riverYTop + cardH + connLen + connLen + cardH + riverYBot)
+const svgW = trackW
+
+// ============ 河流路径 ============
+const riverPath = computed(() => {
+  if (posts.length === 0) return 'M 0 0'
+  const total = trackW.value
+  const y = riverCenterY.value
+  const steps = 80
+  let d = `M 0 ${y} `
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const x = total * t
+    const dy =
+      Math.sin(t * Math.PI * 1.5) * riverAmplitude * 0.6 +
+      Math.sin(t * Math.PI * 3.7 + 0.8) * riverAmplitude * 0.3 +
+      Math.sin(t * Math.PI * 6.1 + 2.3) * riverAmplitude * 0.15
+    d += `L ${x.toFixed(1)} ${(y + dy).toFixed(1)} `
   }
-  return [...map.entries()]
-    .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([year, posts]): YearGroup => ({ year, posts }))
+  return d
 })
 
-/** 把日期字符串格式化为 MM-DD,无效则原样返回 */
+// ============ 节点位置 ============
+interface NodePoint {
+  x: number
+  y: number
+}
+
+const nodes = computed<NodePoint[]>(() => {
+  if (posts.length === 0) return []
+  return posts.map((_, i) => {
+    const x = postX(i) + cardW / 2
+    const t = x / Math.max(1, trackW.value)
+    const dy =
+      Math.sin(t * Math.PI * 1.5) * riverAmplitude * 0.6 +
+      Math.sin(t * Math.PI * 3.7 + 0.8) * riverAmplitude * 0.3 +
+      Math.sin(t * Math.PI * 6.1 + 2.3) * riverAmplitude * 0.15
+    return { x, y: riverCenterY.value + dy }
+  })
+})
+
+// ============ 日期格式化 ============
 function formatDate(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -147,38 +212,38 @@ function formatDate(dateStr: string): string {
 </script>
 
 <style scoped>
-.panels-wrapper {
+.page-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
   position: relative;
   z-index: 10;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 4rem;
   max-width: 96rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
+  margin: 0 auto;
+  padding: 5rem 1rem 2rem;
 }
 
 @media (min-width: 768px) {
-  .panels-wrapper {
-    margin-top: 100px;
-  }
-  .sticky-panel {
-    position: sticky;
-    top: 100px;
-    align-self: flex-start;
+  .page-wrap {
+    padding-top: 6rem;
+    padding-bottom: 4rem;
   }
 }
 
-/* ===== 进入动画（与 post 页一致） ===== */
+/* ===== 时间轴外容器 ===== */
+.timeline-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* ===== 入场动画 ===== */
 .post-rise-inner {
   animation: contentRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 0.15s;
-}
-
-.side-rise {
-  animation: contentRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--rise-delay, 0s);
 }
 
 @keyframes contentRise {
@@ -193,282 +258,289 @@ function formatDate(dateStr: string): string {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .post-rise-inner,
-  .side-rise {
+  .post-rise-inner {
     animation: none;
   }
 }
 
-.archive-heading {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  margin-bottom: 2rem;
-  letter-spacing: 0.05em;
+/* ===== 横向滚动视口 ===== */
+.timeline-viewport {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-.timeline {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  padding-bottom: 1rem;
+.timeline-viewport::-webkit-scrollbar {
+  height: 4px;
 }
 
-.year-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.timeline-viewport::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 2px;
 }
 
-.year-line-top {
-  width: 2px;
-  height: 1.5rem;
-  background: linear-gradient(to bottom, transparent, rgba(140, 185, 255, 0.4));
+.timeline-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
 }
 
-.year-badge {
-  padding: 0.25rem 1.25rem;
-  border-radius: 999px;
-  background: rgba(120, 170, 255, 0.18);
-  border: 1px solid rgba(140, 185, 255, 0.35);
-  color: rgba(180, 215, 255, 0.95);
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+/* ===== SVG 河流 ===== */
+.river-svg {
+  display: block;
+  overflow: visible;
 }
 
-.year-line-bottom {
-  width: 2px;
-  height: 1.5rem;
-  background: rgba(140, 185, 255, 0.35);
+.river-glow-outer {
+  fill: none;
+  stroke: rgba(99, 179, 237, 0.12);
+  stroke-width: 36;
+  stroke-linejoin: round;
+  filter: blur(20px);
 }
 
-.post-row {
-  display: grid;
-  grid-template-columns: 1fr 2rem 1fr;
-  align-items: stretch;
+.river-glow-mid {
+  fill: none;
+  stroke: rgba(99, 179, 237, 0.22);
+  stroke-width: 20;
+  stroke-linejoin: round;
+  filter: blur(10px);
 }
 
-.axis {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
+.river-glow-inner {
+  fill: none;
+  stroke: rgba(167, 139, 250, 0.3);
+  stroke-width: 10;
+  stroke-linejoin: round;
+  filter: blur(5px);
 }
 
-.axis-line {
-  flex: 1;
-  width: 2px;
-  background: rgba(140, 185, 255, 0.35);
+.river-path {
+  fill: none;
+  stroke: url(#river-grad);
+  stroke-width: 6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 10px rgba(99, 179, 237, 0.4));
 }
 
-.axis-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(160, 200, 255, 0.9);
-  border: 2px solid rgba(80, 120, 200, 0.6);
-  box-shadow: 0 0 8px rgba(140, 185, 255, 0.5);
-  flex-shrink: 0;
-  margin: 0.25rem 0;
+.node-dot {
+  fill: rgba(255, 255, 255, 1);
+  stroke: rgba(99, 179, 237, 0.7);
+  stroke-width: 3;
 }
 
+.node-glow {
+  fill: none;
+  stroke: rgba(99, 179, 237, 0.3);
+  stroke-width: 3;
+}
+
+.conn-line {
+  stroke: rgba(148, 163, 184, 0.4);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+
+/* ===== 流动粒子 ===== */
+.particle {
+  fill: rgba(200, 230, 255, 0.85);
+  filter: drop-shadow(0 0 6px rgba(99, 179, 237, 0.6));
+}
+
+/* ===== 卡片(foreignObject 内) ===== */
 .post-card {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.75rem 1rem;
-  margin: 0.4rem 0.5rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  height: 100%;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
   text-decoration: none;
   transition:
-    background 0.25s ease,
-    border-color 0.25s ease,
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease;
+  color: inherit;
 }
 
 .post-card:hover {
-  background: rgba(140, 185, 255, 0.1);
-  border-color: rgba(140, 185, 255, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(80, 120, 255, 0.15);
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(99, 179, 237, 0.4);
+  box-shadow:
+    0 12px 36px rgba(59, 130, 246, 0.18),
+    0 0 20px rgba(99, 179, 237, 0.08);
 }
 
-.card-invisible {
-  visibility: hidden;
-  pointer-events: none;
+.card-cover {
+  position: relative;
+  height: 130px;
+  flex-shrink: 0;
 }
 
-.card-left {
-  text-align: right;
-}
-
-.card-right {
-  text-align: left;
-}
-
-.post-date {
+.card-cover-date {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
   font-size: 0.82rem;
-  color: rgba(160, 200, 255, 0.9);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 3px 10px;
+  border-radius: 4px;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 
-.post-title {
-  font-size: 1rem;
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0 1rem 0.85rem;
+}
+
+.card-title {
+  font-size: 1.05rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
-  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.45;
   margin: 0;
-}
-
-.post-desc {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.5;
+  padding: 0.75rem 0 0.35rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.card-desc {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.55;
   margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
 }
 
-.post-cat {
-  font-size: 0.72rem;
-  color: rgba(160, 205, 255, 0.85);
-  padding: 0.15rem 0.6rem;
+.card-cat {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: rgba(140, 185, 255, 0.14);
-  border: 1px solid rgba(140, 185, 255, 0.28);
+  border: 1px solid;
   display: inline-block;
-  align-self: flex-end;
-}
-
-.card-left .post-cat {
+  margin-top: 0.35rem;
   align-self: flex-start;
 }
 
-.timeline-end {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* 分类颜色 */
+.cat-cyan {
+  color: rgba(34, 211, 238, 0.9);
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.25);
 }
 
-.end-line {
-  width: 2px;
-  height: 1.5rem;
-  background: linear-gradient(to bottom, rgba(140, 185, 255, 0.35), transparent);
+.cat-violet {
+  color: rgba(167, 139, 250, 0.9);
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.25);
 }
 
-.end-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(140, 185, 255, 0.4);
+.cat-pink {
+  color: rgba(244, 114, 182, 0.9);
+  background: rgba(244, 114, 182, 0.1);
+  border-color: rgba(244, 114, 182, 0.25);
 }
 
+.cat-emerald {
+  color: rgba(52, 211, 153, 0.9);
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.cat-blue {
+  color: rgba(96, 165, 250, 0.9);
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.cat-sky {
+  color: rgba(56, 189, 248, 0.9);
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.cat-indigo {
+  color: rgba(129, 140, 248, 0.9);
+  background: rgba(129, 140, 248, 0.1);
+  border-color: rgba(129, 140, 248, 0.25);
+}
+
+.cat-purple {
+  color: rgba(168, 85, 247, 0.9);
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.cat-orange {
+  color: rgba(251, 146, 60, 0.9);
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.25);
+}
+
+.cat-teal {
+  color: rgba(45, 212, 191, 0.9);
+  background: rgba(45, 212, 191, 0.1);
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
+.cat-rose {
+  color: rgba(251, 113, 133, 0.9);
+  background: rgba(251, 113, 133, 0.1);
+  border-color: rgba(251, 113, 133, 0.25);
+}
+
+.cat-amber {
+  color: rgba(252, 211, 77, 0.9);
+  background: rgba(252, 211, 77, 0.1);
+  border-color: rgba(252, 211, 77, 0.25);
+}
+
+.cat-slate {
+  color: rgba(148, 163, 184, 0.85);
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+/* ===== 移动端 ===== */
 @media (max-width: 767px) {
-  .panels-wrapper {
-    /* 移动端顶部导航是 fixed，需要额外留白，避免归档面板贴近或压到上方按钮。 */
-    margin-top: 6rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
+  .page-wrap {
+    padding-top: 6rem;
+    padding-bottom: 2rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    min-height: auto;
   }
 
-  .archive-panel {
-    padding: 1.1rem;
+  .card-cover {
+    height: 100px;
   }
 
-  .archive-heading {
-    margin-bottom: 1rem;
-    font-size: 1rem;
+  .card-title {
+    font-size: 0.92rem;
   }
 
-  .timeline {
-    padding-bottom: 0.25rem;
-  }
-
-  .year-node {
-    position: relative;
-    align-items: flex-start;
-    padding-left: 2rem;
-  }
-
-  .year-line-top,
-  .year-line-bottom {
-    position: absolute;
-    left: 0.95rem;
-  }
-
-  .year-line-top {
-    top: 0;
-    height: 1.25rem;
-  }
-
-  .year-line-bottom {
-    top: 1.95rem;
-    bottom: 0;
-    height: auto;
-  }
-
-  .year-badge {
-    padding: 0.22rem 0.95rem;
-    font-size: 0.82rem;
-    letter-spacing: 0.08em;
-  }
-
-  .post-row {
-    grid-template-columns: 2rem minmax(0, 1fr);
-    align-items: stretch;
-  }
-
-  .axis {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .card-invisible {
-    display: none;
-  }
-
-  .post-row-left .card-left {
-    display: flex;
-  }
-
-  .post-row-left .card-left,
-  .post-row-right .card-right {
-    grid-column: 2;
-    grid-row: 1;
-    display: flex;
-    visibility: visible;
-    pointer-events: auto;
-    text-align: left;
-    margin: 0.45rem 0 0.45rem 0.25rem;
-  }
-
-  .post-card {
-    padding: 0.8rem 0.9rem;
-    border-radius: 0.85rem;
-  }
-
-  .post-title {
-    font-size: 0.95rem;
-  }
-
-  .post-desc {
+  .card-desc {
     font-size: 0.78rem;
   }
 
-  .post-cat,
-  .card-left .post-cat {
-    align-self: flex-start;
-  }
-
-  .timeline-end {
-    align-items: flex-start;
-    padding-left: calc(1rem - 3px);
+  .card-cat {
+    font-size: 0.72rem;
   }
 }
 </style>

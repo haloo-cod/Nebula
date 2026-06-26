@@ -155,7 +155,6 @@ onMounted(loadMonth)
 
 <style scoped>
 .calendar-panel {
-  /* 宽度跟随右列（20%），如需更宽可在 index.vue 调整列宽 */
   min-height: 0;
 }
 
@@ -164,7 +163,7 @@ onMounted(loadMonth)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
 .cal-title {
@@ -175,14 +174,14 @@ onMounted(loadMonth)
 }
 
 .cal-ym {
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.02em;
 }
 
 .cal-today-btn {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.08);
   border: none;
@@ -200,7 +199,7 @@ onMounted(loadMonth)
 }
 
 .cal-nav {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   line-height: 1;
   color: rgba(255, 255, 255, 0.55);
   background: transparent;
@@ -222,7 +221,7 @@ onMounted(loadMonth)
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.15rem;
+  gap: 0.18rem;
 }
 
 /* 关键：grid 子项默认 min-width:auto，长文本（如"劳动节"）会撑破列宽导致溢出 */
@@ -236,7 +235,7 @@ onMounted(loadMonth)
 
 .cal-weekday {
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.4);
   padding: 0.2rem 0;
 }
@@ -269,7 +268,7 @@ onMounted(loadMonth)
 }
 
 .cal-num {
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   line-height: 1;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -279,9 +278,9 @@ onMounted(loadMonth)
 }
 
 .cal-sub {
-  font-size: 0.55rem;
+  font-size: 0.7rem;
   line-height: 1.1;
-  margin-top: 0.1rem;
+  margin-top: 0.08rem;
   color: rgba(140, 200, 255, 0.85);
   width: 100%;
   box-sizing: border-box;
@@ -308,7 +307,7 @@ onMounted(loadMonth)
   position: absolute;
   top: 1px;
   right: 2px;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   line-height: 1;
   padding: 0.05rem 0.12rem;
   border-radius: 0.2rem;

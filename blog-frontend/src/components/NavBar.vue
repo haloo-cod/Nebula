@@ -1,42 +1,52 @@
 <template>
-  <nav class="nav-bar">
-    <!-- 翻译切换按钮 + 下拉 -->
-    <div ref="translateRef" class="translate-wrap" translate="no">
-      <button class="translate-btn" @click.stop="langOpen = !langOpen">
-        <SvgIcon name="international" class="translate-icon" />
-        <span class="translate-label">{{ currentLabel }}</span>
-        <span class="translate-arrow" :class="{ 'is-open': langOpen }">▼</span>
-      </button>
-      <Transition name="lang-drop">
-        <ul v-if="langOpen" class="lang-menu">
-          <li
-            v-for="lang in languages"
-            :key="lang.code"
-            class="lang-item"
-            :class="currentLang === lang.code ? 'lang-item-active' : ''"
-            @click="switchLang(lang.code)"
-          >
-            {{ lang.label }}
-          </li>
-        </ul>
-      </Transition>
+  <header class="liquid-glass-nav">
+    <!-- 左侧：Logo + 翻译按钮 -->
+    <div class="nav-left">
+      <span class="logo">Starlit'blog</span>
+      <div ref="translateRef" class="translate-wrap" translate="no">
+        <button class="translate-btn" @click.stop="langOpen = !langOpen">
+          <SvgIcon name="international" class="translate-icon" />
+          <span class="translate-label">{{ currentLabel }}</span>
+          <span class="translate-arrow" :class="{ 'is-open': langOpen }">▼</span>
+        </button>
+        <Transition name="lang-drop">
+          <ul v-if="langOpen" class="lang-menu">
+            <li
+              v-for="lang in languages"
+              :key="lang.code"
+              class="lang-item"
+              :class="currentLang === lang.code ? 'lang-item-active' : ''"
+              @click="switchLang(lang.code)"
+            >
+              {{ lang.label }}
+            </li>
+          </ul>
+        </Transition>
+      </div>
     </div>
 
-    <!-- 桌面端导航 -->
-    <ul ref="navListRef" class="nav-list">
-      <li class="nav-indicator" :style="indicatorStyle"></li>
-      <li v-for="(item, index) in navItems" :key="item.path" :ref="(el) => setItemRef(el, index)">
-        <RouterLink
-          :to="item.path"
-          class="nav-link"
-          :class="isActive(item.path) ? 'nav-link-active' : 'nav-link-inactive'"
-          @click="closeMenu"
-        >
-          <SvgIcon :name="item.icon" class="nav-icon" />
-          <span class="nav-label">{{ item.label }}</span>
-        </RouterLink>
-      </li>
-    </ul>
+    <!-- 中部菜单（仅桌面端可见） -->
+    <nav class="nav-menu">
+      <RouterLink
+        v-for="item in navItems"
+        :key="item.path"
+        :to="item.path"
+        class="menu-item"
+        :class="{ active: isActive(item.path) }"
+        @click="closeMenu"
+      >
+        <SvgIcon :name="item.icon" class="menu-icon" />
+        <span class="menu-label">{{ item.label }}</span>
+        <div class="active-dot" v-if="isActive(item.path)"></div>
+      </RouterLink>
+    </nav>
+
+    <!-- 右侧功能区（仅桌面端可见） -->
+    <div class="nav-actions">
+      <button class="icon-btn" aria-label="设置">
+        <SvgIcon name="settings" class="action-icon" />
+      </button>
+    </div>
 
     <!-- 移动端菜单按钮 -->
     <button
@@ -66,19 +76,11 @@
         </li>
       </ul>
     </Transition>
-  </nav>
+  </header>
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  watch,
-  onMounted,
-  onUnmounted,
-  nextTick,
-  computed,
-  type ComponentPublicInstance,
-} from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
@@ -105,9 +107,9 @@ function onDocumentClick(e: MouseEvent) {
 
 /** 导航项 */
 interface NavItem {
-  label: string // 显示名
-  path: string // 路由路径
-  icon: string // 图标短名(对应 SvgIcon 的 name)
+  label: string
+  path: string
+  icon: string
 }
 
 const navItems: NavItem[] = [
@@ -121,370 +123,465 @@ const navItems: NavItem[] = [
 
 const route = useRoute()
 const menuOpen = ref(false)
-const navListRef = ref<HTMLElement | null>(null)
-const itemRefs = ref<(HTMLElement | null)[]>([])
-const indicatorStyle = ref<Record<string, string>>({ left: '0px', width: '0px', opacity: '0' })
 
 function isActive(path: string): boolean {
-  // 首页:根路径,以及从首页进入的文章(/post/:slug)都锁定「首页」光标
   if (path === '/') return route.path === '/' || route.path.startsWith('/post/')
-  // 其余项:精确匹配或作为前缀(如 /archive 锁定 /archive/post/:slug、/gallery 锁定 /gallery/:module)
   return route.path === path || route.path.startsWith(path + '/')
-}
-
-// 模板 ref 回调:Vue 传入的元素类型较宽(元素或组件实例),这里收窄为 HTMLElement
-function setItemRef(el: Element | ComponentPublicInstance | null, index: number) {
-  itemRefs.value[index] = el as HTMLElement | null
 }
 
 function closeMenu() {
   menuOpen.value = false
 }
 
-function updateIndicator() {
-  if (!navListRef.value) return
-  const idx = navItems.findIndex((item) => isActive(item.path))
-  if (idx === -1) {
-    indicatorStyle.value = { left: '0px', width: '0px', opacity: '0' }
-    return
-  }
-  const el = itemRefs.value[idx]
-  if (!el) return
-  const listRect = navListRef.value.getBoundingClientRect()
-  const itemRect = el.getBoundingClientRect()
-  indicatorStyle.value = {
-    left: `${itemRect.left - listRect.left}px`,
-    width: `${itemRect.width}px`,
-    opacity: '1',
-  }
-}
-
-let observer: ResizeObserver | null = null
-
 onMounted(() => {
-  nextTick(updateIndicator)
-  observer = new ResizeObserver(updateIndicator)
-  if (navListRef.value) observer.observe(navListRef.value)
   document.addEventListener('click', onDocumentClick)
 })
 
-watch(
-  () => route.path,
-  () => nextTick(updateIndicator),
-)
-
-// 语言切换后 translate.js 会异步替换 DOM 文本，延迟刷新指示器
-watch(currentLang, () => {
-  setTimeout(() => nextTick(updateIndicator), 300)
-})
-
 onUnmounted(() => {
-  observer?.disconnect()
   document.removeEventListener('click', onDocumentClick)
 })
 </script>
 
 <style scoped>
-.nav-bar {
+/* ============================================
+   液态玻璃导航栏 — 核心容器
+   暗底透明玻璃 + backdrop-filter + 镜面高光
+   ============================================ */
+.liquid-glass-nav {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
   z-index: 50;
   display: flex;
-  justify-content: center;
-  padding-top: 2rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 30px;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+
+  /* 极致通透：极低透明度 + 背景模糊 */
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0 0 16px 16px;
+
+  /* 液态玻璃边缘光晕 */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  /* 内高光折射 + 外悬浮阴影 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 20px rgba(255, 255, 255, 0.08),
+    0 4px 32px rgba(0, 0, 0, 0.25),
+    0 12px 60px rgba(0, 0, 0, 0.15);
 }
 
-/* 翻译按钮容器：锚定在面板左边缘（面板 max-width 96rem 居中），与面板共享中轴 */
+.nav-left,
+.nav-menu,
+.nav-actions {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================
+   左侧：Logo + 翻译
+   ============================================ */
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  user-select: none;
+  background: none;
+}
+
+/* 翻译按钮容器 */
 .translate-wrap {
-  position: absolute;
-  top: 2rem;
-  left: max(0.25rem, calc(50% - 48rem + 0.25rem));
-  z-index: 55;
+  position: relative;
 }
 
 .translate-btn {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 9px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 5px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition:
-    color 0.3s ease,
-    background 0.3s ease;
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.translate-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.3);
 }
 
 .translate-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .translate-label {
   white-space: nowrap;
 }
 
-.translate-btn:hover {
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.12);
-}
-
 .translate-arrow {
   font-size: 10px;
   transition: transform 0.3s ease;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
 }
 
 .translate-arrow.is-open {
   transform: rotate(180deg);
 }
 
-/* 语言下拉菜单 */
+/* 语言下拉菜单 — 液态玻璃,极高层级确保不被导航栏遮挡 */
 .lang-menu {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + 8px);
   left: 0;
-  min-width: 140px;
+  z-index: 1000;
+  min-width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem;
-  border-radius: 1rem;
-  background: rgba(30, 30, 50, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
-}
-
-/* 移动端菜单 */
-.mobile-menu {
-  position: fixed;
-  top: 6rem;
-  left: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 1.5rem;
-  background: rgba(30, 30, 50, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
-}
-
-@media (min-width: 768px) {
-  .mobile-menu {
-    display: none;
-  }
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(20, 20, 30, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 .lang-item {
-  padding: 10px 16px;
-  font-size: 15px;
+  padding: 9px 14px;
+  font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
-  border-radius: 0.75rem;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
   cursor: pointer;
+  white-space: nowrap;
   transition:
-    color 0.2s ease,
-    background 0.2s ease;
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
 .lang-item:hover {
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.08);
+  color: #3b82f6;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .lang-item-active {
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.12);
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+  font-weight: 600;
 }
 
-/* 下拉动画 */
 .lang-drop-enter-active {
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
 }
-
 .lang-drop-leave-active {
   transition: all 0.15s ease;
 }
-
 .lang-drop-enter-from {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
-
 .lang-drop-leave-to {
   opacity: 0;
   transform: translateY(-4px);
 }
 
-@media (max-width: 767px) {
-  .translate-wrap {
-    top: 2rem;
-    left: 1rem;
-  }
-
-  .translate-btn {
-    padding: 10px 20px;
-    font-size: 14px;
-  }
-}
-
-/* 桌面导航列表 */
-.nav-list {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .nav-list {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.6rem 1.5rem;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-}
-
-.nav-indicator {
-  position: absolute;
-  top: 10px;
-  height: calc(100% - 20px);
-  border-radius: 9999px;
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(16px);
-  box-shadow:
-    0 2px 24px rgba(255, 255, 255, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition:
-    left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
-    width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.3s ease;
-}
-
-.nav-link {
-  position: relative;
-  z-index: 10;
+/* ============================================
+   中部菜单（仅桌面端）
+   所有文字纯白 + text-shadow 确保星空背景可读
+   ============================================ */
+.nav-menu {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 10px 20px;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: 9999px;
-  transition: color 0.3s ease;
-  white-space: nowrap;
-  text-align: center;
-  line-height: 1.2;
+  gap: 4px;
 }
 
-.nav-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 9em;
+.menu-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
-.nav-link-inactive {
-  color: rgba(255, 255, 255, 0.55);
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.nav-link-inactive:hover {
-  color: rgba(255, 255, 255, 0.85);
+.menu-item.active {
+  color: #ffffff;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
 }
 
-.nav-link-active {
-  color: #1a1a2e;
-}
-
-.nav-icon {
-  font-size: 18px;
+.menu-icon {
+  font-size: 1.2rem;
   line-height: 1;
 }
 
-/* 移动端按钮 */
-.mobile-toggle {
-  position: absolute;
-  top: 2rem;
-  right: 1.5rem;
-  z-index: 60;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  cursor: pointer;
-  transition: background 0.3s ease;
+.menu-label {
+  font-size: 1rem;
 }
 
-@media (min-width: 768px) {
-  .mobile-toggle {
+/* 激活状态 — 带发光的蓝色小圆点指示器 */
+.active-dot {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #60a5fa;
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px rgba(96, 165, 250, 0.8),
+    0 0 16px rgba(96, 165, 250, 0.4),
+    0 0 24px rgba(96, 165, 250, 0.2);
+}
+
+/* ============================================
+   右侧功能区（仅桌面端）
+   ============================================ */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.action-icon {
+  font-size: 20px;
+}
+
+/* ============================================
+   移动端适配
+   ============================================ */
+@media (max-width: 767px) {
+  .liquid-glass-nav {
+    width: 100%;
+    height: 56px;
+    padding: 0 16px;
+    margin: 0;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .logo {
+    font-size: 1rem;
+  }
+
+  .translate-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .translate-label {
+    display: none;
+  }
+
+  .translate-icon {
+    font-size: 18px;
+  }
+
+  .translate-arrow {
     display: none;
   }
 }
 
+/* 移动端：隐藏桌面菜单和功能区 */
+@media (max-width: 767px) {
+  .nav-menu {
+    display: none;
+  }
+  .nav-actions {
+    display: none;
+  }
+}
+
+/* 桌面端：隐藏移动端汉堡按钮和下拉菜单 */
+@media (min-width: 769px) {
+  .mobile-toggle {
+    display: none !important;
+  }
+  .mobile-menu {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   移动端汉堡按钮
+   ============================================ */
+.mobile-toggle {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
 .mobile-toggle:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .mobile-toggle span {
   display: block;
-  width: 20px;
+  width: 18px;
   height: 2px;
-  background: rgba(255, 255, 255, 0.85);
+  background: #ffffff;
   border-radius: 2px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
   transition: all 0.3s ease;
   transform-origin: center;
 }
 
 .mobile-toggle.is-open span:nth-child(1) {
-  transform: translateY(8px) rotate(45deg);
+  transform: translateY(7px) rotate(45deg);
 }
-
 .mobile-toggle.is-open span:nth-child(2) {
   opacity: 0;
   transform: scaleX(0);
 }
-
 .mobile-toggle.is-open span:nth-child(3) {
-  transform: translateY(-8px) rotate(-45deg);
+  transform: translateY(-7px) rotate(-45deg);
 }
 
-/* 菜单动画 */
+/* ============================================
+   移动端下拉菜单
+   ============================================ */
+.mobile-menu {
+  position: fixed;
+  top: 88px;
+  left: 1rem;
+  right: 1rem;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 1.5rem;
+  background: rgba(20, 20, 40, 0.94);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 12px;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.mobile-link-inactive {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mobile-link-inactive:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mobile-link-active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* 移动端菜单动画 */
 .menu-slide-enter-active {
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
-
 .menu-slide-leave-active {
   transition: all 0.2s ease;
 }
-
 .menu-slide-enter-from {
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(-10px);
 }
-
 .menu-slide-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
 </style>

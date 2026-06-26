@@ -12,11 +12,11 @@
 </template>
 
 <script setup lang="ts">
-import bgImage from '@/assets/img/test3.jpg'
+import bgImage from '@/assets/img/test5.png'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
 withDefaults(defineProps<{ overlay?: number }>(), {
-  overlay: 0.25,
+  overlay: 0.15,
 })
 </script>
 
