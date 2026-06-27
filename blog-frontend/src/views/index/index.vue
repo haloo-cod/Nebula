@@ -4,14 +4,20 @@
       <!-- 面板区域（简介 + 占位） -->
       <div v-if="showUIElements" class="home-panels">
         <div class="home-panels-inner">
-          <HomeProfilePanel
-            :avatar="avatar"
-            :name="profile.name"
-            :bio="profile.bio"
-            :links="socialLinks"
-          />
-          <div class="right-panel-glass glass-surface">
-            <PlaceholderPanel icon="📅" text="日历" flat />
+          <div class="left-panel-glass">
+            <LiquidGlass :cornerRadius="16" theme="light" class="panel-liquid-glass">
+              <HomeProfilePanel
+                :avatar="avatar"
+                :name="profile.name"
+                :bio="profile.bio"
+                :links="socialLinks"
+              />
+            </LiquidGlass>
+          </div>
+          <div class="right-panel-glass">
+            <LiquidGlass :cornerRadius="16" theme="light" class="panel-liquid-glass">
+              <DataDashboard />
+            </LiquidGlass>
           </div>
         </div>
       </div>
@@ -32,7 +38,8 @@
 import { ref, watch, computed, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
-import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
+import DataDashboard from '@/components/panels/DataDashboard.vue'
+import LiquidGlass from '@/components/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
 import { avatar, profile, socialLinks } from '@/data/profile'
@@ -243,11 +250,16 @@ const containerClass = computed(() => {
   flex: 0 0 calc(40% - 10px);
 }
 
+.left-panel-glass,
 .right-panel-glass {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   border-radius: 16px;
+}
+
+.panel-liquid-glass {
+  flex: 1;
 }
 
 @media (max-width: 768px) {
