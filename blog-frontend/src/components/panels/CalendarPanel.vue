@@ -1,5 +1,5 @@
 <template>
-  <GlassPanel :flat="flat" class="calendar-panel">
+  <GlassPanel :flat="flat" class="calendar-panel" v-if="!flat">
     <!-- 头部：年月 + 切换 -->
     <div class="cal-header">
       <button class="cal-nav" @click="prevMonth" aria-label="上个月">‹</button>
@@ -15,7 +15,7 @@
       <span
         v-for="(w, i) in weekLabels"
         :key="w"
-        class="cal-weekday"
+        class="cal-weekday glass-subtle"
         :class="{ 'is-weekend': i === 0 || i === 6 }"
         >{{ w }}</span
       >
@@ -47,6 +47,56 @@
       </div>
     </div>
   </GlassPanel>
+  <template v-else>
+    <div class="cal-content-flat">
+    <!-- 头部：年月 + 切换 -->
+    <div class="cal-header">
+      <button class="cal-nav" @click="prevMonth" aria-label="上个月">‹</button>
+      <div class="cal-title">
+        <span class="cal-ym">{{ viewYear }}年{{ viewMonth }}月</span>
+        <button class="cal-today-btn" v-if="!isCurrentMonth" @click="goToday">回今天</button>
+      </div>
+      <button class="cal-nav" @click="nextMonth" aria-label="下个月">›</button>
+    </div>
+
+    <!-- 星期表头 -->
+    <div class="cal-grid cal-weekdays">
+      <span
+        v-for="(w, i) in weekLabels"
+        :key="w"
+        class="cal-weekday glass-subtle"
+        :class="{ 'is-weekend': i === 0 || i === 6 }"
+        >{{ w }}</span
+      >
+    </div>
+
+    <!-- 日期格子 -->
+    <div class="cal-grid cal-days">
+      <div
+        v-for="(cell, idx) in cells"
+        :key="idx"
+        class="cal-cell"
+        :class="{
+          'is-empty': !cell,
+          'is-today': cell && cell.isToday,
+          'is-weekend': cell && cell.isWeekend,
+          'is-off': cell && cell.holiday && cell.holiday.isOff,
+          'is-work': cell && cell.holiday && cell.holiday.isWork,
+        }"
+        :title="cell ? cellTitle(cell) : ''"
+      >
+        <template v-if="cell">
+          <span class="cal-num">{{ cell.day }}</span>
+          <span class="cal-sub" v-if="cell.label">{{ cell.label }}</span>
+          <span class="cal-tag" v-if="cell.holiday && cell.holiday.isOff">休</span>
+          <span class="cal-tag cal-tag-work" v-else-if="cell.holiday && cell.holiday.isWork"
+            >班</span
+          >
+        </template>
+      </div>
+    </div>
+    </div>
+  </template>
 </template>
 
 <script setup lang="ts">
@@ -158,12 +208,22 @@ onMounted(loadMonth)
   min-height: 0;
 }
 
+/* flat 模式下（包在 LiquidGlass 里），内容需要内边距 */
+.cal-content-flat {
+  padding: 0.6rem;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* 头部 */
 .cal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.4rem;
 }
 
 .cal-title {
@@ -174,19 +234,19 @@ onMounted(loadMonth)
 }
 
 .cal-ym {
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.02em;
 }
 
 .cal-today-btn {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.08);
   border: none;
-  border-radius: 0.4rem;
-  padding: 0.05rem 0.4rem;
+  border-radius: 0.35rem;
+  padding: 0.05rem 0.35rem;
   cursor: pointer;
   transition:
     color 0.2s ease,
@@ -199,13 +259,13 @@ onMounted(loadMonth)
 }
 
 .cal-nav {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: rgba(255, 255, 255, 0.55);
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0 0.35rem;
+  padding: 0 0.3rem;
   border-radius: 0.4rem;
   transition:
     color 0.2s ease,
@@ -221,7 +281,7 @@ onMounted(loadMonth)
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.18rem;
+  gap: 0.1rem;
 }
 
 /* 关键：grid 子项默认 min-width:auto，长文本（如"劳动节"）会撑破列宽导致溢出 */
@@ -230,29 +290,42 @@ onMounted(loadMonth)
 }
 
 .cal-weekdays {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
 }
 
 .cal-weekday {
   text-align: center;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.4);
-  padding: 0.2rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0 0.1rem;
+  height: 32px;
+  width: 100%;
+  border-radius: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
 .cal-weekday.is-weekend {
-  color: rgba(255, 180, 180, 0.55);
+  color: rgba(255, 180, 180, 0.7);
+}
+
+.cal-weekday.is-weekend {
+  color: rgba(255, 180, 180, 0.7);
 }
 
 /* 日期格子 */
 .cal-cell {
   position: relative;
-  aspect-ratio: 1 / 1;
+  height: 32px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 0.5rem;
+  border-radius: 0.3rem;
   transition: background 0.2s ease;
   min-width: 0;
   overflow: hidden;
@@ -268,20 +341,22 @@ onMounted(loadMonth)
 }
 
 .cal-num {
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .cal-cell.is-weekend .cal-num {
-  color: rgba(255, 190, 190, 0.85);
+  color: rgba(255, 190, 190, 0.95);
 }
 
 .cal-sub {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  font-weight: 500;
   line-height: 1.1;
-  margin-top: 0.08rem;
-  color: rgba(140, 200, 255, 0.85);
+  margin-top: 0.05rem;
+  color: rgba(160, 210, 255, 0.9);
   width: 100%;
   box-sizing: border-box;
   padding: 0 1px;
@@ -293,24 +368,24 @@ onMounted(loadMonth)
 
 /* 今天 */
 .cal-cell.is-today {
-  background: rgba(120, 170, 255, 0.22);
+  background: rgba(120, 170, 255, 0.25);
   box-shadow: inset 0 0 0 1px rgba(140, 190, 255, 0.5);
 }
 
 .cal-cell.is-today .cal-num {
   color: #fff;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 /* 放假/补班角标 */
 .cal-tag {
   position: absolute;
-  top: 1px;
-  right: 2px;
-  font-size: 0.6rem;
+  top: 0;
+  right: 1px;
+  font-size: 0.5rem;
   line-height: 1;
-  padding: 0.05rem 0.12rem;
-  border-radius: 0.2rem;
+  padding: 0.04rem 0.1rem;
+  border-radius: 0.15rem;
   color: #fff;
   background: rgba(80, 190, 120, 0.85); /* 休 */
 }
@@ -321,6 +396,6 @@ onMounted(loadMonth)
 
 /* 放假日数字微调色，增强可读性 */
 .cal-cell.is-off .cal-num {
-  color: rgba(150, 235, 180, 0.95);
+  color: rgba(150, 235, 180, 1);
 }
 </style>

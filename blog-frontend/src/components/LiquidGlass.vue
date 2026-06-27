@@ -42,7 +42,7 @@ const glassPresets = {
     ior: 1.1,
     highlightWidth: 3.5,
     blurRadius: 0.0,
-    overlayColor: [0.85, 0.9, 1.0] as [number, number, number],
+    overlayColor: [0.15, 0.2, 0.25] as [number, number, number],
     normalStrength: 6.4,
     displacementScale: 1.0,
     heightTransitionWidth: 8.0,
@@ -473,6 +473,19 @@ onMounted(() => {
 
   window.addEventListener('resize', resizeCanvas)
 
+  // 滚动时更新 canvas 偏移，使折射效果跟随页面实时变化
+  const handleScroll = () => {
+    const container = containerRef.value
+    if (!container || !gl) return
+    const rect = container.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
+  }
+
+  const containerEl = containerRef.value!
+  window.addEventListener('scroll', handleScroll, { passive: true })
+  ;(containerEl as any).__scrollHandler = handleScroll
+
   // 不立即启动渲染循环，等背景图加载完成后再开始（由 loadBgImage 中的 bgLoaded = true 触发）
   ;(containerRef.value as any).__resizeObserver = ro
 })
@@ -482,6 +495,8 @@ onUnmounted(() => {
   const ro = (containerRef.value as any)?.__resizeObserver as ResizeObserver | undefined
   if (ro) ro.disconnect()
   window.removeEventListener('resize', resizeCanvas)
+  const sh = (containerRef.value as any)?.__scrollHandler as (() => void) | undefined
+  if (sh) window.removeEventListener('scroll', sh)
 })
 </script>
 

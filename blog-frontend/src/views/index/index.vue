@@ -1,11 +1,11 @@
-<template>
+﻿<template>
   <PageBackground>
     <div class="home-root" :class="{ 'home-locked': !showUIElements }">
       <!-- 面板区域（简介 + 占位） -->
       <div v-if="showUIElements" class="home-panels">
         <div class="home-panels-inner">
           <div class="left-panel-glass">
-            <LiquidGlass :cornerRadius="16" theme="light" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
               <HomeProfilePanel
                 :avatar="avatar"
                 :name="profile.name"
@@ -15,7 +15,7 @@
             </LiquidGlass>
           </div>
           <div class="right-panel-glass">
-            <LiquidGlass :cornerRadius="16" theme="light" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
               <DataDashboard />
             </LiquidGlass>
           </div>
@@ -30,6 +30,31 @@
           </h1>
         </div>
       </div>
+
+      <!-- 下方面板区域 -->
+      <div v-if="showUIElements" class="home-bottom">
+        <div class="bottom-grid">
+          <!-- 左侧：轮播图 -->
+          <div class="bottom-left">
+            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+              <Carousel />
+            </LiquidGlass>
+          </div>
+          <!-- 右侧上：日历 -->
+          <div class="bottom-right-top">
+            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+              <CalendarPanel flat />
+            </LiquidGlass>
+          </div>
+          <!-- 右侧下：文章缩略 + 日记（占位） -->
+          <div class="bottom-right-bottom">
+            <div class="bottom-right-bottom-inner">
+              <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass" />
+              <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </PageBackground>
 </template>
@@ -39,6 +64,8 @@ import { ref, watch, computed, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
 import DataDashboard from '@/components/panels/DataDashboard.vue'
+import CalendarPanel from '@/components/panels/CalendarPanel.vue'
+import Carousel from '@/components/panels/Carousel.vue'
 import LiquidGlass from '@/components/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
@@ -281,6 +308,101 @@ const containerClass = computed(() => {
   .home-panels-inner > :last-child {
     flex: none;
     width: 100%;
+  }
+}
+
+/* ============================================
+   下方面板区域
+   ============================================ */
+.home-bottom {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(50vh + 40px);
+  z-index: 15;
+  width: 85%;
+  max-width: 1100px;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: calc(40% - 8px) calc(60% - 8px);
+  grid-template-rows: auto auto;
+  gap: 16px;
+}
+
+.bottom-left {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  height: 900px;
+  margin-bottom: 16px;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.bottom-right-top {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  min-height: 200px;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.bottom-right-bottom {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  min-height: 220px;
+}
+
+.bottom-right-bottom-inner {
+  height: 300px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.posts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0.75rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .home-bottom {
+    top: calc(50vh + 30px);
+    width: 92%;
+  }
+
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom-left {
+    height: auto;
+    min-height: 400px;
+    padding: 12px;
+  }
+
+  .bottom-right-bottom-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom-right-top {
+    padding: 12px;
+  }
+
+  .posts-grid {
+    grid-template-columns: 1fr;
+    padding: 0.5rem;
   }
 }
 </style>

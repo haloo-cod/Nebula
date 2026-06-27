@@ -36,4 +36,18 @@
   --transition-fast: 0.15s ease;
   --transition-normal: 0.3s ease;
   --transition-slow: 0.5s ease;
+
+  /* ============================================
+     毛玻璃主题变量
+     ============================================ */
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.06);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-border-subtle: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 4px 32px rgba(0, 0, 0, 0.25);
+  --glass-blur: 12px;
+  --glass-blur-subtle: 8px;
+  --glass-blur-strong: 16px;
 }
