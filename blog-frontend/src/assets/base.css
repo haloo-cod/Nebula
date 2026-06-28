@@ -51,3 +51,20 @@
   --glass-blur-subtle: 8px;
   --glass-blur-strong: 16px;
 }
+
+/* ============================================
+   亮色主题 — 提高底色不透明度并改用深色描边/阴影,
+   保证浅色背景图下毛玻璃仍有清晰边界与对比
+   ============================================ */
+:root[data-theme='light'] {
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.42);
+  --glass-bg-strong: rgba(255, 255, 255, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-border-subtle: rgba(255, 255, 255, 0.5);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 4px 32px rgba(0, 0, 0, 0.12);
+  --glass-blur: 14px;
+  --glass-blur-subtle: 10px;
+  --glass-blur-strong: 18px;
+}

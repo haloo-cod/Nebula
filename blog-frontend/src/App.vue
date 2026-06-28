@@ -25,6 +25,11 @@ onMounted(() => {
     <RouterView />
     <BackToTop v-if="ui.showNavbar" />
     <FloatingPlayer v-if="ui.showNavbar" />
+    <div
+      v-if="ui.themeTransitioning"
+      class="theme-overlay"
+      :class="{ 'theme-overlay--revealing': ui.themeTransitionRevealStarted }"
+    ></div>
   </div>
 </template>
 
@@ -87,5 +92,26 @@ html {
 <style scoped>
 .app-shell {
   min-height: 100vh;
+}
+
+.theme-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(8, 10, 14, 0.32);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    backdrop-filter 0.2s ease,
+    -webkit-backdrop-filter 0.2s ease;
+  opacity: 1;
+}
+
+.theme-overlay--revealing {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 </style>

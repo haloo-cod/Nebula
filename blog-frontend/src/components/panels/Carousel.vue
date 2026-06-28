@@ -1,27 +1,29 @@
 <template>
   <div class="carousel">
-    <div class="carousel-track" :style="trackStyle">
-      <!-- 尾部克隆：最后一张 -->
-      <img
-        :src="images[images.length - 1]"
-        class="carousel-slide clone"
-        loading="lazy"
-      />
-      <!-- 真实图片 -->
-      <img
-        v-for="(img, i) in images"
-        :key="i"
-        :src="img"
-        :alt="`slide ${i + 1}`"
-        class="carousel-slide"
-        loading="lazy"
-      />
-      <!-- 头部克隆：第一张 -->
-      <img
-        :src="images[0]"
-        class="carousel-slide clone"
-        loading="lazy"
-      />
+    <div class="carousel-viewport">
+      <div class="carousel-track" ref="trackRef" :style="trackStyle">
+        <!-- 尾部克隆：最后一张 -->
+        <img
+          :src="images[images.length - 1]"
+          class="carousel-slide clone"
+          loading="lazy"
+        />
+        <!-- 真实图片 -->
+        <img
+          v-for="(img, i) in images"
+          :key="i"
+          :src="img"
+          :alt="`slide ${i + 1}`"
+          class="carousel-slide"
+          loading="lazy"
+        />
+        <!-- 头部克隆：第一张 -->
+        <img
+          :src="images[0]"
+          class="carousel-slide clone"
+          loading="lazy"
+        />
+      </div>
     </div>
     <div class="carousel-dots">
       <span
@@ -51,6 +53,7 @@ const images = [
 const currentIndex = ref(0)
 const autoPlayTimer = ref<number | null>(null)
 const transitioning = ref(false)
+const trackRef = ref<HTMLElement | null>(null)
 const INTERVAL = 4000
 
 // 真实图片从 index=1 开始（前面有一个尾部克隆）
@@ -63,6 +66,7 @@ const trackStyle = computed(() => ({
 
 function goTo(index: number) {
   if (transitioning.value) return
+  transitioning.value = true
   currentIndex.value = index
   resetAutoPlay()
 }
@@ -71,19 +75,18 @@ function next() {
   if (transitioning.value) return
   transitioning.value = true
   currentIndex.value += 1
+  resetAutoPlay()
+}
 
-  setTimeout(() => {
-    // 到达尾部克隆，瞬间跳回第一张真实图片
-    if (currentIndex.value === images.length + OFFSET) {
-      transitioning.value = false
-      currentIndex.value = 0
-      transitioning.value = true
-    }
-  }, 500)
-
-  setTimeout(() => {
+// 使用 transitionend 事件确保动画完成后才重置，避免瞬间跳回
+function onTransitionEnd() {
+  if (currentIndex.value === images.length) {
     transitioning.value = false
-  }, 550)
+    currentIndex.value = 0
+    void trackRef.value?.offsetWidth
+  } else {
+    transitioning.value = false
+  }
 }
 
 function resetAutoPlay() {
@@ -92,10 +95,12 @@ function resetAutoPlay() {
 }
 
 onMounted(() => {
+  trackRef.value?.addEventListener('transitionend', onTransitionEnd)
   autoPlayTimer.value = window.setInterval(next, INTERVAL)
 })
 
 onUnmounted(() => {
+  trackRef.value?.removeEventListener('transitionend', onTransitionEnd)
   if (autoPlayTimer.value) clearInterval(autoPlayTimer.value)
 })
 </script>
@@ -107,6 +112,15 @@ onUnmounted(() => {
   height: 100%;
   overflow: hidden;
   border-radius: 14px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.carousel-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .carousel-track {

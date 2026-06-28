@@ -8,7 +8,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import darkBgUrl from '@/assets/img/test3.jpg'
+import lightBgUrl from '@/assets/img/test6.png'
+import { enqueueTextureUpload } from '@/components/liquidGlassQueue'
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -34,6 +37,35 @@ const props = withDefaults(
     theme: 'dark',
   },
 )
+
+type LiquidGlassTheme = 'light' | 'dark'
+
+const backgroundUrls: Record<LiquidGlassTheme, string> = {
+  dark: darkBgUrl,
+  light: lightBgUrl,
+}
+
+const backgroundImageCache = new Map<string, Promise<HTMLImageElement>>()
+
+function getCachedBackgroundImage(url: string): Promise<HTMLImageElement> {
+  const cached = backgroundImageCache.get(url)
+  if (cached) return cached
+
+  const loader = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error(`Failed to load background image: ${url}`))
+    image.src = url
+  })
+
+  backgroundImageCache.set(url, loader)
+  return loader
+}
+
+// 预热两张背景图,主题切换时直接复用已解码资源
+void getCachedBackgroundImage(darkBgUrl)
+void getCachedBackgroundImage(lightBgUrl)
 
 // 两套液态玻璃参数预设
 const glassPresets = {
@@ -67,6 +99,7 @@ let bgTexture: WebGLTexture | null = null
 let program: WebGLProgram | null = null
 let positionBuffer: WebGLBuffer | null = null
 let bgLoaded = false
+let textureRequestVersion = 0
 
 const uniforms = {
   resolution: { loc: null as WebGLUniformLocation | null, value: [0, 0] as [number, number] },
@@ -353,67 +386,80 @@ function resizeCanvas() {
   uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
 }
 
-function captureBackground() {
-  const container = containerRef.value
-  if (!container || !gl || !bgTexture) return
-
-  // 向上遍历 DOM 树查找 .bg-layer（PageBackground 组件内的背景层）
-  let el: HTMLElement | null = container.parentElement
-  while (el) {
-    const bgLayer = el.querySelector('.bg-layer') as HTMLElement | null
-    if (bgLayer) {
-      const bgUrl = bgLayer.style.backgroundImage?.replace('url("', '').replace('")', '')
-      if (bgUrl) {
-        loadBgImage(bgUrl)
-      }
-      break
-    }
-    el = el.parentElement
-  }
-}
-
-function loadBgImage(bgUrl: string) {
+async function loadBgImage(bgUrl: string) {
   if (!gl || !bgTexture) return
+  // 版本号用于丢弃快速连续切换主题时已经过期的纹理上传任务。
+  const requestVersion = ++textureRequestVersion
 
-  const image = new Image()
-  image.crossOrigin = 'anonymous'
-  image.onload = () => {
-    if (!gl || !bgTexture) return
-    gl.bindTexture(gl.TEXTURE_2D, bgTexture)
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
-    const isPow2 = (v: number) => (v & (v - 1)) === 0
-    if (isPow2(image.width) && isPow2(image.height)) {
-      gl.generateMipmap(gl.TEXTURE_2D)
-    } else {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    }
+  try {
+    const image = await getCachedBackgroundImage(bgUrl)
+    enqueueTextureUpload({
+      execute: () => {
+        if (!gl || !bgTexture || requestVersion !== textureRequestVersion) return
+        gl.bindTexture(gl.TEXTURE_2D, bgTexture)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+        const isPow2 = (v: number) => (v & (v - 1)) === 0
+        if (isPow2(image.width) && isPow2(image.height)) {
+          gl.generateMipmap(gl.TEXTURE_2D)
+        } else {
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        }
+        bgLoaded = true
+        // 方案 B:上传新纹理后先主动绘制一帧,再让 canvas 淡入。
+        // 否则 visible=true 后 opacity 回升的最前几毫秒会暴露旧 canvas 像素。
+        drawFrame()
+        visible.value = true
+        if (!animationId) {
+          animationId = requestAnimationFrame(render)
+        }
+      },
+    })
+  } catch (error) {
+    console.warn('[LiquidGlass] Failed to load background image:', error)
     bgLoaded = true
     visible.value = true
-    console.log('[LiquidGlass] Background loaded:', image.width, 'x', image.height)
-    // 背景加载完成，开始渲染
     if (!animationId) {
       animationId = requestAnimationFrame(render)
     }
   }
-  image.onerror = () => {
-    console.warn('[LiquidGlass] Failed to load background image:', bgUrl)
-    // 即使加载失败也标记为已加载，避免无限等待
-    bgLoaded = true
-    visible.value = true
-    if (!animationId) {
-      animationId = requestAnimationFrame(render)
-    }
-  }
-  image.src = bgUrl
 }
 
-function render() {
+function syncBackgroundWithTheme(theme: LiquidGlassTheme) {
+  // 复用首次加载流程:先隐藏 canvas,等新纹理上传并绘制完成后再淡入。
+  visible.value = false
+  void loadBgImage(backgroundUrls[theme])
+}
+
+function applyThemePreset(theme: 'light' | 'dark') {
+  const p = glassPresets[theme]
+  uniforms.ior.value = p.ior
+  uniforms.glassThickness.value = p.glassThickness
+  uniforms.normalStrength.value = p.normalStrength
+  uniforms.displacementScale.value = p.displacementScale
+  uniforms.heightTransitionWidth.value = p.heightTransitionWidth
+  uniforms.sminSmoothing.value = p.sminSmoothing
+  uniforms.blurRadius.value = p.blurRadius
+  uniforms.highlightWidth.value = p.highlightWidth
+  uniforms.overlayColor.value = [...p.overlayColor, 1.0] as [number, number, number, number]
+}
+
+// 主题切换:重新应用玻璃参数预设,并直接从共享图片缓存刷新纹理
+watch(
+  () => props.theme,
+  (theme) => {
+    if (!gl) return
+    applyThemePreset(theme)
+    syncBackgroundWithTheme(theme)
+  },
+)
+
+/** 单帧绘制:用于常规 RAF 循环,也用于纹理更新后的立即刷新 */
+function drawFrame() {
   if (!gl || !program || !positionBuffer || !bgTexture || !bgLoaded) {
-    animationId = requestAnimationFrame(render)
-    return
+    return false
   }
 
   gl.clearColor(0, 0, 0, 0)
@@ -449,7 +495,11 @@ function render() {
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
   gl.drawArrays(gl.TRIANGLES, 0, 6)
   gl.disable(gl.BLEND)
+  return true
+}
 
+function render() {
+  drawFrame()
   animationId = requestAnimationFrame(render)
 }
 
@@ -461,10 +511,7 @@ onMounted(() => {
 
   resizeCanvas()
 
-  // 延迟捕获背景，确保 PageBackground 的 .bg-layer 已渲染
-  setTimeout(() => {
-    captureBackground()
-  }, 100)
+  syncBackgroundWithTheme(props.theme)
 
   const ro = new ResizeObserver(() => {
     resizeCanvas()
@@ -517,7 +564,7 @@ onUnmounted(() => {
   z-index: 0;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.6s ease-out;
+  transition: opacity 0.12s ease-out;
 }
 
 .liquid-glass-canvas--visible {

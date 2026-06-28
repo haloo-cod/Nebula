@@ -24,6 +24,8 @@ const nameMap: Record<string, string> = {
   menu: 'menu',
   arrow_up: 'arrow_upward',
   settings: 'settings',
+  sun: 'brightness_7',
+  moon: 'brightness_4',
 }
 
 const props = defineProps<{ name: string }>()

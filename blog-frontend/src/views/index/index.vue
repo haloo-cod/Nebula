@@ -5,7 +5,7 @@
       <div v-if="showUIElements" class="home-panels">
         <div class="home-panels-inner">
           <div class="left-panel-glass">
-            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
               <HomeProfilePanel
                 :avatar="avatar"
                 :name="profile.name"
@@ -15,7 +15,7 @@
             </LiquidGlass>
           </div>
           <div class="right-panel-glass">
-            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
               <DataDashboard />
             </LiquidGlass>
           </div>
@@ -36,21 +36,21 @@
         <div class="bottom-grid">
           <!-- 左侧：轮播图 -->
           <div class="bottom-left">
-            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
               <Carousel />
             </LiquidGlass>
           </div>
           <!-- 右侧上：日历 -->
           <div class="bottom-right-top">
-            <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass">
+            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
               <CalendarPanel flat />
             </LiquidGlass>
           </div>
           <!-- 右侧下：文章缩略 + 日记（占位） -->
           <div class="bottom-right-bottom">
             <div class="bottom-right-bottom-inner">
-              <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass" />
-              <LiquidGlass :cornerRadius="16" theme="dark" class="panel-liquid-glass" />
+              <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass" />
+              <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass" />
             </div>
           </div>
         </div>
@@ -337,7 +337,7 @@ const containerClass = computed(() => {
   display: flex;
   height: 900px;
   margin-bottom: 16px;
-  padding: 14px;
+  /* padding: 14px; */
   box-sizing: border-box;
 }
 
@@ -346,7 +346,7 @@ const containerClass = computed(() => {
   grid-row: 1;
   display: flex;
   min-height: 200px;
-  padding: 14px;
+  /* padding: 14px; */
   box-sizing: border-box;
 }
 
@@ -363,7 +363,7 @@ const containerClass = computed(() => {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   width: 100%;
-  padding: 14px;
+  /* padding: 14px; */
   box-sizing: border-box;
 }
 

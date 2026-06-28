@@ -43,6 +43,33 @@
 
     <!-- 右侧功能区（仅桌面端可见） -->
     <div class="nav-actions">
+      <button
+        class="theme-pull-switch"
+        :class="{ 'is-moon': themeIcon === 'moon', 'is-dragging': isThemeDragging }"
+        :style="pullStyle"
+        type="button"
+        :aria-label="themeIcon === 'moon' ? '切换到浅色图标' : '切换到深色图标'"
+        :aria-pressed="themeIcon === 'moon'"
+        @click="onThemeClick"
+        @pointerdown="onThemePointerDown"
+        @pointermove="onThemePointerMove"
+        @pointerup="onThemePointerUp"
+        @pointercancel="onThemePointerCancel"
+      >
+        <span class="switch-anchor" aria-hidden="true"></span>
+        <span class="switch-rig">
+          <span class="switch-cord"></span>
+          <span class="switch-handle">
+            <SvgIcon name="sun" class="theme-icon theme-icon-sun" />
+            <SvgIcon name="moon" class="theme-icon theme-icon-moon" />
+          </span>
+        </span>
+      </button>
+      <Transition name="theme-toast">
+        <div v-if="themeToastVisible" class="theme-toast" role="status" aria-live="polite">
+          {{ themeToastText }}
+        </div>
+      </Transition>
       <button class="icon-btn" aria-label="设置">
         <SvgIcon name="settings" class="action-icon" />
       </button>
@@ -85,12 +112,185 @@ import { RouterLink, useRoute } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
+import { useUIStore } from '@/stores/ui'
 
+const ui = useUIStore()
 const currentLang = ref(getCurrentLang())
 const langOpen = ref(false)
 const translateRef = ref<HTMLElement | null>(null)
+// 图标随主题:暗色显示月亮,亮色显示太阳
+const themeIcon = computed<'sun' | 'moon'>(() => (ui.theme === 'light' ? 'sun' : 'moon'))
+const themeToastText = ref('')
+const themeToastVisible = ref(false)
+const isThemeDragging = ref(false)
+const pullDistance = ref(0)
+const pullOffsetX = ref(0)
+const themeAnchorClientX = ref(0)
+const themeAnchorClientY = ref(0)
+const themeDragMoved = ref(false)
+const suppressThemeClick = ref(false)
+const THEME_HANDLE_BASE_Y = 48
+const THEME_PULL_MAX_X = 34
+const THEME_PULL_THRESHOLD = 22
+const THEME_ANCHOR_CENTER_OFFSET = 9
+const THEME_EGG_WINDOW = 10000
+const themeEggTimestamps: number[] = []
+let themeResetTimer: ReturnType<typeof setTimeout> | null = null
+let themeToastTimer: ReturnType<typeof setTimeout> | null = null
 
 const currentLabel = computed(() => getLangLabel(currentLang.value))
+const pullStyle = computed(() => {
+  const handleY = THEME_HANDLE_BASE_Y + pullDistance.value
+  const cordLength = Math.hypot(pullOffsetX.value, handleY)
+  const cordAngle = -Math.atan2(pullOffsetX.value, handleY)
+  return {
+    '--handle-x': `${pullOffsetX.value}px`,
+    '--handle-y': `${handleY}px`,
+    '--cord-length': `${cordLength}px`,
+    '--cord-angle': `${cordAngle}rad`,
+  }
+})
+
+function toggleThemeIcon() {
+  ui.toggleTheme()
+}
+
+function clearThemeResetTimer() {
+  if (themeResetTimer) {
+    clearTimeout(themeResetTimer)
+    themeResetTimer = null
+  }
+}
+
+function clearThemeToastTimer() {
+  if (themeToastTimer) {
+    clearTimeout(themeToastTimer)
+    themeToastTimer = null
+  }
+}
+
+function showThemeToast(text: string) {
+  clearThemeToastTimer()
+  themeToastText.value = text
+  themeToastVisible.value = true
+  themeToastTimer = window.setTimeout(() => {
+    themeToastVisible.value = false
+    themeToastTimer = null
+  }, 2400)
+}
+
+function recordThemeEggTrigger() {
+  const now = Date.now()
+  while (themeEggTimestamps.length > 0 && now - themeEggTimestamps[0] > THEME_EGG_WINDOW) {
+    themeEggTimestamps.shift()
+  }
+  themeEggTimestamps.push(now)
+  if (themeEggTimestamps.length >= 3) {
+    showThemeToast('告诉你，不要再深夜的酒吧点炒面（doge')
+    return
+  }
+  showThemeToast('绳子只有这么长啦！')
+}
+
+function animateThemePull(depth = 18) {
+  clearThemeResetTimer()
+  pullOffsetX.value = 0
+  pullDistance.value = depth
+  themeResetTimer = window.setTimeout(() => {
+    pullDistance.value = 0
+    pullOffsetX.value = 0
+    themeResetTimer = null
+  }, 180)
+}
+
+function onThemeClick() {
+  if (suppressThemeClick.value) {
+    suppressThemeClick.value = false
+    return
+  }
+  toggleThemeIcon()
+  animateThemePull(16)
+}
+
+function onThemePointerDown(e: PointerEvent) {
+  isThemeDragging.value = true
+  pullDistance.value = 0
+  pullOffsetX.value = 0
+  themeDragMoved.value = false
+  clearThemeResetTimer()
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  themeAnchorClientX.value = rect.left + rect.width / 2
+  themeAnchorClientY.value = rect.top + THEME_ANCHOR_CENTER_OFFSET
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onThemePointerMove(e: PointerEvent) {
+  if (!isThemeDragging.value) return
+  const maxVisualDistance = Math.max(
+    THEME_PULL_THRESHOLD,
+    window.innerHeight * 0.5 - themeAnchorClientY.value - THEME_HANDLE_BASE_Y,
+  )
+  const rawDistance = Math.max(0, e.clientY - themeAnchorClientY.value - THEME_HANDLE_BASE_Y)
+  const offsetX = Math.max(
+    -THEME_PULL_MAX_X,
+    Math.min(THEME_PULL_MAX_X, e.clientX - themeAnchorClientX.value),
+  )
+  const distance =
+    rawDistance <= THEME_PULL_THRESHOLD
+      ? rawDistance
+      : THEME_PULL_THRESHOLD +
+        (maxVisualDistance - THEME_PULL_THRESHOLD) *
+          Math.pow(
+            Math.min(1, (rawDistance - THEME_PULL_THRESHOLD) / (maxVisualDistance - THEME_PULL_THRESHOLD)),
+            1.35,
+          )
+  pullDistance.value = distance
+  pullOffsetX.value = offsetX
+  if (distance > 4 || Math.abs(offsetX) > 4) themeDragMoved.value = true
+
+  if (e.clientY >= window.innerHeight * 0.5) {
+    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    }
+    isThemeDragging.value = false
+    suppressThemeClick.value = true
+    clearThemeResetTimer()
+    pullDistance.value = 0
+    pullOffsetX.value = 0
+    themeDragMoved.value = false
+    recordThemeEggTrigger()
+  }
+}
+
+function onThemePointerUp(e: PointerEvent) {
+  if (!isThemeDragging.value) return
+  const shouldToggle = pullDistance.value >= THEME_PULL_THRESHOLD
+  isThemeDragging.value = false
+  if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+  }
+  if (shouldToggle) {
+    toggleThemeIcon()
+    suppressThemeClick.value = true
+  } else if (themeDragMoved.value) {
+    suppressThemeClick.value = true
+  }
+  clearThemeResetTimer()
+  pullDistance.value = 0
+  pullOffsetX.value = 0
+  themeDragMoved.value = false
+}
+
+function onThemePointerCancel(e: PointerEvent) {
+  isThemeDragging.value = false
+  if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+  }
+  clearThemeResetTimer()
+  pullDistance.value = 0
+  pullOffsetX.value = 0
+  themeDragMoved.value = false
+}
 
 function switchLang(code: string) {
   currentLang.value = code
@@ -139,6 +339,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  clearThemeResetTimer()
+  clearThemeToastTimer()
 })
 </script>
 
@@ -382,8 +584,184 @@ onUnmounted(() => {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   flex-shrink: 0;
+}
+
+.theme-toast {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 44px;
+  max-width: min(280px, calc(100vw - 2rem));
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(18, 24, 38, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.theme-toast-enter-active,
+.theme-toast-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.theme-toast-enter-from,
+.theme-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
+.theme-pull-switch {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 60px;
+  height: 86px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.32));
+}
+
+.switch-anchor {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18) 70%, transparent 72%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 12px rgba(255, 255, 255, 0.32);
+}
+
+.switch-rig {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 34px;
+  height: 82px;
+  transform: translateX(-50%);
+}
+
+.switch-cord {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 4px;
+  margin-left: -2px;
+  height: var(--cord-length, 48px);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.22)),
+    rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transform-origin: top center;
+  transition:
+    height 0.28s ease,
+    transform 0.28s ease;
+  transform: rotate(var(--cord-angle, 0rad));
+}
+
+.switch-handle {
+  position: absolute;
+  top: var(--handle-y, 48px);
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.62), transparent 32%),
+    radial-gradient(circle at 70% 78%, rgba(96, 165, 250, 0.16), transparent 36%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.16),
+    0 6px 18px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    top 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.28s ease,
+    border-color 0.28s ease;
+  transform: translateX(calc(-50% + var(--handle-x, 0px))) translateY(-50%);
+}
+
+.theme-icon {
+  grid-area: 1 / 1;
+  font-size: 18px;
+  transition:
+    opacity 0.22s ease,
+    transform 0.28s ease;
+}
+
+.theme-icon-sun {
+  color: #fde68a;
+  opacity: 1;
+  filter: drop-shadow(0 0 8px rgba(253, 230, 138, 0.55));
+}
+
+.theme-icon-moon {
+  color: #bfdbfe;
+  opacity: 0;
+  transform: translateY(4px) rotate(-18deg) scale(0.7);
+  filter: drop-shadow(0 0 8px rgba(147, 197, 253, 0.45));
+}
+
+.theme-pull-switch:hover .switch-handle {
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.62), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.28), rgba(96, 165, 250, 0.14));
+  border-color: rgba(255, 255, 255, 0.48);
+}
+
+.theme-pull-switch:active .switch-handle {
+  transform: translateX(calc(-50% + var(--handle-x, 0px))) translateY(-50%) scale(0.96);
+}
+
+.theme-pull-switch.is-dragging .switch-cord,
+.theme-pull-switch.is-dragging .switch-handle,
+.theme-pull-switch.is-dragging .theme-icon {
+  transition-duration: 0s;
+}
+
+.theme-pull-switch.is-moon .switch-handle {
+  transform: translateX(calc(-50% + var(--handle-x, 0px))) translateY(-50%);
+}
+
+.theme-pull-switch.is-moon .theme-icon-sun {
+  opacity: 0;
+  transform: translateY(-4px) rotate(16deg) scale(0.7);
+}
+
+.theme-pull-switch.is-moon .theme-icon-moon {
+  opacity: 1;
+  transform: translateY(0) rotate(0) scale(1);
+}
+
+.theme-pull-switch:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.9);
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
 .icon-btn {
