@@ -111,7 +111,8 @@ withDefaults(
 .hp-top {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 2rem;
+  min-height: 150px;
 }
 
 .hp-avatar {
@@ -131,7 +132,7 @@ withDefaults(
 }
 
 .hp-name {
-  font-size: 1.35rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #ffffff;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
@@ -140,7 +141,7 @@ withDefaults(
 }
 
 .hp-bio {
-  font-size: 0.88rem;
+  font-size: 1.25rem;
   color: rgba(255, 255, 255, 0.65);
   line-height: 1.55;
   margin: 0;

@@ -12,10 +12,12 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import darkBgUrl from '@/assets/img/test3.jpg'
 import lightBgUrl from '@/assets/img/test6.png'
 import { enqueueTextureUpload } from '@/components/liquidGlassQueue'
+import { useUIStore } from '@/stores/ui'
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const visible = ref(false)
+const ui = useUIStore()
 
 const props = withDefaults(
   defineProps<{
@@ -25,9 +27,11 @@ const props = withDefaults(
     ior?: number
     highlightWidth?: number
     overlayColor?: [number, number, number]
+    allowReveal?: boolean
     theme?: 'light' | 'dark'
   }>(),
   {
+    allowReveal: true,
     cornerRadius: 32,
     blurRadius: 0.0,
     glassThickness: 41,
@@ -356,7 +360,7 @@ function initWebGL() {
   uniforms.displacementScale.value = props.theme === 'light' ? glassPresets.light.displacementScale : glassPresets.dark.displacementScale
   uniforms.heightTransitionWidth.value = props.theme === 'light' ? glassPresets.light.heightTransitionWidth : glassPresets.dark.heightTransitionWidth
   uniforms.sminSmoothing.value = props.theme === 'light' ? glassPresets.light.sminSmoothing : glassPresets.dark.sminSmoothing
-  uniforms.blurRadius.value = props.theme === 'light' ? glassPresets.light.blurRadius : glassPresets.dark.blurRadius
+  uniforms.blurRadius.value = getEffectiveBlurRadius(props.theme)
   uniforms.highlightWidth.value = props.theme === 'light' ? glassPresets.light.highlightWidth : glassPresets.dark.highlightWidth
   uniforms.overlayColor.value = [...(props.theme === 'light' ? glassPresets.light.overlayColor : glassPresets.dark.overlayColor), 1.0] as [number, number, number, number]
 
@@ -429,8 +433,13 @@ async function loadBgImage(bgUrl: string) {
 
 function syncBackgroundWithTheme(theme: LiquidGlassTheme) {
   // 复用首次加载流程:先隐藏 canvas,等新纹理上传并绘制完成后再淡入。
-  visible.value = false
+  if (props.allowReveal || ui.themeTransitioning) visible.value = false
   void loadBgImage(backgroundUrls[theme])
+}
+
+function getEffectiveBlurRadius(theme: 'light' | 'dark') {
+  if (typeof props.blurRadius === 'number') return props.blurRadius
+  return glassPresets[theme].blurRadius
 }
 
 function applyThemePreset(theme: 'light' | 'dark') {
@@ -441,7 +450,7 @@ function applyThemePreset(theme: 'light' | 'dark') {
   uniforms.displacementScale.value = p.displacementScale
   uniforms.heightTransitionWidth.value = p.heightTransitionWidth
   uniforms.sminSmoothing.value = p.sminSmoothing
-  uniforms.blurRadius.value = p.blurRadius
+  uniforms.blurRadius.value = getEffectiveBlurRadius(theme)
   uniforms.highlightWidth.value = p.highlightWidth
   uniforms.overlayColor.value = [...p.overlayColor, 1.0] as [number, number, number, number]
 }
@@ -453,6 +462,13 @@ watch(
     if (!gl) return
     applyThemePreset(theme)
     syncBackgroundWithTheme(theme)
+  },
+)
+
+watch(
+  () => props.blurRadius,
+  () => {
+    uniforms.blurRadius.value = getEffectiveBlurRadius(props.theme)
   },
 )
 

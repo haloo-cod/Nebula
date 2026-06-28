@@ -30,7 +30,11 @@
       <RouterLink
         v-for="item in navItems"
         :key="item.path"
-        :to="item.path"
+        :to="
+          item.path === '/'
+            ? { path: '/', state: { showContent: true, skipLiquidGlassReveal: true } }
+            : item.path
+        "
         class="menu-item"
         :class="{ active: isActive(item.path) }"
         @click="closeMenu"
@@ -70,9 +74,80 @@
           {{ themeToastText }}
         </div>
       </Transition>
-      <button class="icon-btn" aria-label="设置">
-        <SvgIcon name="settings" class="action-icon" />
-      </button>
+      <div ref="settingsRef" class="settings-wrap" translate="no">
+        <button
+          class="icon-btn"
+          :class="{ 'icon-btn-active': settingsOpen }"
+          aria-label="设置"
+          aria-haspopup="dialog"
+          :aria-expanded="settingsOpen"
+          @click.stop="settingsOpen = !settingsOpen"
+        >
+          <SvgIcon name="settings" class="action-icon" />
+        </button>
+        <Transition name="settings-drop">
+          <div v-if="settingsOpen" class="settings-panel" role="dialog" aria-label="显示设置面板">
+            <div class="settings-section">
+              <div class="settings-head">
+                <div class="settings-copy">
+                  <span class="settings-title">背景模糊</span>
+                  <span class="settings-value">{{ ui.backgroundBlurEnabled ? ui.backgroundBlur : 0 }}px</span>
+                </div>
+                <button
+                  class="settings-toggle"
+                  :class="{ 'settings-toggle--on': ui.backgroundBlurEnabled }"
+                  type="button"
+                  :aria-pressed="ui.backgroundBlurEnabled"
+                  @click="ui.setBackgroundBlurEnabled(!ui.backgroundBlurEnabled)"
+                >
+                  <span class="settings-toggle-thumb"></span>
+                </button>
+              </div>
+              <input
+                class="settings-slider"
+                type="range"
+                min="0"
+                max="24"
+                step="1"
+                :value="ui.backgroundBlur"
+                :disabled="!ui.backgroundBlurEnabled"
+                @input="onBackgroundBlurInput"
+              />
+            </div>
+
+            <div class="settings-section settings-section--divider">
+              <div class="settings-head">
+                <div class="settings-copy">
+                  <span class="settings-title">液态玻璃</span>
+                </div>
+                <button
+                  class="settings-toggle"
+                  :class="{ 'settings-toggle--on': ui.liquidGlassEnabled }"
+                  type="button"
+                  :aria-pressed="ui.liquidGlassEnabled"
+                  @click="ui.setLiquidGlassEnabled(!ui.liquidGlassEnabled)"
+                >
+                  <span class="settings-toggle-thumb"></span>
+                </button>
+              </div>
+              <div class="settings-head settings-head--compact">
+                <span class="settings-subtitle">玻璃模糊</span>
+                <span class="settings-value">{{ ui.liquidGlassBlur }}px</span>
+              </div>
+              <input
+                class="settings-slider"
+                type="range"
+                min="0"
+                max="12"
+                step="1"
+                :value="ui.liquidGlassBlur"
+                :disabled="!ui.liquidGlassEnabled"
+                @input="onLiquidGlassBlurInput"
+              />
+            </div>
+          </div>
+        </Transition>
+      </div>
     </div>
 
     <!-- 移动端菜单按钮 -->
@@ -92,7 +167,11 @@
       <ul v-if="menuOpen" class="mobile-menu">
         <li v-for="item in navItems" :key="item.path">
           <RouterLink
-            :to="item.path"
+            :to="
+              item.path === '/'
+                ? { path: '/', state: { showContent: true, skipLiquidGlassReveal: true } }
+                : item.path
+            "
             class="mobile-link"
             :class="isActive(item.path) ? 'mobile-link-active' : 'mobile-link-inactive'"
             @click="closeMenu"
@@ -118,6 +197,8 @@ const ui = useUIStore()
 const currentLang = ref(getCurrentLang())
 const langOpen = ref(false)
 const translateRef = ref<HTMLElement | null>(null)
+const settingsOpen = ref(false)
+const settingsRef = ref<HTMLElement | null>(null)
 // 图标随主题:暗色显示月亮,亮色显示太阳
 const themeIcon = computed<'sun' | 'moon'>(() => (ui.theme === 'light' ? 'sun' : 'moon'))
 const themeToastText = ref('')
@@ -298,10 +379,22 @@ function switchLang(code: string) {
   langOpen.value = false
 }
 
+function onBackgroundBlurInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  ui.setBackgroundBlur(value)
+}
+
+function onLiquidGlassBlurInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  ui.setLiquidGlassBlur(value)
+}
+
 function onDocumentClick(e: MouseEvent) {
-  if (!langOpen.value) return
-  if (translateRef.value && !translateRef.value.contains(e.target as Node)) {
+  if (langOpen.value && translateRef.value && !translateRef.value.contains(e.target as Node)) {
     langOpen.value = false
+  }
+  if (settingsOpen.value && settingsRef.value && !settingsRef.value.contains(e.target as Node)) {
+    settingsOpen.value = false
   }
 }
 
@@ -781,13 +874,142 @@ onUnmounted(() => {
     color 0.2s ease;
 }
 
+.settings-wrap {
+  position: relative;
+}
+
 .icon-btn:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #ffffff;
 }
 
+.icon-btn-active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .action-icon {
   font-size: 20px;
+}
+
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1000;
+  width: 268px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(18, 24, 38, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 16px 38px rgba(0, 0, 0, 0.28);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-section--divider {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-head--compact {
+  margin-bottom: 0;
+}
+
+.settings-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-title {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.settings-subtitle {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.settings-value {
+  color: rgba(176, 224, 255, 0.9);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.settings-toggle {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-toggle--on {
+  background: rgba(96, 165, 250, 0.3);
+  border-color: rgba(147, 197, 253, 0.45);
+}
+
+.settings-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  transition: transform 0.18s ease;
+}
+
+.settings-toggle--on .settings-toggle-thumb {
+  transform: translateX(18px);
+}
+
+.settings-slider {
+  width: 100%;
+  accent-color: #93c5fd;
+  cursor: pointer;
+}
+
+.settings-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-drop-enter-active,
+.settings-drop-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.settings-drop-enter-from,
+.settings-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* ============================================

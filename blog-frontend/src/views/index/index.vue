@@ -5,7 +5,14 @@
       <div v-if="showUIElements" class="home-panels">
         <div class="home-panels-inner">
           <div class="left-panel-glass">
-            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              :cornerRadius="16"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :allow-reveal="allowLiquidGlassReveal"
+              class="panel-liquid-glass"
+            >
               <HomeProfilePanel
                 :avatar="avatar"
                 :name="profile.name"
@@ -13,11 +20,29 @@
                 :links="socialLinks"
               />
             </LiquidGlass>
+            <div v-else class="panel-fallback-glass">
+              <HomeProfilePanel
+                :avatar="avatar"
+                :name="profile.name"
+                :bio="profile.bio"
+                :links="socialLinks"
+              />
+            </div>
           </div>
           <div class="right-panel-glass">
-            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              :cornerRadius="16"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :allow-reveal="allowLiquidGlassReveal"
+              class="panel-liquid-glass"
+            >
               <DataDashboard />
             </LiquidGlass>
+            <div v-else class="panel-fallback-glass">
+              <DataDashboard />
+            </div>
           </div>
         </div>
       </div>
@@ -36,21 +61,73 @@
         <div class="bottom-grid">
           <!-- 左侧：轮播图 -->
           <div class="bottom-left">
-            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              :cornerRadius="16"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :allow-reveal="allowLiquidGlassReveal"
+              class="panel-liquid-glass"
+            >
               <Carousel />
             </LiquidGlass>
+            <div v-else class="panel-fallback-glass">
+              <Carousel />
+            </div>
           </div>
           <!-- 右侧上：日历 -->
           <div class="bottom-right-top">
-            <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass">
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              :cornerRadius="16"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :allow-reveal="allowLiquidGlassReveal"
+              class="panel-liquid-glass"
+            >
               <CalendarPanel flat />
             </LiquidGlass>
+            <div v-else class="panel-fallback-glass">
+              <CalendarPanel flat />
+            </div>
+          </div>
+          <!-- 右侧中：电子时钟 -->
+          <div class="bottom-right-middle">
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              :cornerRadius="16"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :allow-reveal="allowLiquidGlassReveal"
+              class="panel-liquid-glass"
+            >
+              <DigitalClockPanel />
+            </LiquidGlass>
+            <div v-else class="panel-fallback-glass">
+              <DigitalClockPanel />
+            </div>
           </div>
           <!-- 右侧下：文章缩略 + 日记（占位） -->
           <div class="bottom-right-bottom">
             <div class="bottom-right-bottom-inner">
-              <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass" />
-              <LiquidGlass :cornerRadius="16" :theme="ui.theme" class="panel-liquid-glass" />
+              <LiquidGlass
+                v-if="ui.liquidGlassEnabled"
+                :cornerRadius="16"
+                :theme="ui.theme"
+                :blur-radius="ui.liquidGlassBlur"
+                :allow-reveal="allowLiquidGlassReveal"
+                class="panel-liquid-glass"
+              />
+              <div v-else class="panel-fallback-glass panel-fallback-glass--empty"></div>
+              <LiquidGlass
+                v-if="ui.liquidGlassEnabled"
+                :cornerRadius="16"
+                :theme="ui.theme"
+                :blur-radius="ui.liquidGlassBlur"
+                :allow-reveal="allowLiquidGlassReveal"
+                class="panel-liquid-glass"
+              />
+              <div v-else class="panel-fallback-glass panel-fallback-glass--empty"></div>
             </div>
           </div>
         </div>
@@ -65,6 +142,7 @@ import PageBackground from '@/components/PageBackground.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
 import DataDashboard from '@/components/panels/DataDashboard.vue'
 import CalendarPanel from '@/components/panels/CalendarPanel.vue'
+import DigitalClockPanel from '@/components/panels/DigitalClockPanel.vue'
 import Carousel from '@/components/panels/Carousel.vue'
 import LiquidGlass from '@/components/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
@@ -74,8 +152,10 @@ import { avatar, profile, socialLinks } from '@/data/profile'
 const ui = useUIStore()
 const fullTitle = "Starlitn'blog"
 const isMobile = ref(window.innerWidth < 768)
-const cameFromInApp = !!history.state?.back || history.state?.showContent === true
-const instant = isMobile.value || cameFromInApp
+const showContentDirectly = history.state?.showContent === true
+const skipLiquidGlassReveal = history.state?.skipLiquidGlassReveal === true
+const instant = isMobile.value || showContentDirectly
+const allowLiquidGlassReveal = !skipLiquidGlassReveal
 
 const { displayed, done: typewriterDone } = useTypewriter(fullTitle, {
   speed: 120,
@@ -289,6 +369,26 @@ const containerClass = computed(() => {
   flex: 1;
 }
 
+.panel-fallback-glass {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 20px rgba(255, 255, 255, 0.06),
+    0 8px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.panel-fallback-glass--empty {
+  min-height: 100%;
+}
+
 @media (max-width: 768px) {
   .home-panels {
     top: 80px;
@@ -327,13 +427,13 @@ const containerClass = computed(() => {
 .bottom-grid {
   display: grid;
   grid-template-columns: calc(40% - 8px) calc(60% - 8px);
-  grid-template-rows: auto auto;
+  grid-template-rows: 350px 96px auto;
   gap: 16px;
 }
 
 .bottom-left {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   display: flex;
   height: 900px;
   margin-bottom: 16px;
@@ -345,14 +445,22 @@ const containerClass = computed(() => {
   grid-column: 2;
   grid-row: 1;
   display: flex;
-  min-height: 200px;
+  height: 350px;
   /* padding: 14px; */
+  box-sizing: border-box;
+}
+
+.bottom-right-middle {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  height: 96px;
   box-sizing: border-box;
 }
 
 .bottom-right-bottom {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   min-height: 220px;
 }

@@ -4,7 +4,7 @@
     <div
       class="bg-layer"
       :class="{ 'bg-layer-recomposite': recompositing }"
-      :style="{ backgroundImage: `url(${bgImage})` }"
+      :style="bgLayerStyle"
     ></div>
     <!-- 叠加层 -->
     <div class="overlay-layer" :style="{ background: `rgba(0,0,0,${overlay})` }"></div>
@@ -27,10 +27,20 @@ withDefaults(defineProps<{ overlay?: number }>(), {
   overlay: 0.09,
 })
 
-const { theme } = storeToRefs(useUIStore())
+const { theme, backgroundBlur, backgroundBlurEnabled } = storeToRefs(useUIStore())
 
 // 背景图随主题切换:亮色用 test6,暗色用 test3
 const bgImage = computed(() => (theme.value === 'light' ? lightBg : darkBg))
+
+const bgLayerStyle = computed(() => {
+  const blur = backgroundBlurEnabled.value ? backgroundBlur.value : 0
+  const scale = blur > 0 ? 1 + Math.min(blur / 240, 0.08) : 1
+  return {
+    backgroundImage: `url(${bgImage.value})`,
+    filter: `blur(${blur}px)`,
+    transform: `translateZ(0) scale(${scale})`,
+  }
+})
 
 // 主题切换时,背景层被提升为独立合成层(translateZ + will-change),
 // backdrop-filter 会采样该层的缓存快照,导致换图后毛玻璃仍显示旧背景。
@@ -62,7 +72,7 @@ watch(theme, () => {
 
 /* 主题切换瞬间:撤销合成层提升,让 backdrop-filter 重新采样新背景 */
 .bg-layer-recomposite {
-  transform: none;
+  transform: none !important;
   will-change: auto;
 }
 

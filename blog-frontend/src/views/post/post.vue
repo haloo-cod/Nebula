@@ -87,7 +87,7 @@ function goBack() {
   if (route.path.startsWith('/archive/')) {
     router.push({ path: '/archive' })
   } else {
-    router.push({ path: '/', state: { showContent: true } })
+    router.push({ path: '/', state: { showContent: true, skipLiquidGlassReveal: true } })
   }
 }
 </script>
