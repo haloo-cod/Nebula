@@ -216,8 +216,8 @@ const THEME_PULL_THRESHOLD = 22
 const THEME_ANCHOR_CENTER_OFFSET = 9
 const THEME_EGG_WINDOW = 10000
 const themeEggTimestamps: number[] = []
-let themeResetTimer: ReturnType<typeof setTimeout> | null = null
-let themeToastTimer: ReturnType<typeof setTimeout> | null = null
+let themeResetTimer: number | null = null
+let themeToastTimer: number | null = null
 
 const currentLabel = computed(() => getLangLabel(currentLang.value))
 const pullStyle = computed(() => {
@@ -407,6 +407,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: '首页', path: '/', icon: 'home' },
+  { label: '图书', path: '/books', icon: 'book' },
   { label: '归档', path: '/archive', icon: 'archive' },
   { label: '展览', path: '/gallery', icon: 'gallery' },
   { label: '友链', path: '/friends', icon: 'friends' },

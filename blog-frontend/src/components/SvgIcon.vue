@@ -15,6 +15,7 @@ const iconUrls = import.meta.glob<string>('../assets/iconfont/goole/*.svg', {
 // 短名 → Google 文件名前缀映射
 const nameMap: Record<string, string> = {
   home: 'home',
+  book: 'book',
   archive: 'box',
   friends: 'group',
   gift: 'featured_seasonal_and_gifts',

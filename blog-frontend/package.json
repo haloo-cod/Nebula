@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "epubjs": "^0.3.93",
     "i18n-jsautotranslate": "^4.0.0",
     "lunar-typescript": "^1.8.6",
     "marked": "^18.0.4",

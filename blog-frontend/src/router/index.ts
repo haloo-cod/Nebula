@@ -13,6 +13,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/archive/archive.vue'),
   },
   {
+    path: '/books',
+    name: 'books',
+    component: () => import('../views/books/books.vue'),
+  },
+  {
+    path: '/books/read/:slug',
+    name: 'book-reader',
+    component: () => import('../views/books/reader.vue'),
+  },
+  {
+    path: '/archive/tree',
+    name: 'archive-tree',
+    component: () => import('../views/archive/ArchiveTreePoster.vue'),
+  },
+  {
     // 从归档页进入文章:URL 带 /archive 前缀,使导航栏「归档」光标保持锁定
     path: '/archive/post/:slug',
     name: 'archive-post',

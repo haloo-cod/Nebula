@@ -35,6 +35,24 @@ export interface PostStat {
   count: number // 该年发表数量
 }
 
+/** 图书元数据(列表与阅读器共用,EPUB 元数据可按需补全) */
+export interface Book {
+  slug: string // URL 标识,由 EPUB 文件名或后端标识生成
+  title: string // 书名,缺省时可由 EPUB 元数据补全
+  author: string // 作者,缺省时可由 EPUB 元数据补全
+  description: string // 简介或阅读备注,可能为空串
+  cover: string // 封面图 URL,可能为空串;为空时使用占位封面
+  file: string // EPUB 文件访问地址,测试阶段指向 public/books,后续可换后端 URL
+}
+
+/** 从 EPUB 内部自动解析出的图书元数据 */
+export interface ExtractedBookMeta {
+  title?: string // EPUB metadata.title
+  author?: string // EPUB metadata.creator
+  description?: string // EPUB metadata.description
+  cover?: string // EPUB 内封面解析出的 blob URL
+}
+
 /** 个人资料 */
 export interface Profile {
   name: string // 昵称
