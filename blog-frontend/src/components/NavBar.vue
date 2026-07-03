@@ -74,6 +74,20 @@
           {{ themeToastText }}
         </div>
       </Transition>
+      <Transition name="tavern-confirm">
+        <div v-if="tavernConfirmOpen" class="tavern-confirm" role="dialog" aria-modal="true" aria-label="深夜酒馆入口确认">
+          <p class="tavern-confirm-kicker">深夜的门铃响了第五次</p>
+          <p class="tavern-confirm-title">酒馆的门开了一条缝，要进去吗？</p>
+          <div class="tavern-confirm-actions">
+            <button class="tavern-confirm-btn tavern-confirm-btn--ghost" type="button" @click="cancelTavernEntry">
+              先不进去
+            </button>
+            <button class="tavern-confirm-btn tavern-confirm-btn--primary" type="button" @click="enterTavern">
+              进入深夜酒馆
+            </button>
+          </div>
+        </div>
+      </Transition>
       <div ref="settingsRef" class="settings-wrap" translate="no">
         <button
           class="icon-btn"
@@ -187,7 +201,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -210,11 +224,13 @@ const themeAnchorClientX = ref(0)
 const themeAnchorClientY = ref(0)
 const themeDragMoved = ref(false)
 const suppressThemeClick = ref(false)
+const tavernConfirmOpen = ref(false)
 const THEME_HANDLE_BASE_Y = 48
 const THEME_PULL_MAX_X = 34
 const THEME_PULL_THRESHOLD = 22
 const THEME_ANCHOR_CENTER_OFFSET = 9
 const THEME_EGG_WINDOW = 10000
+const THEME_TAVERN_TRIGGER_COUNT = 5
 const themeEggTimestamps: number[] = []
 let themeResetTimer: number | null = null
 let themeToastTimer: number | null = null
@@ -261,6 +277,7 @@ function showThemeToast(text: string) {
 }
 
 function recordThemeEggTrigger() {
+  if (tavernConfirmOpen.value) return
   const now = Date.now()
   while (themeEggTimestamps.length > 0 && now - themeEggTimestamps[0] > THEME_EGG_WINDOW) {
     themeEggTimestamps.shift()
@@ -268,9 +285,28 @@ function recordThemeEggTrigger() {
   themeEggTimestamps.push(now)
   if (themeEggTimestamps.length >= 3) {
     showThemeToast('告诉你，不要再深夜的酒吧点炒面（doge')
+    if (themeEggTimestamps.length >= THEME_TAVERN_TRIGGER_COUNT) {
+      tavernConfirmOpen.value = true
+    }
     return
   }
   showThemeToast('绳子只有这么长啦！')
+}
+
+function resetThemeEggCounter() {
+  themeEggTimestamps.length = 0
+}
+
+function cancelTavernEntry() {
+  tavernConfirmOpen.value = false
+  resetThemeEggCounter()
+  showThemeToast('门又悄悄合上了。')
+}
+
+function enterTavern() {
+  tavernConfirmOpen.value = false
+  resetThemeEggCounter()
+  router.push('/midnight-tavern')
 }
 
 function animateThemePull(depth = 18) {
@@ -416,6 +452,7 @@ const navItems: NavItem[] = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const menuOpen = ref(false)
 
 function isActive(path: string): boolean {
@@ -711,6 +748,82 @@ onUnmounted(() => {
 .theme-toast-leave-to {
   opacity: 0;
   transform: translateY(-6px) scale(0.98);
+}
+
+.tavern-confirm {
+  position: absolute;
+  top: calc(100% + 18px);
+  right: 0;
+  width: min(320px, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid rgba(255, 231, 186, 0.22);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(135deg, rgba(44, 30, 20, 0.78), rgba(18, 24, 34, 0.7)),
+    rgba(20, 18, 22, 0.68);
+  color: rgba(255, 246, 225, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 218, 0.16),
+    0 22px 54px rgba(0, 0, 0, 0.34);
+}
+
+.tavern-confirm-kicker {
+  margin: 0 0 0.38rem;
+  color: rgba(255, 205, 134, 0.72);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+
+.tavern-confirm-title {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.tavern-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.95rem;
+}
+
+.tavern-confirm-btn {
+  border: 1px solid rgba(255, 238, 208, 0.2);
+  border-radius: 999px;
+  padding: 0.44rem 0.78rem;
+  color: rgba(255, 246, 225, 0.92);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tavern-confirm-btn:hover {
+  transform: translateY(-1px);
+}
+
+.tavern-confirm-btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tavern-confirm-btn--primary {
+  background: rgba(162, 96, 48, 0.42);
+  border-color: rgba(255, 210, 145, 0.36);
+}
+
+.tavern-confirm-enter-active,
+.tavern-confirm-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.tavern-confirm-enter-from,
+.tavern-confirm-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
 }
 
 .theme-pull-switch {

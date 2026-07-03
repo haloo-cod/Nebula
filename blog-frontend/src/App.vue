@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import { useUIStore } from '@/stores/ui'
 
 const ui = useUIStore()
+const route = useRoute()
+const hideChrome = computed(() => route.meta.hideChrome === true)
 
 onMounted(() => {
   const splash = document.getElementById('splash')
@@ -21,10 +23,10 @@ onMounted(() => {
 
 <template>
   <div class="app-shell">
-    <NavBar v-if="ui.showNavbar" />
+    <NavBar v-if="ui.showNavbar && !hideChrome" />
     <RouterView />
-    <BackToTop v-if="ui.showNavbar" />
-    <FloatingPlayer v-if="ui.showNavbar" />
+    <BackToTop v-if="ui.showNavbar && !hideChrome" />
+    <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
     <div
       v-if="ui.themeTransitioning"
       class="theme-overlay"

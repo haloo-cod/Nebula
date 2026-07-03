@@ -60,6 +60,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/treasure/treasure.vue'),
   },
   {
+    path: '/midnight-tavern',
+    name: 'midnight-tavern',
+    meta: { hideChrome: true },
+    component: () => import('../views/midnight-tavern/midnight-tavern.vue'),
+  },
+  {
     path: '/about',
     name: 'about',
     component: () => import('../views/about/about.vue'),
