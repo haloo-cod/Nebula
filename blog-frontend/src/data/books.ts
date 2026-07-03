@@ -6,7 +6,30 @@ const rawBookFiles = import.meta.glob<string>('../assets/testepub/*.epub', {
   eager: true,
 })
 
+const rawCoverFiles = import.meta.glob<string>('../assets/book-covers/*', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+})
+
 const extractedMetaCache = new Map<string, Promise<ExtractedBookMeta>>()
+
+const coverByName = Object.fromEntries(
+  Object.entries(rawCoverFiles).map(([path, file]) => [
+    path
+      .split('/')
+      .pop()!
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase(),
+    file,
+  ]),
+)
+
+// 手动封面映射:当前先用本地静态图验证展示效果,后续可直接换成后端返回的 coverUrl。
+const coverAssignments: Record<string, string> = {
+  '07义生活 (1)': coverByName.yimei01 || '',
+  '08义生活 (1)': coverByName.yimei02 || '',
+}
 
 /** 由 EPUB 路径生成稳定 slug */
 function slugify(path: string): string {
@@ -27,7 +50,7 @@ const books: Book[] = Object.entries(rawBookFiles).map(([path, file]) => ({
   title: titleFromPath(path),
   author: '',
   description: '',
-  cover: '',
+  cover: coverAssignments[slugify(path)] || '',
   file,
 }))
 

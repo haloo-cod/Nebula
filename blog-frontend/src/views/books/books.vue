@@ -9,7 +9,7 @@
 
       <div class="books-grid">
         <RouterLink
-          v-for="book in books"
+          v-for="book in visibleBooks"
           :key="book.slug"
           :to="`/books/read/${book.slug}`"
           class="book-link"
@@ -21,63 +21,91 @@
             :blur-radius="ui.liquidGlassBlur"
             class="book-glass"
           >
-            <article class="book-card">
+            <article class="book-card book-card--liquid">
               <div class="book-cover" :style="getCoverStyle(book)">
-                <span v-if="!book.cover" class="book-cover-placeholder">{{ book.title.slice(0, 1) }}</span>
+                <span v-if="!book.cover" class="book-cover-placeholder">{{ getPlaceholderLabel(book.title) }}</span>
               </div>
               <div class="book-info">
                 <h2 class="book-name">{{ book.title }}</h2>
-                <p class="book-author">{{ book.author }}</p>
+                <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
               </div>
             </article>
           </LiquidGlass>
 
           <article v-else class="book-card book-card-fallback">
             <div class="book-cover" :style="getCoverStyle(book)">
-              <span v-if="!book.cover" class="book-cover-placeholder">{{ book.title.slice(0, 1) }}</span>
+              <span v-if="!book.cover" class="book-cover-placeholder">{{ getPlaceholderLabel(book.title) }}</span>
             </div>
             <div class="book-info">
               <h2 class="book-name">{{ book.title }}</h2>
-              <p class="book-author">{{ book.author }}</p>
+              <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
             </div>
           </article>
         </RouterLink>
+      </div>
+
+      <div v-if="totalPages > 1" class="books-pagination">
+        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">上一页</button>
+        <button
+          v-for="page in pageNumbers"
+          :key="page"
+          class="page-btn"
+          :class="{ 'page-btn-active': page === currentPage }"
+          type="button"
+          @click="currentPage = page"
+        >
+          {{ page }}
+        </button>
+        <button class="page-btn" type="button" :disabled="currentPage === totalPages" @click="goNextPage">下一页</button>
       </div>
     </div>
   </PageBackground>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/LiquidGlass.vue'
-import { extractBookMeta, getBooks } from '@/data/books'
+import { getBooks } from '@/data/books'
 import { useUIStore } from '@/stores/ui'
 import type { Book } from '@/types'
 
 const ui = useUIStore()
+const PAGE_SIZE = 16
 const books = ref<Book[]>(getBooks())
+const currentPage = ref(1)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(books.value.length / PAGE_SIZE)))
+
+const visibleBooks = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return books.value.slice(start, start + PAGE_SIZE)
+})
+
+const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, index) => index + 1))
 
 function getCoverStyle(book: Book) {
   if (!book.cover) return {}
   return { backgroundImage: `url(${book.cover})` }
 }
 
-onMounted(() => {
-  void Promise.all(
-    books.value.map(async (book) => {
-      const extracted = await extractBookMeta(book)
-      return {
-        ...book,
-        author: book.author || extracted.author || '',
-        cover: book.cover || extracted.cover || '',
-        description: book.description || extracted.description || '',
-      }
-    }),
-  ).then((hydratedBooks) => {
-    books.value = hydratedBooks
-  })
+function getPlaceholderLabel(title: string): string {
+  return title.slice(0, 2)
+}
+
+function goPrevPage() {
+  if (currentPage.value <= 1) return
+  currentPage.value -= 1
+}
+
+function goNextPage() {
+  if (currentPage.value >= totalPages.value) return
+  currentPage.value += 1
+}
+
+watch(totalPages, (nextTotal) => {
+  if (currentPage.value > nextTotal) currentPage.value = nextTotal
 })
 </script>
 
@@ -122,8 +150,48 @@ onMounted(() => {
   gap: 1rem;
 }
 
+.books-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.6rem;
+}
+
+.page-btn {
+  min-width: 2.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.52rem 0.9rem;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.page-btn-active {
+  border-color: rgba(145, 196, 255, 0.42);
+  background: rgba(110, 165, 255, 0.22);
+  color: #fff;
+}
+
 .book-link {
-  min-height: 18.5rem;
+  display: block;
+  aspect-ratio: 1 / 1.8;
   color: inherit;
   text-decoration: none;
 }
@@ -131,10 +199,39 @@ onMounted(() => {
 .book-glass {
   width: 100%;
   height: 100%;
-  min-height: 18.5rem;
   transition:
     transform 0.24s ease,
     filter 0.24s ease;
+}
+
+.book-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 0.45rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.book-card--liquid {
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.book-card-fallback {
+  transition:
+    transform 0.24s ease,
+    box-shadow 0.24s ease,
+    border-color 0.24s ease;
 }
 
 .book-link:hover .book-glass {
@@ -142,83 +239,72 @@ onMounted(() => {
   filter: drop-shadow(0 16px 34px rgba(80, 140, 255, 0.18));
 }
 
-.book-card {
-  display: flex;
-  height: 100%;
-  min-height: 18.5rem;
-  flex-direction: column;
-  padding: 0.9rem;
-}
-
-.book-card-fallback {
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition:
-    transform 0.24s ease,
-    box-shadow 0.24s ease;
-}
-
-.book-link:hover .book-card-fallback {
+.book-link:hover .book-card {
   transform: translateY(-5px);
+  border-color: rgba(140, 185, 255, 0.24);
   box-shadow: 0 16px 34px rgba(80, 140, 255, 0.18);
 }
 
 .book-cover {
   position: relative;
-  display: grid;
-  min-height: 13rem;
-  flex: 1;
-  place-items: center;
+  width: 100%;
+  aspect-ratio: 1 / 1.6;
   overflow: hidden;
   border-radius: 0.9rem;
-  background:
-    radial-gradient(circle at 22% 18%, rgba(162, 210, 255, 0.26), transparent 32%),
-    linear-gradient(145deg, rgba(18, 31, 54, 0.92), rgba(52, 68, 106, 0.72));
-  background-size: cover;
+  box-sizing: border-box;
+  padding: 0 0.3rem;
+  background-size: contain;
+  background-repeat: no-repeat;
   background-position: center;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 12px 28px rgba(0, 0, 0, 0.2);
+  background-origin: content-box;
+  background-clip: content-box;
 }
 
 .book-cover::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.11), transparent 46%);
   pointer-events: none;
 }
 
 .book-cover-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 4rem;
+  font-size: 2rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
   text-shadow: 0 8px 26px rgba(0, 0, 0, 0.42);
 }
 
 .book-info {
-  padding: 0.9rem 0.35rem 0.15rem;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex: 1;
+  padding: 0.42rem 0.18rem 0.12rem 0.3rem;
 }
 
 .book-name {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.94);
-  font-size: 0.98rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .book-author {
-  margin-top: 0.28rem;
+  margin-top: 0.16rem;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.78rem;
-  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.86rem;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -239,14 +325,12 @@ onMounted(() => {
     gap: 0.8rem;
   }
 
-  .book-link,
-  .book-glass,
   .book-card {
-    min-height: 15.5rem;
+    min-height: auto;
   }
 
-  .book-cover {
-    min-height: 10.4rem;
+  .book-glass {
+    aspect-ratio: auto;
   }
 }
 

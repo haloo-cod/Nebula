@@ -16,6 +16,8 @@ const iconUrls = import.meta.glob<string>('../assets/iconfont/goole/*.svg', {
 const nameMap: Record<string, string> = {
   home: 'home',
   book: 'book',
+  arrow_back_ios: 'arrow_back_ios',
+  arrow_forward_ios: 'arrow_forward_ios',
   archive: 'box',
   friends: 'group',
   gift: 'featured_seasonal_and_gifts',
@@ -34,8 +36,11 @@ const props = defineProps<{ name: string }>()
 const maskUrl = computed(() => {
   const prefix = nameMap[props.name] ?? props.name
   const entry = Object.entries(iconUrls).find(([path]) => {
-    const file = path.split('/').pop()!
-    return file.startsWith(prefix + '_') || file === prefix + '.svg'
+    const file = path
+      .split('/')
+      .pop()!
+      .replace(/\.svg$/i, '')
+    return file === prefix || file.startsWith(prefix + '_')
   })
   return entry ? `url("${entry[1]}")` : 'none'
 })

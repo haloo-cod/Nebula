@@ -1,13 +1,17 @@
 <template>
-  <GlassPanel :flat="flat" class="calendar-panel" v-if="!flat">
+  <GlassPanel :flat="flat" class="calendar-panel" :class="calendarThemeClass" v-if="!flat">
     <!-- 头部：年月 + 切换 -->
     <div class="cal-header">
-      <button class="cal-nav" @click="prevMonth" aria-label="上个月">‹</button>
+      <button class="cal-nav" @click="prevMonth" aria-label="上个月">
+        <SvgIcon name="arrow_back_ios" />
+      </button>
       <div class="cal-title">
         <span class="cal-ym">{{ viewYear }}年{{ viewMonth }}月</span>
         <button class="cal-today-btn" v-if="!isCurrentMonth" @click="goToday">回今天</button>
       </div>
-      <button class="cal-nav" @click="nextMonth" aria-label="下个月">›</button>
+      <button class="cal-nav" @click="nextMonth" aria-label="下个月">
+        <SvgIcon name="arrow_forward_ios" />
+      </button>
     </div>
 
     <!-- 星期表头 -->
@@ -48,15 +52,19 @@
     </div>
   </GlassPanel>
   <template v-else>
-    <div class="cal-content-flat">
+    <div class="cal-content-flat" :class="calendarThemeClass">
     <!-- 头部：年月 + 切换 -->
     <div class="cal-header">
-      <button class="cal-nav" @click="prevMonth" aria-label="上个月">‹</button>
+      <button class="cal-nav" @click="prevMonth" aria-label="上个月">
+        <SvgIcon name="arrow_back_ios" />
+      </button>
       <div class="cal-title">
         <span class="cal-ym">{{ viewYear }}年{{ viewMonth }}月</span>
         <button class="cal-today-btn" v-if="!isCurrentMonth" @click="goToday">回今天</button>
       </div>
-      <button class="cal-nav" @click="nextMonth" aria-label="下个月">›</button>
+      <button class="cal-nav" @click="nextMonth" aria-label="下个月">
+        <SvgIcon name="arrow_forward_ios" />
+      </button>
     </div>
 
     <!-- 星期表头 -->
@@ -102,12 +110,16 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import GlassPanel from './GlassPanel.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
 import { getSolarTerms, getHolidays, pickMonthHolidays } from '@/data/calendar'
+import { useUIStore } from '@/stores/ui'
 import type { HolidayDay } from '@/types'
 
 withDefaults(defineProps<{ flat?: boolean }>(), {
   flat: false,
 })
+
+const ui = useUIStore()
 
 /** 单个日期格子的数据(null 表示月初的占位空格) */
 interface DayCell {
@@ -133,6 +145,8 @@ const holidays = ref<Record<number, HolidayDay>>({}) // { day: { name, isOff, is
 const isCurrentMonth = computed(
   () => viewYear.value === now.getFullYear() && viewMonth.value === now.getMonth() + 1,
 )
+
+const calendarThemeClass = computed(() => `calendar-panel--${ui.theme}`)
 
 const cells = computed<(DayCell | null)[]>(() => {
   const year = viewYear.value
@@ -210,20 +224,82 @@ onMounted(loadMonth)
 
 /* flat 模式下（包在 LiquidGlass 里），内容需要内边距 */
 .cal-content-flat {
+  position: relative;
+  overflow: hidden;
   padding: 0.6rem;
   height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-radius: 0.85rem;
+  color: var(--cal-text);
+}
+
+.cal-content-flat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--cal-readability-bg);
+  backdrop-filter: blur(4px) saturate(1.04) brightness(var(--cal-backdrop-brightness));
+  -webkit-backdrop-filter: blur(4px) saturate(1.04) brightness(var(--cal-backdrop-brightness));
+  pointer-events: none;
+}
+
+.cal-content-flat > * {
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-panel,
+.cal-content-flat {
+  --cal-text: rgba(240, 246, 255, 0.94);
+  --cal-muted: rgba(226, 236, 255, 0.72);
+  --cal-weekend: rgba(255, 172, 184, 0.92);
+  --cal-sub: rgba(152, 220, 255, 0.9);
+  --cal-readability-bg: rgba(10, 16, 34, 0.14);
+  --cal-backdrop-brightness: 0.94;
+  --cal-weekday-bg: rgba(255, 255, 255, 0.045);
+  --cal-weekday-border: rgba(255, 255, 255, 0.06);
+  --cal-nav-bg: rgba(255, 255, 255, 0.08);
+  --cal-nav-hover-bg: rgba(255, 255, 255, 0.16);
+  --cal-nav-border: rgba(255, 255, 255, 0.14);
+  --cal-today-bg: rgba(120, 170, 255, 0.24);
+  --cal-today-ring: rgba(150, 205, 255, 0.56);
+  --cal-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.calendar-panel--light {
+  --cal-text: rgba(35, 43, 62, 0.88);
+  --cal-muted: rgba(54, 65, 86, 0.68);
+  --cal-weekend: rgba(145, 64, 83, 0.82);
+  --cal-sub: rgba(24, 93, 128, 0.86);
+  --cal-readability-bg: rgba(255, 255, 255, 0.16);
+  --cal-backdrop-brightness: 1;
+  --cal-weekday-bg: rgba(255, 255, 255, 0.16);
+  --cal-weekday-border: rgba(44, 62, 96, 0.08);
+  --cal-nav-bg: rgba(255, 255, 255, 0.24);
+  --cal-nav-hover-bg: rgba(255, 255, 255, 0.42);
+  --cal-nav-border: rgba(44, 62, 96, 0.1);
+  --cal-today-bg: rgba(238, 111, 103, 0.36);
+  --cal-today-ring: rgba(255, 239, 226, 0.58);
+  --cal-shadow: 0 1px 1px rgba(255, 255, 255, 0.28);
+}
+
+.calendar-panel--dark {
+  --cal-readability-bg: rgba(10, 16, 34, 0.18);
+  --cal-backdrop-brightness: 0.9;
 }
 
 /* 头部 */
 .cal-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.4rem;
+  gap: 0.5rem;
+  margin: 0 0.2rem 0.5rem;
 }
 
 .cal-title {
@@ -231,22 +307,24 @@ onMounted(loadMonth)
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
+  min-width: 0;
 }
 
 .cal-ym {
-  font-size: 1rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  letter-spacing: 0.02em;
+  font-size: 1.16rem;
+  font-weight: 700;
+  color: var(--cal-text);
+  letter-spacing: 0.01em;
+  text-shadow: var(--cal-shadow);
 }
 
 .cal-today-btn {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
+  font-size: 0.72rem;
+  color: var(--cal-muted);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.35rem;
-  padding: 0.05rem 0.35rem;
+  padding: 0.08rem 0.42rem;
   cursor: pointer;
   transition:
     color 0.2s ease,
@@ -254,27 +332,44 @@ onMounted(loadMonth)
 }
 
 .cal-today-btn:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.16);
+  color: var(--cal-text);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .cal-nav {
-  font-size: 1.2rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.55);
-  background: transparent;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-color: var(--cal-nav-border);
+  border-radius: 0.78rem;
+  background: var(--cal-nav-bg);
+  color: var(--cal-muted);
   cursor: pointer;
-  padding: 0 0.3rem;
-  border-radius: 0.4rem;
+  padding: 0;
   transition:
     color 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.cal-nav :deep(.svg-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.cal-nav:first-child :deep(.svg-icon) {
+  transform: translateX(2px);
 }
 
 .cal-nav:hover {
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--cal-text);
+  border-color: rgba(180, 215, 255, 0.3);
+  background: var(--cal-nav-hover-bg);
+  transform: translateY(-1px);
 }
 
 /* 网格 */
@@ -284,24 +379,33 @@ onMounted(loadMonth)
   gap: 0.1rem;
 }
 
+.cal-days {
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(36px, 1fr);
+  min-height: 0;
+}
+
 /* 关键：grid 子项默认 min-width:auto，长文本（如"劳动节"）会撑破列宽导致溢出 */
 .cal-grid > * {
   min-width: 0;
 }
 
 .cal-weekdays {
-  margin-bottom: 0.2rem;
+  flex: 0 0 auto;
+  margin-bottom: 0.18rem;
 }
 
 .cal-weekday {
   text-align: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--cal-muted);
   padding: 0 0.1rem;
-  height: 32px;
+  height: 34px;
   width: 100%;
-  border-radius: 0.3rem;
+  border: 1px solid var(--cal-weekday-border);
+  border-radius: 0.42rem;
+  background: var(--cal-weekday-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -309,17 +413,13 @@ onMounted(loadMonth)
 }
 
 .cal-weekday.is-weekend {
-  color: rgba(255, 180, 180, 0.7);
-}
-
-.cal-weekday.is-weekend {
-  color: rgba(255, 180, 180, 0.7);
+  color: var(--cal-weekend);
 }
 
 /* 日期格子 */
 .cal-cell {
   position: relative;
-  height: 32px;
+  min-height: 36px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -328,12 +428,12 @@ onMounted(loadMonth)
   border-radius: 0.3rem;
   transition: background 0.2s ease;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 0 1px;
 }
 
 .cal-cell:not(.is-empty):hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.11);
 }
 
 .cal-cell.is-empty {
@@ -341,22 +441,24 @@ onMounted(loadMonth)
 }
 
 .cal-num {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.03rem;
+  font-weight: 700;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--cal-text);
+  text-shadow: var(--cal-shadow);
 }
 
 .cal-cell.is-weekend .cal-num {
-  color: rgba(255, 190, 190, 0.95);
+  color: var(--cal-weekend);
 }
 
 .cal-sub {
-  font-size: 0.65rem;
-  font-weight: 500;
+  font-size: 0.68rem;
+  font-weight: 700;
   line-height: 1.1;
   margin-top: 0.05rem;
-  color: rgba(160, 210, 255, 0.9);
+  color: var(--cal-sub);
+  text-shadow: var(--cal-shadow);
   width: 100%;
   box-sizing: border-box;
   padding: 0 1px;
@@ -368,8 +470,10 @@ onMounted(loadMonth)
 
 /* 今天 */
 .cal-cell.is-today {
-  background: rgba(120, 170, 255, 0.25);
-  box-shadow: inset 0 0 0 1px rgba(140, 190, 255, 0.5);
+  background: var(--cal-today-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--cal-today-ring),
+    0 0 12px rgba(255, 126, 102, 0.16);
 }
 
 .cal-cell.is-today .cal-num {
