@@ -28,6 +28,7 @@ const props = withDefaults(
     highlightWidth?: number
     overlayColor?: [number, number, number]
     allowReveal?: boolean
+    realtimeOffset?: boolean
     theme?: 'light' | 'dark'
   }>(),
   {
@@ -39,6 +40,7 @@ const props = withDefaults(
     highlightWidth: 3.5,
     overlayColor: () => [0.85, 0.9, 1.0] as [number, number, number],
     theme: 'dark',
+    realtimeOffset: false,
   },
 )
 
@@ -104,6 +106,11 @@ let program: WebGLProgram | null = null
 let positionBuffer: WebGLBuffer | null = null
 let bgLoaded = false
 let textureRequestVersion = 0
+let needsOffsetSync = true
+let resizeObserver: ResizeObserver | null = null
+let scrollOptions: AddEventListenerOptions | undefined
+let scrollParents: HTMLElement[] = []
+let scrollHandler: (() => void) | null = null
 
 const uniforms = {
   resolution: { loc: null as WebGLUniformLocation | null, value: [0, 0] as [number, number] },
@@ -388,6 +395,38 @@ function resizeCanvas() {
   uniforms.mousePos.value = [canvas.width / 2, canvas.height / 2]
   // u_canvasOffset 是 canvas 在屏幕上的偏移
   uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
+  needsOffsetSync = false
+}
+
+function syncCanvasOffset() {
+  const container = containerRef.value
+  if (!container || !gl) return
+  const rect = container.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  uniforms.resolution.value = [window.innerWidth * dpr, window.innerHeight * dpr]
+  uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
+  needsOffsetSync = false
+}
+
+function markCanvasOffsetDirty() {
+  needsOffsetSync = true
+}
+
+function isScrollableElement(element: HTMLElement): boolean {
+  const style = window.getComputedStyle(element)
+  const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`
+  const canScroll = /(auto|scroll|overlay)/.test(overflow)
+  return canScroll && (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
+}
+
+function getScrollParents(element: HTMLElement): HTMLElement[] {
+  const parents: HTMLElement[] = []
+  let current = element.parentElement
+  while (current && current !== document.body) {
+    if (isScrollableElement(current)) parents.push(current)
+    current = current.parentElement
+  }
+  return parents
 }
 
 async function loadBgImage(bgUrl: string) {
@@ -515,6 +554,7 @@ function drawFrame() {
 }
 
 function render() {
+  if (props.realtimeOffset && needsOffsetSync) syncCanvasOffset()
   drawFrame()
   animationId = requestAnimationFrame(render)
 }
@@ -529,37 +569,45 @@ onMounted(() => {
 
   syncBackgroundWithTheme(props.theme)
 
-  const ro = new ResizeObserver(() => {
+  resizeObserver = new ResizeObserver(() => {
+    markCanvasOffsetDirty()
     resizeCanvas()
   })
-  ro.observe(containerRef.value!)
+  resizeObserver.observe(containerRef.value!)
 
   window.addEventListener('resize', resizeCanvas)
 
   // 滚动时更新 canvas 偏移，使折射效果跟随页面实时变化
-  const handleScroll = () => {
-    const container = containerRef.value
-    if (!container || !gl) return
-    const rect = container.getBoundingClientRect()
-    const dpr = window.devicePixelRatio || 1
-    uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
+  scrollHandler = () => {
+    if (props.realtimeOffset) {
+      markCanvasOffsetDirty()
+      return
+    }
+    syncCanvasOffset()
   }
 
   const containerEl = containerRef.value!
-  window.addEventListener('scroll', handleScroll, { passive: true })
-  ;(containerEl as any).__scrollHandler = handleScroll
+  scrollOptions = { passive: true, capture: props.realtimeOffset }
+  window.addEventListener('scroll', scrollHandler, scrollOptions)
+  if (props.realtimeOffset) {
+    scrollParents = getScrollParents(containerEl)
+    scrollParents.forEach((parent) => parent.addEventListener('scroll', scrollHandler!, scrollOptions))
+  }
 
   // 不立即启动渲染循环，等背景图加载完成后再开始（由 loadBgImage 中的 bgLoaded = true 触发）
-  ;(containerRef.value as any).__resizeObserver = ro
 })
 
 onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId)
-  const ro = (containerRef.value as any)?.__resizeObserver as ResizeObserver | undefined
-  if (ro) ro.disconnect()
+  resizeObserver?.disconnect()
   window.removeEventListener('resize', resizeCanvas)
-  const sh = (containerRef.value as any)?.__scrollHandler as (() => void) | undefined
-  if (sh) window.removeEventListener('scroll', sh)
+  if (scrollHandler) {
+    window.removeEventListener('scroll', scrollHandler, scrollOptions)
+    scrollParents.forEach((parent) => parent.removeEventListener('scroll', scrollHandler!, scrollOptions))
+  }
+  scrollParents = []
+  scrollHandler = null
+  resizeObserver = null
 })
 </script>
 

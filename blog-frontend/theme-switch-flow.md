@@ -147,4 +147,112 @@
 
    用途: 控制 WebGL 液态玻璃的厚度、折射率、边缘高光、覆盖色等。
 
-   如果换图后 LiquidGlass 太重、太亮或太暗,改这里。
+如果换图后 LiquidGlass 太重、太亮或太暗,改这里。
+
+
+迭代版本 v2: LazyLiquidGlass 与安全等待
+=========================================
+
+本节只记录 v1 之后新增的约束和修正,不覆盖前面的原始链路。
+
+1. 归档页引入 LazyLiquidGlass。
+
+   文件: src/components/LazyLiquidGlass.vue
+
+   用途:
+   - 只在卡片接近视口时挂载真实 LiquidGlass。
+   - 不接近视口或等待名额时使用 fallback 玻璃样式。
+   - 全局最多同时激活 6 个真实 LiquidGlass 实例。
+
+2. LazyLiquidGlass 的限制是性能边界。
+
+   归档页可能有大量文章卡片,不能让每张卡片都同时创建 WebGL canvas。
+   因此 MAX_ACTIVE_LIQUID_GLASS 当前保持为 6。
+
+   如果未来要调整这个数字,需要同时观察:
+   - 主题切换时 gl.texImage2D 上传是否集中卡顿。
+   - 横向滚动时主线程是否被多个 RAF 占满。
+   - 低配设备是否出现 WebGL context 丢失。
+
+3. LiquidGlass 新增 realtimeOffset。
+
+   文件: src/components/LiquidGlass.vue
+
+   默认值:
+   realtimeOffset = false
+
+   旧页面必须继续走默认值,避免每帧读取 getBoundingClientRect()。
+   只有归档页横向滚动卡片需要显式开启 realtime-offset。
+
+4. realtimeOffset 的工作方式。
+
+   - 普通模式:滚动事件直接同步 canvasOffset,保持旧逻辑。
+   - 实时模式:滚动事件只标记 dirty。
+   - RAF render() 中仅当 realtimeOffset=true 且 dirty 时才同步 canvasOffset。
+
+   这样归档页横向滚动时折射采样坐标能跟上位置变化,
+   但不会在没有滚动/尺寸变化时每帧强制读取布局。
+
+5. 主题切换等待逻辑更新。
+
+   文件:
+   - src/components/liquidGlassQueue.ts
+   - src/stores/ui.ts
+
+   v1 中 ui.ts 等待 waitForFirstTextureUploadSettled()。
+   v2 改为等待 waitForNextTextureUploadSettled()。
+
+6. 为什么要改等待逻辑。
+
+   引入 LazyLiquidGlass 后,"液态玻璃开关开启" 不再等于
+   "当前页面一定有真实 LiquidGlass 实例会立刻入队上传纹理"。
+
+   例如:
+   - 当前页面没有 LiquidGlass。
+   - 当前页面只有 LazyLiquidGlass fallback。
+   - 卡片还没进入 IntersectionObserver 范围。
+
+   如果继续无条件等待旧的首个纹理完成信号,主题遮罩可能一直卡住。
+
+7. waitForNextTextureUploadSettled() 的语义。
+
+   - 记录调用时的 textureUploadGeneration。
+   - 只等待调用之后产生的新批次首个纹理上传完成。
+   - 如果没有新批次产生,超时后自动放行。
+
+   这只是主题切换期间的安全兜底,平时不会运行。
+
+8. v2 后的主题切换顺序。
+
+   1. ui.toggleTheme() 拉起全屏遮罩。
+   2. 等 1 帧,确保遮罩先 paint。
+   3. 创建 firstTextureReady = waitForNextTextureUploadSettled()。
+   4. 切换 theme。
+   5. 已挂载的真实 LiquidGlass watcher 执行:
+      applyThemePreset(theme)
+      syncBackgroundWithTheme(theme)
+   6. syncBackgroundWithTheme() 仍然执行:
+      visible=false -> loadBgImage -> enqueueTextureUpload
+   7. 队列仍然每帧只执行一个 gl.texImage2D。
+   8. 上传任务内仍然必须保持:
+      gl.texImage2D(...) -> bgLoaded=true -> drawFrame() -> visible=true
+   9. firstTextureReady resolve 后遮罩开始退场。
+   10. waitForTextureUploadQueueIdle() 等待队列排空。
+   11. 再等 2 帧后关闭 themeTransitioning。
+
+9. 如果没有真实 LiquidGlass 入队。
+
+   firstTextureReady 会在超时后放行。
+   主题遮罩正常退场,避免页面进入永久 transitioning 状态。
+
+   这不会破坏已有 LiquidGlass 的防闪逻辑:
+   只要真实 LiquidGlass 后续入队,它自己的上传任务仍会先 drawFrame(),再 visible=true。
+
+10. 后续修改注意事项。
+
+   - 不要把 realtimeOffset 默认值改成 true。
+   - 不要移除 LazyLiquidGlass 的并发上限。
+   - 不要让归档页每张卡片都直接挂载 LiquidGlass。
+   - 不要把 drawFrame() 移到 visible=true 后面。
+   - 不要绕过 enqueueTextureUpload() 直接批量上传纹理。
+   - 不要让 ui.ts 无超时地等待一个可能不存在的纹理批次。

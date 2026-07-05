@@ -20,14 +20,14 @@
                 :links="socialLinks"
               />
             </LiquidGlass>
-            <div v-else class="panel-fallback-glass">
+            <PanelFallbackGlass v-else>
               <HomeProfilePanel
                 :avatar="avatar"
                 :name="profile.name"
                 :bio="profile.bio"
                 :links="socialLinks"
               />
-            </div>
+            </PanelFallbackGlass>
           </div>
           <div class="right-panel-glass">
             <LiquidGlass
@@ -40,9 +40,9 @@
             >
               <DataDashboard />
             </LiquidGlass>
-            <div v-else class="panel-fallback-glass">
+            <PanelFallbackGlass v-else>
               <DataDashboard />
-            </div>
+            </PanelFallbackGlass>
           </div>
         </div>
       </div>
@@ -71,9 +71,9 @@
             >
               <Carousel />
             </LiquidGlass>
-            <div v-else class="panel-fallback-glass">
+            <PanelFallbackGlass v-else>
               <Carousel />
-            </div>
+            </PanelFallbackGlass>
           </div>
           <!-- 右侧上：日历 -->
           <div class="bottom-right-top">
@@ -87,9 +87,9 @@
             >
               <CalendarPanel flat />
             </LiquidGlass>
-            <div v-else class="panel-fallback-glass">
+            <PanelFallbackGlass v-else>
               <CalendarPanel flat />
-            </div>
+            </PanelFallbackGlass>
           </div>
           <!-- 右侧中：电子时钟 -->
           <div class="bottom-right-middle">
@@ -103,9 +103,9 @@
             >
               <DigitalClockPanel />
             </LiquidGlass>
-            <div v-else class="panel-fallback-glass">
+            <PanelFallbackGlass v-else>
               <DigitalClockPanel />
-            </div>
+            </PanelFallbackGlass>
           </div>
           <!-- 右侧下：文章缩略 + 日记（占位） -->
           <div class="bottom-right-bottom">
@@ -118,7 +118,7 @@
                 :allow-reveal="allowLiquidGlassReveal"
                 class="panel-liquid-glass"
               />
-              <div v-else class="panel-fallback-glass panel-fallback-glass--empty"></div>
+              <PanelFallbackGlass v-else class="panel-fallback-glass--empty"></PanelFallbackGlass>
               <LiquidGlass
                 v-if="ui.liquidGlassEnabled"
                 :cornerRadius="16"
@@ -127,7 +127,7 @@
                 :allow-reveal="allowLiquidGlassReveal"
                 class="panel-liquid-glass"
               />
-              <div v-else class="panel-fallback-glass panel-fallback-glass--empty"></div>
+              <PanelFallbackGlass v-else class="panel-fallback-glass--empty"></PanelFallbackGlass>
             </div>
           </div>
         </div>
@@ -139,6 +139,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
 import DataDashboard from '@/components/panels/DataDashboard.vue'
 import CalendarPanel from '@/components/panels/CalendarPanel.vue'
@@ -374,15 +375,6 @@ const containerClass = computed(() => {
   width: 100%;
   height: 100%;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 0 20px rgba(255, 255, 255, 0.06),
-    0 8px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
 }
 
 .panel-fallback-glass--empty {

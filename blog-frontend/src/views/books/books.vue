@@ -32,7 +32,7 @@
             </article>
           </LiquidGlass>
 
-          <article v-else class="book-card book-card-fallback">
+          <PanelFallbackGlass v-else tag="article" class="book-card book-card-fallback">
             <div class="book-cover" :style="getCoverStyle(book)">
               <span v-if="!book.cover" class="book-cover-placeholder">{{ getPlaceholderLabel(book.title) }}</span>
             </div>
@@ -40,7 +40,7 @@
               <h2 class="book-name">{{ book.title }}</h2>
               <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
             </div>
-          </article>
+          </PanelFallbackGlass>
         </RouterLink>
       </div>
 
@@ -66,6 +66,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import LiquidGlass from '@/components/LiquidGlass.vue'
 import { getBooks } from '@/data/books'
 import { useUIStore } from '@/stores/ui'
@@ -209,14 +210,7 @@ watch(totalPages, (nextTotal) => {
   height: 100%;
   flex-direction: column;
   border-radius: 1.15rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   padding: 0.45rem;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 12px 32px rgba(0, 0, 0, 0.16);
 }
 
 .book-card--liquid {
@@ -241,8 +235,13 @@ watch(totalPages, (nextTotal) => {
 
 .book-link:hover .book-card {
   transform: translateY(-5px);
+}
+
+.book-link:hover .book-card-fallback {
   border-color: rgba(140, 185, 255, 0.24);
-  box-shadow: 0 16px 34px rgba(80, 140, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 34px rgba(80, 140, 255, 0.18);
 }
 
 .book-cover {

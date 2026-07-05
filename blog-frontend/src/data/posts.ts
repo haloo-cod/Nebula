@@ -1,4 +1,5 @@
 import type { Post, PostStat, Frontmatter } from '@/types'
+import { postCoverAssignments } from '@/data/post-covers'
 
 // 自动发现 src/assets/md 下所有 .md 文件,无需手动维护导入列表
 // eager + ?raw:构建时把每个文件的原始字符串内容直接内联进来
@@ -54,6 +55,7 @@ const posts: Post[] = Object.entries(rawFiles)
       title: data.title || slugify(path),
       description: data.description || '',
       date: data.published || '',
+      cover: postCoverAssignments[slugify(path)] || '',
       tags: data.tags || [],
       category: data.category || '',
       draft: data.draft || false,

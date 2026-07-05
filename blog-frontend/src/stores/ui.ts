@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
-  waitForFirstTextureUploadSettled,
+  waitForNextTextureUploadSettled,
   waitForTextureUploadQueueIdle,
 } from '@/components/liquidGlassQueue'
 
@@ -88,8 +88,8 @@ export const useUIStore = defineStore('ui', () => {
   const showNavbar = ref(true)
   const theme = ref<Theme>(readStoredTheme())
   const backgroundBlurEnabled = ref(readStoredBoolean(BACKGROUND_BLUR_ENABLED_KEY, false))
-  const backgroundBlur = ref(readStoredBackgroundBlur() || DEFAULT_BACKGROUND_BLUR)
-  const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, true))
+  const backgroundBlur = ref(readStoredBackgroundBlur() ?? DEFAULT_BACKGROUND_BLUR)
+  const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, false))
   const liquidGlassBlur = ref(readStoredLiquidGlassBlur())
   const themeTransitioning = ref(false)
   const themeTransitionRevealStarted = ref(false)
@@ -171,6 +171,7 @@ export const useUIStore = defineStore('ui', () => {
     themeTransitionRevealStarted.value = false
     await waitForNextFrames(1)
 
+    const firstTextureReady = liquidGlassEnabled.value ? waitForNextTextureUploadSettled() : null
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
 
     if (!liquidGlassEnabled.value) {
@@ -184,7 +185,7 @@ export const useUIStore = defineStore('ui', () => {
 
     // 首个 LiquidGlass 面板已画入新纹理后,开始撤掉遮罩;
     // 剩余面板继续按队列逐个淡入,保留“依次呈现”的动画感。
-    await waitForFirstTextureUploadSettled()
+    await firstTextureReady
     themeTransitionRevealStarted.value = true
 
     // 队列全部排空后再等两帧,确保背景层 recomposite 与最后一帧渲染稳定。

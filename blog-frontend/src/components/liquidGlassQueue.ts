@@ -9,6 +9,28 @@ let textureUploadFrame = 0
 let textureUploadGeneration = 0
 let settledInGeneration = 0
 
+function waitForSettledGeneration(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  if (predicate()) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    const startedAt = performance.now()
+    let frame = 0
+    const finish = () => {
+      if (frame) cancelAnimationFrame(frame)
+      resolve()
+    }
+    const check = () => {
+      if (predicate() || (timeoutMs > 0 && performance.now() - startedAt >= timeoutMs)) {
+        finish()
+        return
+      }
+      frame = requestAnimationFrame(check)
+    }
+
+    frame = requestAnimationFrame(check)
+  })
+}
+
 // 当前批次里第一个任务完成后立刻通知,用于让全屏主题遮罩开始撤场。
 // 注意这里只关心“首个面板已能展示新纹理”,不是等整批全部完成。
 function notifyFirstSettled() {
@@ -62,6 +84,15 @@ export function waitForFirstTextureUploadSettled(): Promise<void> {
   return new Promise((resolve) => {
     firstSettledResolvers.add(resolve)
   })
+}
+
+/** 等待调用之后产生的新批次首个纹理完成,无新批次时超时放行避免主题遮罩卡死 */
+export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void> {
+  const baseGeneration = textureUploadGeneration
+  return waitForSettledGeneration(
+    () => textureUploadGeneration > baseGeneration && settledInGeneration > 0,
+    timeoutMs,
+  )
 }
 
 /** 等待当前纹理上传队列排空 */

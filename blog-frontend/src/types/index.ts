@@ -9,6 +9,7 @@ export interface Post {
   title: string // 文章标题,缺省时回退为 slug
   description: string // 摘要描述,可能为空串
   date: string // 发表日期(frontmatter 的 published 字段),可能为空串
+  cover: string // 文章封面图 URL,由前端手动映射补齐,可能为空串
   tags: string[] // 标签列表
   category: string // 分类,可能为空串
   draft: boolean // 是否草稿(草稿不参与统计与默认展示)
