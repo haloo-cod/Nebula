@@ -1,6 +1,10 @@
 <template>
   <div class="liquid-glass" ref="containerRef">
-    <canvas ref="canvasRef" class="liquid-glass-canvas" :class="{ 'liquid-glass-canvas--visible': visible }"></canvas>
+    <canvas
+      ref="canvasRef"
+      class="liquid-glass-canvas"
+      :class="{ 'liquid-glass-canvas--visible': visible }"
+    ></canvas>
     <div class="liquid-glass-content">
       <slot />
     </div>
@@ -127,7 +131,10 @@ const uniforms = {
   sminSmoothing: { loc: null as WebGLUniformLocation | null, value: 0 },
   showNormals: { loc: null as WebGLUniformLocation | null, value: 0 },
   blurRadius: { loc: null as WebGLUniformLocation | null, value: 0 },
-  overlayColor: { loc: null as WebGLUniformLocation | null, value: [0, 0, 0, 0] as [number, number, number, number] },
+  overlayColor: {
+    loc: null as WebGLUniformLocation | null,
+    value: [0, 0, 0, 0] as [number, number, number, number],
+  },
   highlightWidth: { loc: null as WebGLUniformLocation | null, value: 0 },
 }
 
@@ -331,7 +338,17 @@ function initWebGL() {
   // Background texture (初始为透明，避免蓝色闪烁)
   bgTexture = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, bgTexture)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]))
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    new Uint8Array([0, 0, 0, 0]),
+  )
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
@@ -362,14 +379,27 @@ function initWebGL() {
   // Set default uniform values
   uniforms.cornerRadius.value = props.cornerRadius
   uniforms.ior.value = props.theme === 'light' ? glassPresets.light.ior : glassPresets.dark.ior
-  uniforms.glassThickness.value = props.theme === 'light' ? glassPresets.light.glassThickness : glassPresets.dark.glassThickness
-  uniforms.normalStrength.value = props.theme === 'light' ? glassPresets.light.normalStrength : glassPresets.dark.normalStrength
-  uniforms.displacementScale.value = props.theme === 'light' ? glassPresets.light.displacementScale : glassPresets.dark.displacementScale
-  uniforms.heightTransitionWidth.value = props.theme === 'light' ? glassPresets.light.heightTransitionWidth : glassPresets.dark.heightTransitionWidth
-  uniforms.sminSmoothing.value = props.theme === 'light' ? glassPresets.light.sminSmoothing : glassPresets.dark.sminSmoothing
+  uniforms.glassThickness.value =
+    props.theme === 'light' ? glassPresets.light.glassThickness : glassPresets.dark.glassThickness
+  uniforms.normalStrength.value =
+    props.theme === 'light' ? glassPresets.light.normalStrength : glassPresets.dark.normalStrength
+  uniforms.displacementScale.value =
+    props.theme === 'light'
+      ? glassPresets.light.displacementScale
+      : glassPresets.dark.displacementScale
+  uniforms.heightTransitionWidth.value =
+    props.theme === 'light'
+      ? glassPresets.light.heightTransitionWidth
+      : glassPresets.dark.heightTransitionWidth
+  uniforms.sminSmoothing.value =
+    props.theme === 'light' ? glassPresets.light.sminSmoothing : glassPresets.dark.sminSmoothing
   uniforms.blurRadius.value = getEffectiveBlurRadius(props.theme)
-  uniforms.highlightWidth.value = props.theme === 'light' ? glassPresets.light.highlightWidth : glassPresets.dark.highlightWidth
-  uniforms.overlayColor.value = [...(props.theme === 'light' ? glassPresets.light.overlayColor : glassPresets.dark.overlayColor), 1.0] as [number, number, number, number]
+  uniforms.highlightWidth.value =
+    props.theme === 'light' ? glassPresets.light.highlightWidth : glassPresets.dark.highlightWidth
+  uniforms.overlayColor.value = [
+    ...(props.theme === 'light' ? glassPresets.light.overlayColor : glassPresets.dark.overlayColor),
+    1.0,
+  ] as [number, number, number, number]
 
   return true
 }
@@ -416,7 +446,10 @@ function isScrollableElement(element: HTMLElement): boolean {
   const style = window.getComputedStyle(element)
   const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`
   const canScroll = /(auto|scroll|overlay)/.test(overflow)
-  return canScroll && (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
+  return (
+    canScroll &&
+    (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
+  )
 }
 
 function getScrollParents(element: HTMLElement): HTMLElement[] {
@@ -591,7 +624,9 @@ onMounted(() => {
   window.addEventListener('scroll', scrollHandler, scrollOptions)
   if (props.realtimeOffset) {
     scrollParents = getScrollParents(containerEl)
-    scrollParents.forEach((parent) => parent.addEventListener('scroll', scrollHandler!, scrollOptions))
+    scrollParents.forEach((parent) =>
+      parent.addEventListener('scroll', scrollHandler!, scrollOptions),
+    )
   }
 
   // 不立即启动渲染循环，等背景图加载完成后再开始（由 loadBgImage 中的 bgLoaded = true 触发）
@@ -603,7 +638,9 @@ onUnmounted(() => {
   window.removeEventListener('resize', resizeCanvas)
   if (scrollHandler) {
     window.removeEventListener('scroll', scrollHandler, scrollOptions)
-    scrollParents.forEach((parent) => parent.removeEventListener('scroll', scrollHandler!, scrollOptions))
+    scrollParents.forEach((parent) =>
+      parent.removeEventListener('scroll', scrollHandler!, scrollOptions),
+    )
   }
   scrollParents = []
   scrollHandler = null

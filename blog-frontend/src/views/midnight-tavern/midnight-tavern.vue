@@ -49,10 +49,11 @@
                   <span class="tag-separator">：</span>
                   <span class="tag-topic">{{ post.topic }}</span>
                 </span>
-                <span class="tag-action">{{ activePostId === post.id ? '收好瓶塞' : '拆开纸签' }}</span>
+                <span class="tag-action">{{
+                  activePostId === post.id ? '收好瓶塞' : '拆开纸签'
+                }}</span>
               </span>
             </button>
-
           </div>
         </div>
       </section>
@@ -60,10 +61,17 @@
 
     <Transition name="letter-fade">
       <div v-if="selectedPost" class="letter-overlay" @click.self="closePost">
-        <article class="letter-modal" role="dialog" aria-modal="true" :aria-labelledby="`letter-title-${selectedPost.id}`">
+        <article
+          class="letter-modal"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="`letter-title-${selectedPost.id}`"
+        >
           <button class="letter-close" type="button" @click="closePost">收回瓶中信</button>
           <p class="letter-kicker">来自:{{ selectedPost.author }}</p>
-          <h2 :id="`letter-title-${selectedPost.id}`" class="letter-title">{{ selectedPost.topic }}</h2>
+          <h2 :id="`letter-title-${selectedPost.id}`" class="letter-title">
+            {{ selectedPost.topic }}
+          </h2>
           <div class="letter-body">
             <p>{{ selectedPost.body }}</p>
           </div>
@@ -74,13 +82,26 @@
     <button class="write-trigger" type="button" @click="composerOpen = true">投下一只瓶子</button>
 
     <Transition name="composer-fade">
-      <div v-if="composerOpen" class="composer-panel" role="dialog" aria-modal="true" aria-label="投下一只瓶子">
+      <div
+        v-if="composerOpen"
+        class="composer-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="投下一只瓶子"
+      >
         <div class="composer-head">
           <div>
             <p class="composer-kicker">Bottle a note</p>
             <h2 class="composer-title">投下一只瓶子</h2>
           </div>
-          <button class="composer-close" type="button" aria-label="关闭" @click="composerOpen = false">×</button>
+          <button
+            class="composer-close"
+            type="button"
+            aria-label="关闭"
+            @click="composerOpen = false"
+          >
+            ×
+          </button>
         </div>
         <p class="composer-copy">未来登录后,这只瓶子会真正漂进酒馆里。现在先作为 UI 预览。</p>
         <label class="composer-field">
@@ -168,7 +189,9 @@ const tavernPosts: TavernPost[] = [
   },
 ]
 
-const selectedPost = computed(() => tavernPosts.find((post) => post.id === activePostId.value) ?? null)
+const selectedPost = computed(
+  () => tavernPosts.find((post) => post.id === activePostId.value) ?? null,
+)
 
 function togglePost(id: string) {
   activePostId.value = activePostId.value === id ? null : id
@@ -206,7 +229,12 @@ function closePost() {
   width: min(46rem, 92vw);
   height: 34rem;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 186, 92, 0.28), rgba(255, 186, 92, 0.08) 42%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 186, 92, 0.28),
+    rgba(255, 186, 92, 0.08) 42%,
+    transparent 70%
+  );
   pointer-events: none;
   transform: translateX(-50%);
 }
@@ -521,8 +549,7 @@ function closePost() {
   border-radius: 0.58rem;
   padding: 0.78rem 0.72rem 0.62rem;
   background:
-    linear-gradient(135deg, rgba(255, 243, 213, 0.94), rgba(206, 174, 121, 0.92)),
-    #e7c98f;
+    linear-gradient(135deg, rgba(255, 243, 213, 0.94), rgba(206, 174, 121, 0.92)), #e7c98f;
   color: rgba(62, 41, 25, 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.42),
@@ -598,8 +625,7 @@ function closePost() {
   padding: clamp(1.4rem, 4vw, 2.2rem);
   background:
     radial-gradient(circle at 16% 10%, rgba(255, 255, 255, 0.34), transparent 22%),
-    linear-gradient(135deg, rgba(255, 244, 217, 0.96), rgba(207, 174, 117, 0.94)),
-    #e4c68e;
+    linear-gradient(135deg, rgba(255, 244, 217, 0.96), rgba(207, 174, 117, 0.94)), #e4c68e;
   color: rgba(61, 40, 24, 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
@@ -670,7 +696,9 @@ function closePost() {
 
 .letter-fade-enter-active .letter-modal,
 .letter-fade-leave-active .letter-modal {
-  transition: transform 0.24s ease, opacity 0.24s ease;
+  transition:
+    transform 0.24s ease,
+    opacity 0.24s ease;
 }
 
 .letter-fade-enter-from,
@@ -766,7 +794,9 @@ function closePost() {
 
 .composer-fade-enter-active,
 .composer-fade-leave-active {
-  transition: opacity 0.24s ease, transform 0.24s ease;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
 }
 
 .composer-fade-enter-from,

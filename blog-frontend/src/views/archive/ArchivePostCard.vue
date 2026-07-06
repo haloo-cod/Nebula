@@ -6,7 +6,11 @@
   <div class="archive-card__body">
     <h3 class="archive-card__title">{{ post.title }}</h3>
     <p v-if="post.description" class="archive-card__desc">{{ post.description }}</p>
-    <span v-if="post.category" class="archive-card__cat" :class="`cat-${catColorKey(post.category)}`">
+    <span
+      v-if="post.category"
+      class="archive-card__cat"
+      :class="`cat-${catColorKey(post.category)}`"
+    >
       {{ post.category }}
     </span>
   </div>

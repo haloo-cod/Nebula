@@ -23,7 +23,9 @@
           >
             <article class="book-card book-card--liquid">
               <div class="book-cover" :style="getCoverStyle(book)">
-                <span v-if="!book.cover" class="book-cover-placeholder">{{ getPlaceholderLabel(book.title) }}</span>
+                <span v-if="!book.cover" class="book-cover-placeholder">{{
+                  getPlaceholderLabel(book.title)
+                }}</span>
               </div>
               <div class="book-info">
                 <h2 class="book-name">{{ book.title }}</h2>
@@ -34,7 +36,9 @@
 
           <PanelFallbackGlass v-else tag="article" class="book-card book-card-fallback">
             <div class="book-cover" :style="getCoverStyle(book)">
-              <span v-if="!book.cover" class="book-cover-placeholder">{{ getPlaceholderLabel(book.title) }}</span>
+              <span v-if="!book.cover" class="book-cover-placeholder">{{
+                getPlaceholderLabel(book.title)
+              }}</span>
             </div>
             <div class="book-info">
               <h2 class="book-name">{{ book.title }}</h2>
@@ -45,7 +49,9 @@
       </div>
 
       <div v-if="totalPages > 1" class="books-pagination">
-        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">上一页</button>
+        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
+          上一页
+        </button>
         <button
           v-for="page in pageNumbers"
           :key="page"
@@ -56,7 +62,14 @@
         >
           {{ page }}
         </button>
-        <button class="page-btn" type="button" :disabled="currentPage === totalPages" @click="goNextPage">下一页</button>
+        <button
+          class="page-btn"
+          type="button"
+          :disabled="currentPage === totalPages"
+          @click="goNextPage"
+        >
+          下一页
+        </button>
       </div>
     </div>
   </PageBackground>
@@ -84,7 +97,9 @@ const visibleBooks = computed(() => {
   return books.value.slice(start, start + PAGE_SIZE)
 })
 
-const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, index) => index + 1))
+const pageNumbers = computed(() =>
+  Array.from({ length: totalPages.value }, (_, index) => index + 1),
+)
 
 function getCoverStyle(book: Book) {
   if (!book.cover) return {}

@@ -38,7 +38,8 @@
           target="_blank"
           rel="noopener"
           class="hp-social-icon"
-        >{{ link.icon }}</a>
+          >{{ link.icon }}</a
+        >
       </div>
     </div>
   </div>

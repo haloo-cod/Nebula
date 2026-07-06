@@ -4,94 +4,93 @@
       <div class="timeline-wrap post-rise-inner">
         <div class="timeline-viewport">
           <div class="timeline-stage" :style="stageStyle">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="river-svg"
-            :width="trackW"
-            :height="svgH"
-            :viewBox="`0 0 ${trackW} ${svgH}`"
-          >
-            <defs>
-              <linearGradient id="river-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="rgba(56,189,248,0.08)" />
-                <stop offset="20%" stop-color="rgba(99,179,237,0.6)" />
-                <stop offset="50%" stop-color="rgba(129,140,248,0.7)" />
-                <stop offset="80%" stop-color="rgba(167,139,250,0.5)" />
-                <stop offset="100%" stop-color="rgba(56,189,248,0.08)" />
-              </linearGradient>
-            </defs>
-
-            <!-- 外层大发光 -->
-            <path :d="riverPath" class="river-glow-outer" />
-            <!-- 中层发光 -->
-            <path :d="riverPath" class="river-glow-mid" />
-            <!-- 内层发光 -->
-            <path :d="riverPath" class="river-glow-inner" />
-            <!-- 主曲线 -->
-            <path :d="riverPath" class="river-path" />
-            <!-- 流动粒子 -->
-            <circle class="particle" r="4">
-              <animateMotion dur="14s" repeatCount="indefinite" :path="riverPath" begin="0s" />
-            </circle>
-            <circle class="particle" r="3.5">
-              <animateMotion dur="18s" repeatCount="indefinite" :path="riverPath" begin="5s" />
-            </circle>
-            <circle class="particle" r="3">
-              <animateMotion dur="16s" repeatCount="indefinite" :path="riverPath" begin="9s" />
-            </circle>
-
-            <!-- 连接线 -->
-            <line
-              v-for="(n, i) in nodes"
-              :key="'cl' + i"
-              :x1="n.x"
-              :y1="n.y"
-              :x2="n.x"
-              :y2="i % 2 === 0 ? n.y - connLen : n.y + connLen"
-              class="conn-line"
-            />
-            <!-- 节点 -->
-            <circle
-              v-for="(n, i) in nodes"
-              :key="'nd' + i"
-              :cx="n.x"
-              :cy="n.y"
-              r="6"
-              class="node-dot"
-            />
-            <circle
-              v-for="(n, i) in nodes"
-              :key="'ng' + i"
-              :cx="n.x"
-              :cy="n.y"
-              r="14"
-              class="node-glow"
-            />
-
-          </svg>
-
-          <RouterLink
-            v-for="(post, i) in posts"
-            :key="post.slug"
-            :to="`/archive/post/${post.slug}`"
-            class="archive-link"
-            :style="cardStyle(i)"
-          >
-            <div v-if="!ui.liquidGlassEnabled" class="archive-panel">
-              <ArchivePostCard :post="post" />
-            </div>
-
-            <LazyLiquidGlass
-              v-else
-              class="archive-glass"
-              :corner-radius="16"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              realtime-offset
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="river-svg"
+              :width="trackW"
+              :height="svgH"
+              :viewBox="`0 0 ${trackW} ${svgH}`"
             >
-              <ArchivePostCard :post="post" />
-            </LazyLiquidGlass>
-          </RouterLink>
+              <defs>
+                <linearGradient id="river-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="rgba(56,189,248,0.08)" />
+                  <stop offset="20%" stop-color="rgba(99,179,237,0.6)" />
+                  <stop offset="50%" stop-color="rgba(129,140,248,0.7)" />
+                  <stop offset="80%" stop-color="rgba(167,139,250,0.5)" />
+                  <stop offset="100%" stop-color="rgba(56,189,248,0.08)" />
+                </linearGradient>
+              </defs>
+
+              <!-- 外层大发光 -->
+              <path :d="riverPath" class="river-glow-outer" />
+              <!-- 中层发光 -->
+              <path :d="riverPath" class="river-glow-mid" />
+              <!-- 内层发光 -->
+              <path :d="riverPath" class="river-glow-inner" />
+              <!-- 主曲线 -->
+              <path :d="riverPath" class="river-path" />
+              <!-- 流动粒子 -->
+              <circle class="particle" r="4">
+                <animateMotion dur="14s" repeatCount="indefinite" :path="riverPath" begin="0s" />
+              </circle>
+              <circle class="particle" r="3.5">
+                <animateMotion dur="18s" repeatCount="indefinite" :path="riverPath" begin="5s" />
+              </circle>
+              <circle class="particle" r="3">
+                <animateMotion dur="16s" repeatCount="indefinite" :path="riverPath" begin="9s" />
+              </circle>
+
+              <!-- 连接线 -->
+              <line
+                v-for="(n, i) in nodes"
+                :key="'cl' + i"
+                :x1="n.x"
+                :y1="n.y"
+                :x2="n.x"
+                :y2="i % 2 === 0 ? n.y - connLen : n.y + connLen"
+                class="conn-line"
+              />
+              <!-- 节点 -->
+              <circle
+                v-for="(n, i) in nodes"
+                :key="'nd' + i"
+                :cx="n.x"
+                :cy="n.y"
+                r="6"
+                class="node-dot"
+              />
+              <circle
+                v-for="(n, i) in nodes"
+                :key="'ng' + i"
+                :cx="n.x"
+                :cy="n.y"
+                r="14"
+                class="node-glow"
+              />
+            </svg>
+
+            <RouterLink
+              v-for="(post, i) in posts"
+              :key="post.slug"
+              :to="`/archive/post/${post.slug}`"
+              class="archive-link"
+              :style="cardStyle(i)"
+            >
+              <div v-if="!ui.liquidGlassEnabled" class="archive-panel">
+                <ArchivePostCard :post="post" />
+              </div>
+
+              <LazyLiquidGlass
+                v-else
+                class="archive-glass"
+                :corner-radius="16"
+                :theme="ui.theme"
+                :blur-radius="ui.liquidGlassBlur"
+                realtime-offset
+              >
+                <ArchivePostCard :post="post" />
+              </LazyLiquidGlass>
+            </RouterLink>
           </div>
         </div>
       </div>
@@ -183,7 +182,6 @@ function cardStyle(index: number) {
     height: `${cardH}px`,
   }
 }
-
 </script>
 
 <style scoped>
@@ -390,6 +388,5 @@ function cardStyle(index: number) {
     padding-right: 0.75rem;
     min-height: auto;
   }
-
 }
 </style>

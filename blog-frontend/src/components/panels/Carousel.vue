@@ -3,11 +3,7 @@
     <div class="carousel-viewport">
       <div class="carousel-track" ref="trackRef" :style="trackStyle">
         <!-- 尾部克隆：最后一张 -->
-        <img
-          :src="images[images.length - 1]"
-          class="carousel-slide clone"
-          loading="lazy"
-        />
+        <img :src="images[images.length - 1]" class="carousel-slide clone" loading="lazy" />
         <!-- 真实图片 -->
         <img
           v-for="(img, i) in images"
@@ -18,11 +14,7 @@
           loading="lazy"
         />
         <!-- 头部克隆：第一张 -->
-        <img
-          :src="images[0]"
-          class="carousel-slide clone"
-          loading="lazy"
-        />
+        <img :src="images[0]" class="carousel-slide clone" loading="lazy" />
       </div>
     </div>
     <div class="carousel-dots">

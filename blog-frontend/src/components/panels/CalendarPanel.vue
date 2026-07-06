@@ -53,56 +53,56 @@
   </GlassPanel>
   <template v-else>
     <div class="cal-content-flat" :class="calendarThemeClass">
-    <!-- 头部：年月 + 切换 -->
-    <div class="cal-header">
-      <button class="cal-nav" @click="prevMonth" aria-label="上个月">
-        <SvgIcon name="arrow_back_ios" />
-      </button>
-      <div class="cal-title">
-        <span class="cal-ym">{{ viewYear }}年{{ viewMonth }}月</span>
-        <button class="cal-today-btn" v-if="!isCurrentMonth" @click="goToday">回今天</button>
+      <!-- 头部：年月 + 切换 -->
+      <div class="cal-header">
+        <button class="cal-nav" @click="prevMonth" aria-label="上个月">
+          <SvgIcon name="arrow_back_ios" />
+        </button>
+        <div class="cal-title">
+          <span class="cal-ym">{{ viewYear }}年{{ viewMonth }}月</span>
+          <button class="cal-today-btn" v-if="!isCurrentMonth" @click="goToday">回今天</button>
+        </div>
+        <button class="cal-nav" @click="nextMonth" aria-label="下个月">
+          <SvgIcon name="arrow_forward_ios" />
+        </button>
       </div>
-      <button class="cal-nav" @click="nextMonth" aria-label="下个月">
-        <SvgIcon name="arrow_forward_ios" />
-      </button>
-    </div>
 
-    <!-- 星期表头 -->
-    <div class="cal-grid cal-weekdays">
-      <span
-        v-for="(w, i) in weekLabels"
-        :key="w"
-        class="cal-weekday glass-subtle"
-        :class="{ 'is-weekend': i === 0 || i === 6 }"
-        >{{ w }}</span
-      >
-    </div>
-
-    <!-- 日期格子 -->
-    <div class="cal-grid cal-days">
-      <div
-        v-for="(cell, idx) in cells"
-        :key="idx"
-        class="cal-cell"
-        :class="{
-          'is-empty': !cell,
-          'is-today': cell && cell.isToday,
-          'is-weekend': cell && cell.isWeekend,
-          'is-off': cell && cell.holiday && cell.holiday.isOff,
-          'is-work': cell && cell.holiday && cell.holiday.isWork,
-        }"
-        :title="cell ? cellTitle(cell) : ''"
-      >
-        <template v-if="cell">
-          <span class="cal-num">{{ cell.day }}</span>
-          <span class="cal-sub" v-if="cell.label">{{ cell.label }}</span>
-          <span class="cal-tag" v-if="cell.holiday && cell.holiday.isOff">休</span>
-          <span class="cal-tag cal-tag-work" v-else-if="cell.holiday && cell.holiday.isWork"
-            >班</span
-          >
-        </template>
+      <!-- 星期表头 -->
+      <div class="cal-grid cal-weekdays">
+        <span
+          v-for="(w, i) in weekLabels"
+          :key="w"
+          class="cal-weekday glass-subtle"
+          :class="{ 'is-weekend': i === 0 || i === 6 }"
+          >{{ w }}</span
+        >
       </div>
-    </div>
+
+      <!-- 日期格子 -->
+      <div class="cal-grid cal-days">
+        <div
+          v-for="(cell, idx) in cells"
+          :key="idx"
+          class="cal-cell"
+          :class="{
+            'is-empty': !cell,
+            'is-today': cell && cell.isToday,
+            'is-weekend': cell && cell.isWeekend,
+            'is-off': cell && cell.holiday && cell.holiday.isOff,
+            'is-work': cell && cell.holiday && cell.holiday.isWork,
+          }"
+          :title="cell ? cellTitle(cell) : ''"
+        >
+          <template v-if="cell">
+            <span class="cal-num">{{ cell.day }}</span>
+            <span class="cal-sub" v-if="cell.label">{{ cell.label }}</span>
+            <span class="cal-tag" v-if="cell.holiday && cell.holiday.isOff">休</span>
+            <span class="cal-tag cal-tag-work" v-else-if="cell.holiday && cell.holiday.isWork"
+              >班</span
+            >
+          </template>
+        </div>
+      </div>
     </div>
   </template>
 </template>

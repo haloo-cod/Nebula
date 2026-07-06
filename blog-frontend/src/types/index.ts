@@ -36,6 +36,18 @@ export interface PostStat {
   count: number // 该年发表数量
 }
 
+/** 展览页项目元数据与 Markdown 正文 */
+export interface GalleryProject {
+  slug: string // URL 标识,对应 src/assets/projects 下的 Markdown 文件名
+  title: string // 项目名称
+  description: string // 项目简介
+  tags: string[] // 项目标签
+  status: string // 项目状态,如 构建中 / 重构中
+  year: string // 项目年份或阶段年份
+  featured?: boolean // 是否作为重点项目展示
+  content: string // Markdown 正文原文(渲染时才转 HTML)
+}
+
 /** 图书元数据(列表与阅读器共用,EPUB 元数据可按需补全) */
 export interface Book {
   slug: string // URL 标识,由 EPUB 文件名或后端标识生成

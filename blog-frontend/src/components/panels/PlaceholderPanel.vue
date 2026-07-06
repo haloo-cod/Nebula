@@ -1,16 +1,11 @@
 <template>
-  <div
-    :flat="flat"
-    class="panel-placeholder flex flex-col items-center justify-center text-center"
-  >
+  <div :flat="flat" class="panel-placeholder flex flex-col items-center justify-center text-center">
     <span class="placeholder-icon">{{ icon }}</span>
     <span class="placeholder-text">{{ text }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
-
-
 withDefaults(
   defineProps<{
     icon?: string // 占位图标
@@ -25,6 +20,4 @@ withDefaults(
 )
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

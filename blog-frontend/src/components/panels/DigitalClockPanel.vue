@@ -64,7 +64,8 @@ onUnmounted(() => {
   gap: 0.05em;
   width: 100%;
   height: 100%;
-  font-family: 'DS-DIGIT', 'SFMono-Regular', 'Cascadia Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-family:
+    'DS-DIGIT', 'SFMono-Regular', 'Cascadia Mono', 'Cascadia Code', 'Consolas', monospace;
   color: var(--clock-main-color);
   text-shadow:
     0 0 12px rgba(170, 225, 255, 0.22),

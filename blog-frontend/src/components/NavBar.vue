@@ -75,14 +75,28 @@
         </div>
       </Transition>
       <Transition name="tavern-confirm">
-        <div v-if="tavernConfirmOpen" class="tavern-confirm" role="dialog" aria-modal="true" aria-label="深夜酒馆入口确认">
+        <div
+          v-if="tavernConfirmOpen"
+          class="tavern-confirm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="深夜酒馆入口确认"
+        >
           <p class="tavern-confirm-kicker">深夜的门铃响了第五次</p>
           <p class="tavern-confirm-title">酒馆的门开了一条缝，要进去吗？</p>
           <div class="tavern-confirm-actions">
-            <button class="tavern-confirm-btn tavern-confirm-btn--ghost" type="button" @click="cancelTavernEntry">
+            <button
+              class="tavern-confirm-btn tavern-confirm-btn--ghost"
+              type="button"
+              @click="cancelTavernEntry"
+            >
               先不进去
             </button>
-            <button class="tavern-confirm-btn tavern-confirm-btn--primary" type="button" @click="enterTavern">
+            <button
+              class="tavern-confirm-btn tavern-confirm-btn--primary"
+              type="button"
+              @click="enterTavern"
+            >
               进入深夜酒馆
             </button>
           </div>
@@ -105,7 +119,9 @@
               <div class="settings-head">
                 <div class="settings-copy">
                   <span class="settings-title">背景模糊</span>
-                  <span class="settings-value">{{ ui.backgroundBlurEnabled ? ui.backgroundBlur : 0 }}px</span>
+                  <span class="settings-value"
+                    >{{ ui.backgroundBlurEnabled ? ui.backgroundBlur : 0 }}px</span
+                  >
                 </div>
                 <button
                   class="settings-toggle"
@@ -358,7 +374,10 @@ function onThemePointerMove(e: PointerEvent) {
       : THEME_PULL_THRESHOLD +
         (maxVisualDistance - THEME_PULL_THRESHOLD) *
           Math.pow(
-            Math.min(1, (rawDistance - THEME_PULL_THRESHOLD) / (maxVisualDistance - THEME_PULL_THRESHOLD)),
+            Math.min(
+              1,
+              (rawDistance - THEME_PULL_THRESHOLD) / (maxVisualDistance - THEME_PULL_THRESHOLD),
+            ),
             1.35,
           )
   pullDistance.value = distance
@@ -443,9 +462,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: '首页', path: '/', icon: 'home' },
+  { label: '博文', path: '/blog', icon: 'article' },
   { label: '图书', path: '/books', icon: 'book' },
   { label: '归档', path: '/archive', icon: 'archive' },
   { label: '展览', path: '/gallery', icon: 'gallery' },
+  { label: '图片', path: '/images', icon: 'photo' },
   { label: '友链', path: '/friends', icon: 'friends' },
   { label: '藏宝阁', path: '/treasure', icon: 'gift' },
   { label: '关于', path: '/about', icon: 'about' },
@@ -456,7 +477,8 @@ const router = useRouter()
 const menuOpen = ref(false)
 
 function isActive(path: string): boolean {
-  if (path === '/') return route.path === '/' || route.path.startsWith('/post/')
+  if (path === '/') return route.path === '/'
+  if (path === '/blog') return route.path === '/blog' || route.path.startsWith('/post/')
   return route.path === path || route.path.startsWith(path + '/')
 }
 
@@ -741,7 +763,9 @@ onUnmounted(() => {
 
 .theme-toast-enter-active,
 .theme-toast-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .theme-toast-enter-from,
@@ -759,8 +783,7 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 231, 186, 0.22);
   border-radius: 1.2rem;
   background:
-    linear-gradient(135deg, rgba(44, 30, 20, 0.78), rgba(18, 24, 34, 0.7)),
-    rgba(20, 18, 22, 0.68);
+    linear-gradient(135deg, rgba(44, 30, 20, 0.78), rgba(18, 24, 34, 0.7)), rgba(20, 18, 22, 0.68);
   color: rgba(255, 246, 225, 0.92);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -817,7 +840,9 @@ onUnmounted(() => {
 
 .tavern-confirm-enter-active,
 .tavern-confirm-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
 }
 
 .tavern-confirm-enter-from,
@@ -849,7 +874,12 @@ onUnmounted(() => {
   height: 10px;
   border-radius: 50%;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18) 70%, transparent 72%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.72),
+    rgba(255, 255, 255, 0.18) 70%,
+    transparent 72%
+  );
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.18),
     0 0 12px rgba(255, 255, 255, 0.32);
@@ -873,7 +903,12 @@ onUnmounted(() => {
   height: var(--cord-length, 48px);
   border-radius: 999px;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.22)),
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.18),
+      rgba(255, 255, 255, 0.86),
+      rgba(255, 255, 255, 0.22)
+    ),
     rgba(255, 255, 255, 0.18);
   box-shadow:
     0 0 8px rgba(255, 255, 255, 0.28),
@@ -1080,7 +1115,9 @@ onUnmounted(() => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .settings-toggle--on {
@@ -1117,7 +1154,9 @@ onUnmounted(() => {
 
 .settings-drop-enter-active,
 .settings-drop-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
 
 .settings-drop-enter-from,

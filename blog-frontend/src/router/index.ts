@@ -23,6 +23,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/books/reader.vue'),
   },
   {
+    path: '/blog',
+    name: 'blog',
+    component: () => import('../views/blog/blog.vue'),
+  },
+  {
+    path: '/images',
+    name: 'images',
+    component: () => import('../views/images/images.vue'),
+  },
+  {
     path: '/archive/tree',
     name: 'archive-tree',
     component: () => import('../views/archive/ArchiveTreePoster.vue'),
@@ -35,19 +45,13 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/gallery',
+    name: 'gallery',
     component: () => import('../views/gallery/gallery.vue'),
-    children: [
-      {
-        path: '',
-        name: 'gallery',
-        component: () => import('../views/gallery/GalleryHome.vue'),
-      },
-      {
-        path: ':module',
-        name: 'gallery-module',
-        component: () => import('../views/gallery/GalleryModule.vue'),
-      },
-    ],
+  },
+  {
+    path: '/gallery/project/:slug',
+    name: 'gallery-project',
+    component: () => import('../views/gallery/project.vue'),
   },
   {
     path: '/friends',

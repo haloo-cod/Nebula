@@ -82,7 +82,9 @@ const nearViewport = ref(false)
 const hasGlassSlot = ref(false)
 let observer: IntersectionObserver | null = null
 
-const shouldRenderLiquidGlass = computed(() => ui.liquidGlassEnabled && nearViewport.value && hasGlassSlot.value)
+const shouldRenderLiquidGlass = computed(
+  () => ui.liquidGlassEnabled && nearViewport.value && hasGlassSlot.value,
+)
 
 function releaseGlassSlot() {
   if (!hasGlassSlot.value) return

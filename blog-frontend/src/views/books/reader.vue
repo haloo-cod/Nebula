@@ -56,9 +56,23 @@
         </button>
 
         <div class="font-control">
-          <button class="reader-icon-btn" type="button" aria-label="减小字号" @click="decreaseFontSize">A-</button>
+          <button
+            class="reader-icon-btn"
+            type="button"
+            aria-label="减小字号"
+            @click="decreaseFontSize"
+          >
+            A-
+          </button>
           <span class="font-scale">{{ fontScale }}%</span>
-          <button class="reader-icon-btn" type="button" aria-label="增大字号" @click="increaseFontSize">A+</button>
+          <button
+            class="reader-icon-btn"
+            type="button"
+            aria-label="增大字号"
+            @click="increaseFontSize"
+          >
+            A+
+          </button>
         </div>
       </div>
     </header>
@@ -98,7 +112,9 @@
           <div v-if="loading" class="reader-state">正在整理书页...</div>
           <div v-else-if="error" class="reader-state reader-state-error">
             <p>{{ error }}</p>
-            <p class="reader-hint">请确认图书文件仍位于 src/assets/testepub/ 且构建后资源可正常访问。</p>
+            <p class="reader-hint">
+              请确认图书文件仍位于 src/assets/testepub/ 且构建后资源可正常访问。
+            </p>
           </div>
           <div
             :key="viewerKey"
@@ -121,8 +137,12 @@
     </main>
 
     <footer class="reader-footer" v-if="!loading && !error">
-      <button class="reader-btn" type="button" :disabled="!rendition" @click="prevPage">上一页</button>
-      <button class="reader-btn" type="button" :disabled="!rendition" @click="nextPage">下一页</button>
+      <button class="reader-btn" type="button" :disabled="!rendition" @click="prevPage">
+        上一页
+      </button>
+      <button class="reader-btn" type="button" :disabled="!rendition" @click="nextPage">
+        下一页
+      </button>
     </footer>
   </div>
 </template>
@@ -206,7 +226,8 @@ function isReaderTheme(value: unknown): value is ReaderTheme {
 }
 
 function clampFontScale(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return defaultReaderPreferences.fontScale
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return defaultReaderPreferences.fontScale
   return Math.min(130, Math.max(85, Math.round(value / 5) * 5))
 }
 
@@ -270,7 +291,8 @@ function getReaderAnchorForModeChange(from: ReadingMode, to: ReadingMode): Reade
   const location = getCurrentLocation()
   if (!location) return { cfi: currentCfi, href: currentHref }
 
-  const anchorPoint = from === 'paginated' && to === 'scrolled' ? location.end || location.start : location.start
+  const anchorPoint =
+    from === 'paginated' && to === 'scrolled' ? location.end || location.start : location.start
   currentCfi = anchorPoint?.cfi || currentCfi
   currentHref = anchorPoint?.href || currentHref
   return {
@@ -399,7 +421,9 @@ function normalizeTocHref(href: string): string {
 
 function isTocItemActive(href: string): boolean {
   if (!activeTocHref.value) return false
-  return activeTocHref.value === href || normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
+  return (
+    activeTocHref.value === href || normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
+  )
 }
 
 async function displayTocItem(href: string) {
@@ -519,14 +543,24 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.72), transparent 28%),
     radial-gradient(circle at 88% 18%, rgba(159, 202, 228, 0.52), transparent 32%),
-    linear-gradient(135deg, rgba(228, 241, 247, 0.96), rgba(241, 232, 211, 0.92) 54%, rgba(205, 226, 238, 0.94));
+    linear-gradient(
+      135deg,
+      rgba(228, 241, 247, 0.96),
+      rgba(241, 232, 211, 0.92) 54%,
+      rgba(205, 226, 238, 0.94)
+    );
 }
 
 .reader-page--night .reader-bg {
   background:
     radial-gradient(circle at 14% 12%, rgba(98, 125, 144, 0.46), transparent 30%),
     radial-gradient(circle at 88% 20%, rgba(172, 145, 112, 0.22), transparent 32%),
-    linear-gradient(135deg, rgba(29, 38, 48, 0.98), rgba(42, 45, 47, 0.96) 55%, rgba(24, 34, 43, 0.98));
+    linear-gradient(
+      135deg,
+      rgba(29, 38, 48, 0.98),
+      rgba(42, 45, 47, 0.96) 55%,
+      rgba(24, 34, 43, 0.98)
+    );
 }
 
 .reader-ambient {
@@ -858,7 +892,13 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 1.65rem;
   background:
-    linear-gradient(90deg, rgba(215, 197, 162, 0.26), transparent 7%, transparent 93%, rgba(214, 197, 162, 0.2)),
+    linear-gradient(
+      90deg,
+      rgba(215, 197, 162, 0.26),
+      transparent 7%,
+      transparent 93%,
+      rgba(214, 197, 162, 0.2)
+    ),
     linear-gradient(180deg, #f8f1e2, #f1e6d1);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -870,7 +910,13 @@ onUnmounted(() => {
 .reader-page--night .paper-shell {
   border-color: rgba(255, 244, 221, 0.16);
   background:
-    linear-gradient(90deg, rgba(20, 18, 15, 0.24), transparent 7%, transparent 93%, rgba(20, 18, 15, 0.2)),
+    linear-gradient(
+      90deg,
+      rgba(20, 18, 15, 0.24),
+      transparent 7%,
+      transparent 93%,
+      rgba(20, 18, 15, 0.2)
+    ),
     linear-gradient(180deg, #3a342c, #2f2b26);
   box-shadow:
     inset 0 1px 0 rgba(255, 244, 221, 0.1),

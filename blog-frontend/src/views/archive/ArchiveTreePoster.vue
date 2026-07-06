@@ -2,7 +2,11 @@
   <PageBackground :overlay="0.14">
     <div class="archive-tree-page">
       <div class="archive-tree-stage" :style="{ height: `${stageHeight}px` }">
-        <svg class="archive-tree-svg" :viewBox="`0 0 ${stageWidth} ${stageHeight}`" preserveAspectRatio="none">
+        <svg
+          class="archive-tree-svg"
+          :viewBox="`0 0 ${stageWidth} ${stageHeight}`"
+          preserveAspectRatio="none"
+        >
           <defs>
             <filter id="treeSketchGlow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="4" result="blur" />
@@ -21,7 +25,12 @@
 
             <path v-for="line in barkLines" :key="line" :d="line" class="tree-bark-line" />
 
-            <path v-for="branch in branches" :key="branch.id" :d="branch.path" class="tree-branch-line" />
+            <path
+              v-for="branch in branches"
+              :key="branch.id"
+              :d="branch.path"
+              class="tree-branch-line"
+            />
             <path v-for="twig in crownTwigs" :key="twig" :d="twig" class="tree-crown-line" />
           </g>
         </svg>
@@ -62,13 +71,21 @@
             <span class="archive-leaf-card-pin"></span>
             <span class="archive-leaf-card-string"></span>
             <div class="archive-leaf-card-head">
-              <span class="archive-leaf-card-date">{{ card.monthLabel }} / {{ card.dayLabel }}</span>
-              <span v-if="card.category" class="archive-leaf-card-category">{{ card.category }}</span>
+              <span class="archive-leaf-card-date"
+                >{{ card.monthLabel }} / {{ card.dayLabel }}</span
+              >
+              <span v-if="card.category" class="archive-leaf-card-category">{{
+                card.category
+              }}</span>
             </div>
             <h3 class="archive-leaf-card-title">{{ card.title }}</h3>
             <p v-if="card.description" class="archive-leaf-card-desc">{{ card.description }}</p>
             <div class="archive-leaf-card-tags">
-              <span v-for="tag in card.tags.slice(0, 2)" :key="`${card.slug}-${tag}`" class="archive-leaf-card-tag">
+              <span
+                v-for="tag in card.tags.slice(0, 2)"
+                :key="`${card.slug}-${tag}`"
+                class="archive-leaf-card-tag"
+              >
                 #{{ tag }}
               </span>
             </div>
@@ -353,7 +370,8 @@ const cards = computed<CardView[]>(() => {
     return group.posts.map((post, postIndex) => {
       const date = new Date(post.date)
       const dayLabel = Number.isNaN(date.getTime()) ? '--' : String(date.getDate()).padStart(2, '0')
-      const offsetY = group.posts.length === 1 ? 0 : (postIndex - (group.posts.length - 1) / 2) * 112
+      const offsetY =
+        group.posts.length === 1 ? 0 : (postIndex - (group.posts.length - 1) / 2) * 112
       const x = branch.endX + direction * 56 - (direction === -1 ? cardWidth : 0)
       const y = branch.endY - 42 + offsetY
 
