@@ -8,6 +8,7 @@
       :blur-radius="ui.liquidGlassBlur"
       :glass-thickness="36"
       :highlight-width="3"
+      ripple-trail
     >
       <ProjectSpecimenCard :project="project" :specimen-index="specimenIndex" />
     </LiquidGlass>

@@ -19,6 +19,10 @@
       :allow-reveal="allowReveal"
       :realtime-offset="realtimeOffset"
       :theme="theme"
+      :ripple-trail="rippleTrail"
+      :ripple-strength="rippleStrength"
+      :ripple-radius="rippleRadius"
+      :ripple-duration="rippleDuration"
     >
       <slot />
     </LiquidGlass>
@@ -61,6 +65,10 @@ const props = withDefaults(
     realtimeOffset?: boolean
     theme?: 'light' | 'dark'
     rootMargin?: string
+    rippleTrail?: boolean
+    rippleStrength?: number
+    rippleRadius?: number
+    rippleDuration?: number
   }>(),
   {
     cornerRadius: 16,
@@ -73,6 +81,10 @@ const props = withDefaults(
     realtimeOffset: false,
     theme: 'dark',
     rootMargin: '360px',
+    rippleTrail: false,
+    rippleStrength: 0.34,
+    rippleRadius: 66,
+    rippleDuration: 1100,
   },
 )
 

@@ -19,6 +19,7 @@
             :cornerRadius="18"
             :theme="ui.theme"
             :blur-radius="ui.liquidGlassBlur"
+            :ripple-trail="true"
             class="book-glass"
           >
             <article class="book-card book-card--liquid">

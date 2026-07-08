@@ -34,6 +34,10 @@ const props = withDefaults(
     allowReveal?: boolean
     realtimeOffset?: boolean
     theme?: 'light' | 'dark'
+    rippleTrail?: boolean
+    rippleStrength?: number
+    rippleRadius?: number
+    rippleDuration?: number
   }>(),
   {
     allowReveal: true,
@@ -45,6 +49,10 @@ const props = withDefaults(
     overlayColor: () => [0.85, 0.9, 1.0] as [number, number, number],
     theme: 'dark',
     realtimeOffset: false,
+    rippleTrail: false,
+    rippleStrength: 0.34,
+    rippleRadius: 66,
+    rippleDuration: 1100,
   },
 )
 
@@ -116,6 +124,19 @@ let scrollOptions: AddEventListenerOptions | undefined
 let scrollParents: HTMLElement[] = []
 let scrollHandler: (() => void) | null = null
 
+const MAX_TRAIL_POINTS = 12
+const TRAIL_MIN_DISTANCE = 14
+
+interface TrailPoint {
+  x: number
+  y: number
+  startedAt: number
+  strength: number
+}
+
+let trailPoints: TrailPoint[] = []
+let lastTrailPoint: [number, number] | null = null
+
 const uniforms = {
   resolution: { loc: null as WebGLUniformLocation | null, value: [0, 0] as [number, number] },
   mousePos: { loc: null as WebGLUniformLocation | null, value: [0, 0] as [number, number] },
@@ -136,6 +157,15 @@ const uniforms = {
     value: [0, 0, 0, 0] as [number, number, number, number],
   },
   highlightWidth: { loc: null as WebGLUniformLocation | null, value: 0 },
+  trailPoints: {
+    locs: [] as Array<WebGLUniformLocation | null>,
+    value: Array.from(
+      { length: MAX_TRAIL_POINTS },
+      () => [0, 0, 1, 0] as [number, number, number, number],
+    ),
+  },
+  trailRadius: { loc: null as WebGLUniformLocation | null, value: 0 },
+  trailStrength: { loc: null as WebGLUniformLocation | null, value: 0 },
 }
 
 // bgUniforms 不再需要（背景由 PageBackground 渲染）
@@ -176,6 +206,9 @@ const fsSource = `
     uniform float u_blurRadius;
     uniform vec4 u_overlayColor;
     uniform float u_highlightWidth;
+    uniform vec4 u_trailPoints[${MAX_TRAIL_POINTS}];
+    uniform float u_trailRadius;
+    uniform float u_trailStrength;
     varying vec2 v_screenTexCoord;
     varying vec2 v_shapeCoord;
 
@@ -215,6 +248,28 @@ const fsSource = `
         return clamp(height, 0.0, 1.0);
     }
 
+    float getTrailDent(vec2 p_pixel_space) {
+        float dent = 0.0;
+        for (int i = 0; i < ${MAX_TRAIL_POINTS}; i++) {
+            vec4 point = u_trailPoints[i];
+            float age = clamp(point.z, 0.0, 1.0);
+            float strength = point.w * u_trailStrength;
+            if (strength > 0.0 && age < 1.0) {
+                float fade = pow(1.0 - age, 2.2);
+                float radius = mix(u_trailRadius * 0.6, u_trailRadius * 1.35, age);
+                float dist = length(p_pixel_space - point.xy);
+                float bowl = exp(-(dist * dist) / (radius * radius));
+                dent += bowl * fade * strength;
+            }
+        }
+        return dent;
+    }
+
+    float getCombinedHeight(vec2 p_pixel_space, vec2 b_pixel_space, float r_pixel, float k_s, float transition_w) {
+        float baseHeight = getHeightFromSDF(p_pixel_space, b_pixel_space, r_pixel, k_s, transition_w);
+        return clamp(baseHeight - getTrailDent(p_pixel_space), 0.0, 1.0);
+    }
+
     void main() {
         float actualCornerRadius = min(u_cornerRadius, min(u_glassSize.x, u_glassSize.y) / 2.0);
         vec2 current_p_pixel = v_shapeCoord * u_glassSize;
@@ -231,18 +286,18 @@ const fsSource = `
         float norm_step_x2 = pixel_step_in_norm_space.x * 1.5;
         float norm_step_y2 = pixel_step_in_norm_space.y * 1.5;
 
-        float h_px1 = getHeightFromSDF((v_shapeCoord + vec2(norm_step_x1, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_nx1 = getHeightFromSDF((v_shapeCoord - vec2(norm_step_x1, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_px2 = getHeightFromSDF((v_shapeCoord + vec2(norm_step_x2, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_nx2 = getHeightFromSDF((v_shapeCoord - vec2(norm_step_x2, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_px1 = getCombinedHeight((v_shapeCoord + vec2(norm_step_x1, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_nx1 = getCombinedHeight((v_shapeCoord - vec2(norm_step_x1, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_px2 = getCombinedHeight((v_shapeCoord + vec2(norm_step_x2, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_nx2 = getCombinedHeight((v_shapeCoord - vec2(norm_step_x2, 0.0)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
         float grad_x1 = (h_px1 - h_nx1) / (2.0 * norm_step_x1 * u_glassSize.x);
         float grad_x2 = (h_px2 - h_nx2) / (2.0 * norm_step_x2 * u_glassSize.x);
         float delta_x = mix(grad_x1, grad_x2, 0.5);
 
-        float h_py1 = getHeightFromSDF((v_shapeCoord + vec2(0.0, norm_step_y1)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_ny1 = getHeightFromSDF((v_shapeCoord - vec2(0.0, norm_step_y1)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_py2 = getHeightFromSDF((v_shapeCoord + vec2(0.0, norm_step_y2)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
-        float h_ny2 = getHeightFromSDF((v_shapeCoord - vec2(0.0, norm_step_y2)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_py1 = getCombinedHeight((v_shapeCoord + vec2(0.0, norm_step_y1)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_ny1 = getCombinedHeight((v_shapeCoord - vec2(0.0, norm_step_y1)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_py2 = getCombinedHeight((v_shapeCoord + vec2(0.0, norm_step_y2)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float h_ny2 = getCombinedHeight((v_shapeCoord - vec2(0.0, norm_step_y2)) * u_glassSize, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
         float grad_y1 = (h_py1 - h_ny1) / (2.0 * norm_step_y1 * u_glassSize.y);
         float grad_y2 = (h_py2 - h_ny2) / (2.0 * norm_step_y2 * u_glassSize.y);
         float delta_y = mix(grad_y1, grad_y2, 0.5);
@@ -279,7 +334,7 @@ const fsSource = `
         blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  1.0) * blurPixelRadius * texelSize);
         blurredColor /= 9.0;
 
-        float height_val = getHeightFromSDF(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
+        float height_val = getCombinedHeight(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
         vec4 finalColor = mix(blurredColor, u_overlayColor, height_val * 0.15);
 
         float highlight_dist = abs(dist_for_shape_boundary);
@@ -372,6 +427,11 @@ function initWebGL() {
   uniforms.blurRadius.loc = gl.getUniformLocation(program, 'u_blurRadius')!
   uniforms.overlayColor.loc = gl.getUniformLocation(program, 'u_overlayColor')!
   uniforms.highlightWidth.loc = gl.getUniformLocation(program, 'u_highlightWidth')!
+  uniforms.trailPoints.locs = Array.from({ length: MAX_TRAIL_POINTS }, (_, index) =>
+    gl!.getUniformLocation(program!, `u_trailPoints[${index}]`),
+  )
+  uniforms.trailRadius.loc = gl.getUniformLocation(program, 'u_trailRadius')!
+  uniforms.trailStrength.loc = gl.getUniformLocation(program, 'u_trailStrength')!
 
   // Store attribute locations
   ;(program as any).__posLoc = posLoc
@@ -400,6 +460,8 @@ function initWebGL() {
     ...(props.theme === 'light' ? glassPresets.light.overlayColor : glassPresets.dark.overlayColor),
     1.0,
   ] as [number, number, number, number]
+  uniforms.trailRadius.value = props.rippleRadius
+  uniforms.trailStrength.value = props.rippleTrail ? props.rippleStrength : 0
 
   return true
 }
@@ -425,7 +487,54 @@ function resizeCanvas() {
   uniforms.mousePos.value = [canvas.width / 2, canvas.height / 2]
   // u_canvasOffset 是 canvas 在屏幕上的偏移
   uniforms.canvasOffset.value = [rect.left * dpr, rect.top * dpr]
+  trailPoints = []
+  lastTrailPoint = null
   needsOffsetSync = false
+}
+
+function getPointerCanvasPoint(event: PointerEvent): [number, number] | null {
+  const container = containerRef.value
+  if (!container) return null
+  const rect = container.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  const [width, height] = uniforms.glassSize.value
+  return [
+    (event.clientX - rect.left) * dpr - width / 2,
+    (event.clientY - rect.top) * dpr - height / 2,
+  ]
+}
+
+function addTrailPoint(event: PointerEvent) {
+  if (!props.rippleTrail) return
+  const point = getPointerCanvasPoint(event)
+  if (!point) return
+  if (lastTrailPoint) {
+    const dx = point[0] - lastTrailPoint[0]
+    const dy = point[1] - lastTrailPoint[1]
+    const dpr = window.devicePixelRatio || 1
+    if (Math.hypot(dx, dy) < TRAIL_MIN_DISTANCE * dpr) return
+  }
+  lastTrailPoint = point
+  trailPoints.push({ x: point[0], y: point[1], startedAt: performance.now(), strength: 1 })
+  if (trailPoints.length > MAX_TRAIL_POINTS) trailPoints.shift()
+}
+
+function resetTrailPoint() {
+  lastTrailPoint = null
+}
+
+function updateTrailUniforms() {
+  const now = performance.now()
+  const duration = Math.max(1, props.rippleDuration)
+  trailPoints = trailPoints.filter((point) => now - point.startedAt < duration)
+  for (let index = 0; index < MAX_TRAIL_POINTS; index += 1) {
+    const point = trailPoints[index]
+    uniforms.trailPoints.value[index] = point
+      ? [point.x, point.y, (now - point.startedAt) / duration, point.strength]
+      : [0, 0, 1, 0]
+  }
+  uniforms.trailRadius.value = props.rippleRadius * (window.devicePixelRatio || 1)
+  uniforms.trailStrength.value = props.rippleTrail ? props.rippleStrength : 0
 }
 
 function syncCanvasOffset() {
@@ -574,6 +683,11 @@ function drawFrame() {
   gl.uniform1f(uniforms.blurRadius.loc!, uniforms.blurRadius.value)
   gl.uniform4fv(uniforms.overlayColor.loc!, uniforms.overlayColor.value)
   gl.uniform1f(uniforms.highlightWidth.loc!, uniforms.highlightWidth.value)
+  uniforms.trailPoints.locs.forEach((loc, index) => {
+    if (loc) gl!.uniform4fv(loc, uniforms.trailPoints.value[index])
+  })
+  gl.uniform1f(uniforms.trailRadius.loc!, uniforms.trailRadius.value)
+  gl.uniform1f(uniforms.trailStrength.loc!, uniforms.trailStrength.value)
 
   gl.activeTexture(gl.TEXTURE0)
   gl.bindTexture(gl.TEXTURE_2D, bgTexture)
@@ -588,6 +702,7 @@ function drawFrame() {
 
 function render() {
   if (props.realtimeOffset && needsOffsetSync) syncCanvasOffset()
+  updateTrailUniforms()
   drawFrame()
   animationId = requestAnimationFrame(render)
 }
@@ -620,6 +735,9 @@ onMounted(() => {
   }
 
   const containerEl = containerRef.value!
+  containerEl.addEventListener('pointerenter', addTrailPoint)
+  containerEl.addEventListener('pointermove', addTrailPoint)
+  containerEl.addEventListener('pointerleave', resetTrailPoint)
   scrollOptions = { passive: true, capture: props.realtimeOffset }
   window.addEventListener('scroll', scrollHandler, scrollOptions)
   if (props.realtimeOffset) {
@@ -642,6 +760,10 @@ onUnmounted(() => {
       parent.removeEventListener('scroll', scrollHandler!, scrollOptions),
     )
   }
+  const containerEl = containerRef.value
+  containerEl?.removeEventListener('pointerenter', addTrailPoint)
+  containerEl?.removeEventListener('pointermove', addTrailPoint)
+  containerEl?.removeEventListener('pointerleave', resetTrailPoint)
   scrollParents = []
   scrollHandler = null
   resizeObserver = null

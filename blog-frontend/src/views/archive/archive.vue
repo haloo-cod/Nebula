@@ -86,6 +86,7 @@
                 :corner-radius="16"
                 :theme="ui.theme"
                 :blur-radius="ui.liquidGlassBlur"
+                :ripple-trail="true"
                 realtime-offset
               >
                 <ArchivePostCard :post="post" />

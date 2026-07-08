@@ -11,6 +11,7 @@
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
               :allow-reveal="allowLiquidGlassReveal"
+              :ripple-trail="true"
               class="panel-liquid-glass"
             >
               <HomeProfilePanel
@@ -36,6 +37,7 @@
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
               :allow-reveal="allowLiquidGlassReveal"
+              :ripple-trail="true"
               class="panel-liquid-glass"
             >
               <DataDashboard />
@@ -67,6 +69,7 @@
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
               :allow-reveal="allowLiquidGlassReveal"
+              :ripple-trail="true"
               class="panel-liquid-glass"
             >
               <Carousel />
@@ -83,6 +86,7 @@
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
               :allow-reveal="allowLiquidGlassReveal"
+              :ripple-trail="true"
               class="panel-liquid-glass"
             >
               <CalendarPanel flat />
@@ -99,6 +103,7 @@
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
               :allow-reveal="allowLiquidGlassReveal"
+              :ripple-trail="true"
               class="panel-liquid-glass"
             >
               <DigitalClockPanel />
