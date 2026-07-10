@@ -65,11 +65,15 @@ watch(
 .back-link {
   display: inline-flex;
   margin-bottom: 1rem;
-  color: rgba(250, 221, 166, 0.82);
+  color: var(--text-muted);
   font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--text-primary);
 }
 
 .project-doc {
@@ -97,7 +101,7 @@ watch(
   line-height: 0.95;
   font-weight: 900;
   letter-spacing: -0.08em;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
 }
 
 .project-header p,
@@ -106,7 +110,7 @@ watch(
   margin-top: 1.1rem;
   font-size: 1rem;
   line-height: 1.8;
-  color: rgba(230, 246, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .project-tags {
@@ -121,17 +125,17 @@ watch(
   background: rgba(255, 255, 255, 0.06);
   padding: 0.36rem 0.64rem;
   font-size: 0.72rem;
-  color: rgba(235, 249, 255, 0.68);
+  color: var(--text-muted);
 }
 
 .doc-state {
   padding-top: 2rem;
-  color: rgba(230, 246, 255, 0.58);
+  color: var(--text-muted);
 }
 
 .markdown-body {
   padding-top: 2rem;
-  color: rgba(242, 249, 255, 0.78);
+  color: var(--text-primary);
   line-height: 1.9;
 }
 
@@ -140,13 +144,13 @@ watch(
 .markdown-body :deep(h3) {
   margin-top: 1.7rem;
   margin-bottom: 0.8rem;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   font-weight: 800;
 }
 
 .markdown-body :deep(p),
 .markdown-body :deep(li) {
-  color: rgba(230, 246, 255, 0.68);
+  color: var(--text-secondary);
 }
 
 .markdown-body :deep(ul) {

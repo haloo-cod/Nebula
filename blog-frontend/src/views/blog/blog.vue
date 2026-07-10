@@ -5,9 +5,23 @@
         <p class="blog-kicker">Blog</p>
         <h1 class="blog-title">博文</h1>
         <p class="blog-desc">一片一片的玻璃卡片。点击任意卡片进入文章页。</p>
+        <div class="blog-filter">
+          <button
+            class="filter-btn"
+            :class="{ active: !activeCategory }"
+            @click="activeCategory = ''"
+          >全部</button>
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            class="filter-btn"
+            :class="{ active: activeCategory === cat }"
+            @click="activeCategory = activeCategory === cat ? '' : cat"
+          >{{ cat }}</button>
+        </div>
       </div>
 
-      <div class="blog-grid">
+      <div class="blog-grid" :key="'grid-' + activeCategory">
         <RouterLink
           v-for="post in visiblePosts"
           :key="post.slug"
@@ -105,8 +119,17 @@ import type { Post } from '@/types'
 
 const ui = useUIStore()
 const PAGE_SIZE = 12
-const posts = ref<Post[]>(getPosts().filter((post) => !post.draft))
+const allPosts = ref<Post[]>(getPosts().filter((post) => !post.draft))
+const activeCategory = ref('')
 const currentPage = ref(1)
+
+// 提取去重分类列表（排除空字符串）
+const categories = computed(() => [...new Set(allPosts.value.map((p) => p.category).filter(Boolean))])
+
+// 根据分类筛选后的文章列表
+const posts = computed(() =>
+  activeCategory.value ? allPosts.value.filter((p) => p.category === activeCategory.value) : allPosts.value,
+)
 
 const categoryColors: Record<string, string> = {
   技术: 'cyan',
@@ -152,6 +175,10 @@ function goNextPage() {
   currentPage.value += 1
 }
 
+watch(activeCategory, () => {
+  currentPage.value = 1
+})
+
 watch(totalPages, (nextTotal) => {
   if (currentPage.value > nextTotal) currentPage.value = nextTotal
 })
@@ -190,6 +217,38 @@ watch(totalPages, (nextTotal) => {
   color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.7;
+}
+
+.blog-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+}
+
+.filter-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.9rem;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background: rgba(110, 165, 255, 0.22);
+  border-color: rgba(145, 196, 255, 0.42);
+  color: var(--text-primary);
 }
 
 .blog-grid {

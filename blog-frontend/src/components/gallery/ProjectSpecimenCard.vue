@@ -90,7 +90,7 @@ defineProps<{
   background: rgba(255, 255, 255, 0.055);
   padding: 0.35rem 0.62rem;
   font-size: 0.72rem;
-  color: rgba(235, 249, 255, 0.68);
+  color: var(--text-muted);
 }
 
 .project-action {

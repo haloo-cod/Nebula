@@ -1,5 +1,5 @@
 <template>
-  <div class="liquid-glass" ref="containerRef">
+  <div class="liquid-glass" ref="containerRef" :class="{ 'liquid-glass--css-fallback': webglFailed }">
     <canvas
       ref="canvasRef"
       class="liquid-glass-canvas"
@@ -21,6 +21,8 @@ import { useUIStore } from '@/stores/ui'
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const visible = ref(false)
+const webglFailed = ref(false)
+const isMounted = ref(false) // 防止 onUnmounted 后异步回调（重试/纹理上传）仍操作已销毁实例
 const ui = useUIStore()
 
 const props = withDefaults(
@@ -119,6 +121,9 @@ let positionBuffer: WebGLBuffer | null = null
 let bgLoaded = false
 let textureRequestVersion = 0
 let needsOffsetSync = true
+let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let renderFallbackTimer: ReturnType<typeof setTimeout> | null = null
+let hasSynced = false
 let resizeObserver: ResizeObserver | null = null
 let scrollOptions: AddEventListenerOptions | undefined
 let scrollParents: HTMLElement[] = []
@@ -582,6 +587,7 @@ async function loadBgImage(bgUrl: string) {
     const image = await getCachedBackgroundImage(bgUrl)
     enqueueTextureUpload({
       execute: () => {
+        if (!isMounted.value) return // 卸载后不操作
         if (!gl || !bgTexture || requestVersion !== textureRequestVersion) return
         gl.bindTexture(gl.TEXTURE_2D, bgTexture)
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
@@ -597,6 +603,8 @@ async function loadBgImage(bgUrl: string) {
         bgLoaded = true
         // 方案 B:上传新纹理后先主动绘制一帧,再让 canvas 淡入。
         // 否则 visible=true 后 opacity 回升的最前几毫秒会暴露旧 canvas 像素。
+        // 再次 resize 确保 layout 已完成后再绘制,避免 getBoundingClientRect 拿到布局前尺寸导致条纹
+        resizeCanvas()
         drawFrame()
         visible.value = true
         if (!animationId) {
@@ -605,8 +613,10 @@ async function loadBgImage(bgUrl: string) {
       },
     })
   } catch (error) {
+    if (!isMounted.value) return
     console.warn('[LiquidGlass] Failed to load background image:', error)
-    bgLoaded = true
+    bgLoaded = true // drawFrame 依赖此标记,纹理上传失败时仍需绘制一帧避免空白
+    drawFrame()
     visible.value = true
     if (!animationId) {
       animationId = requestAnimationFrame(render)
@@ -718,25 +728,55 @@ function render() {
   animationId = requestAnimationFrame(render)
 }
 
-onMounted(() => {
-  if (!initWebGL()) {
-    console.warn('[LiquidGlass] WebGL not available, falling back to CSS')
-    return
+/** 释放所有 WebGL 资源，避免 GPU 内存泄漏导致新上下文创建失败 */
+function destroyWebGLResources() {
+  if (gl) {
+    if (bgTexture) { gl.deleteTexture(bgTexture); bgTexture = null }
+    if (program) { gl.deleteProgram(program); program = null }
+    if (positionBuffer) { gl.deleteBuffer(positionBuffer); positionBuffer = null }
+    const ext = gl.getExtension('WEBGL_lose_context')
+    if (ext) { ext.loseContext() }
+    gl = null
   }
+  textureRequestVersion = 0
+  bgLoaded = false
+}
 
+const RETRY_DELAYS = [100, 300, 800]
+const MAX_RETRIES = RETRY_DELAYS.length
+
+/** 首次挂载或重试成功后执行，注册所有事件监听器并开始渲染 */
+function setupEventsAndRender() {
   resizeCanvas()
+  hasSynced = false
 
-  syncBackgroundWithTheme(props.theme)
-
+  // 防抖策略：ResizeObserver 在 Grid layout 期间会多次触发（intrinsic → 中间态 → 最终值）。
+  // 每次触发重置 50ms 定时器，50ms 无新触发代表尺寸已稳定，此时加载纹理保证坐标正确。
   resizeObserver = new ResizeObserver(() => {
     markCanvasOffsetDirty()
     resizeCanvas()
+    if (renderDebounceTimer !== null) clearTimeout(renderDebounceTimer)
+    renderDebounceTimer = setTimeout(() => {
+      if (hasSynced) return
+      hasSynced = true
+      if (renderFallbackTimer !== null) { clearTimeout(renderFallbackTimer); renderFallbackTimer = null }
+      resizeCanvas()
+      syncBackgroundWithTheme(props.theme)
+    }, 50)
   })
   resizeObserver.observe(containerRef.value!)
 
+  // 200ms 绝对兜底：极端情况下 ResizeObserver 始终没触发稳定信号
+  renderFallbackTimer = setTimeout(() => {
+    if (hasSynced) return
+    hasSynced = true
+    if (renderDebounceTimer !== null) { clearTimeout(renderDebounceTimer); renderDebounceTimer = null }
+    resizeCanvas()
+    syncBackgroundWithTheme(props.theme)
+  }, 200)
+
   window.addEventListener('resize', resizeCanvas, { passive: true })
 
-  // 滚动时更新 canvas 偏移，使折射效果跟随页面实时变化
   scrollHandler = () => {
     if (props.realtimeOffset) {
       markCanvasOffsetDirty()
@@ -757,11 +797,37 @@ onMounted(() => {
       parent.addEventListener('scroll', scrollHandler!, scrollOptions),
     )
   }
+}
 
-  // 不立即启动渲染循环，等背景图加载完成后再开始（由 loadBgImage 中的 bgLoaded = true 触发）
+/** 尝试初始化 WebGL，失败则按 [100, 300, 800]ms 间隔重试 3 次，全部失败后降级为 CSS 毛玻璃 */
+function tryInitWebGL(remainingRetries: number) {
+  if (initWebGL()) {
+    setupEventsAndRender()
+    return
+  }
+
+  if (remainingRetries > 0) {
+    const delay = RETRY_DELAYS[MAX_RETRIES - remainingRetries]
+    setTimeout(() => {
+      if (!isMounted.value) return // 卸载后不再重试,避免触发 CSS fallback
+      tryInitWebGL(remainingRetries - 1)
+    }, delay)
+    return
+  }
+
+  console.warn('[LiquidGlass] WebGL 上下文创建失败，已重试 3 次，降级为 CSS 毛玻璃')
+  webglFailed.value = true
+}
+
+onMounted(() => {
+  isMounted.value = true
+  tryInitWebGL(MAX_RETRIES)
 })
 
 onUnmounted(() => {
+  isMounted.value = false
+  if (renderDebounceTimer !== null) { clearTimeout(renderDebounceTimer); renderDebounceTimer = null }
+  if (renderFallbackTimer !== null) { clearTimeout(renderFallbackTimer); renderFallbackTimer = null }
   if (animationId) cancelAnimationFrame(animationId)
   resizeObserver?.disconnect()
   window.removeEventListener('resize', resizeCanvas)
@@ -778,6 +844,7 @@ onUnmounted(() => {
   scrollParents = []
   scrollHandler = null
   resizeObserver = null
+  destroyWebGLResources()
 })
 </script>
 
@@ -810,5 +877,12 @@ onUnmounted(() => {
   z-index: 1;
   width: 100%;
   height: 100%;
+}
+
+.liquid-glass--css-fallback {
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border-subtle);
 }
 </style>

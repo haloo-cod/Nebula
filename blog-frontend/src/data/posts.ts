@@ -47,6 +47,12 @@ function slugify(path: string): string {
   return path.split('/').pop()!.replace(/\.md$/, '').replace(/\s+/g, '-').toLowerCase()
 }
 
+/** 将相对图片路径转为 Vite 可解析的绝对路径（处理 ../img/xxx → /src/assets/img/xxx） */
+function resolveImagePath(path: string): string {
+  if (!path || path.startsWith('http://') || path.startsWith('https://')) return path
+  return path.replace(/^(\.\.\/)?(img\/.*)$/, '/src/assets/$2')
+}
+
 const posts: Post[] = Object.entries(rawFiles)
   .map(([path, raw]): Post => {
     const { data, content } = parseFrontmatter(raw)
@@ -55,7 +61,7 @@ const posts: Post[] = Object.entries(rawFiles)
       title: data.title || slugify(path),
       description: data.description || '',
       date: data.published || '',
-      cover: postCoverAssignments[slugify(path)] || '',
+      cover: resolveImagePath(postCoverAssignments[slugify(path)] || (data.image as string) || ''),
       tags: data.tags || [],
       category: data.category || '',
       draft: data.draft || false,
@@ -110,7 +116,9 @@ export async function renderPost(slug: string): Promise<string | null> {
     markedPromise = import('marked').then((m) => m.marked)
   }
   const marked = await markedPromise
-  const html = await marked.parse(post.content)
+  const html = (await marked.parse(post.content))
+    // 把 ../img/xxx 这种相对路径转成 Vite 可解析的绝对路径
+    .replace(/(<img\s+src=")(\.\.?\/)?(img\/[^"]+)"/g, '$1/src/assets/$3"')
   htmlCache.set(slug, html)
   return html
 }

@@ -1,6 +1,7 @@
 <template>
   <div
     class="reader-page"
+    translate="no"
     :class="[
       `reader-page--${readingMode}`,
       `reader-page--${readerTheme}`,
@@ -306,7 +307,7 @@ function getRenditionOptions() {
     return {
       width: '100%',
       height: '100%',
-      manager: 'default',
+      manager: 'continuous',
       flow: 'scrolled-doc',
       spread: 'none',
     }
