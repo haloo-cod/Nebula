@@ -143,7 +143,7 @@ withDefaults(
 
 .hp-bio {
   font-size: 1.25rem;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
   line-height: 1.55;
   margin: 0;
 }
@@ -180,13 +180,13 @@ withDefaults(
 .stat-value {
   font-size: 1.35rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
   line-height: 1.1;
 }
 
 .stat-label {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   letter-spacing: 0.06em;
 }
 
@@ -198,7 +198,7 @@ withDefaults(
 
 .hp-social-icon {
   font-size: 1.15rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   text-decoration: none;
   transition:
     color 0.3s ease,
@@ -206,7 +206,7 @@ withDefaults(
 }
 
 .hp-social-icon:hover {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
   transform: translateY(-2px);
 }
 </style>

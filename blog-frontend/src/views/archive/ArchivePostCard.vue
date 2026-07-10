@@ -92,7 +92,7 @@ function formatDate(dateStr: string): string {
   margin: 0;
   padding: 0.75rem 0 0.35rem;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.45;
@@ -105,7 +105,7 @@ function formatDate(dateStr: string): string {
   flex: 1;
   margin: 0;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   line-height: 1.55;
   display: -webkit-box;

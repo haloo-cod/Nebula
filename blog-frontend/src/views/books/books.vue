@@ -148,7 +148,7 @@ watch(totalPages, (nextTotal) => {
 }
 
 .books-title {
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
   font-size: clamp(1.7rem, 3vw, 2.6rem);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -156,7 +156,7 @@ watch(totalPages, (nextTotal) => {
 
 .books-desc {
   margin-top: 0.5rem;
-  color: rgba(255, 255, 255, 0.52);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.7;
 }
@@ -180,7 +180,7 @@ watch(totalPages, (nextTotal) => {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0.52rem 0.9rem;
@@ -192,7 +192,7 @@ watch(totalPages, (nextTotal) => {
 
 .page-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--text-primary);
 }
 
 .page-btn:disabled {
@@ -287,7 +287,7 @@ watch(totalPages, (nextTotal) => {
   inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-primary);
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -305,7 +305,7 @@ watch(totalPages, (nextTotal) => {
 
 .book-name {
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1.5;
@@ -317,7 +317,7 @@ watch(totalPages, (nextTotal) => {
 .book-author {
   margin-top: 0.16rem;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   font-size: 0.86rem;
   line-height: 1.5;
   text-overflow: ellipsis;

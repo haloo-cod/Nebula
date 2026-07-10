@@ -2,7 +2,7 @@
 title: Guide for Blog Template
 published: 2001-10-02
 description: 'How to use this blog template.'
-image: './cover.webp'
+image: 'D:\My_blog\blog-frontend\src\assets\img\test5.PNG'
 pinned: true
 tags: []
 category: Guides
@@ -10,6 +10,8 @@ draft: false
 ---
 
 Tip: For the things that are not mentioned in this guide, you may find the answers in the [Astro Docs](https://docs.astro.build/).
+
+![](D:\My_blog\blog-frontend\src\assets\img\test5.PNG)
 
 ## Front-matter of Posts
 

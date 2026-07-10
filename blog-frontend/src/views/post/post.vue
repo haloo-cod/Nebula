@@ -1,45 +1,43 @@
 <template>
   <PageBackground>
-    <div class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full">
-      <div class="panels-wrapper">
-        <div class="panels-inner flex flex-col md:flex-row gap-6 items-start">
-          <!-- 左侧列 -->
-          <div class="sticky-panel hidden md:flex w-full md:w-[22%] flex-shrink-0 flex-col gap-6">
-            <ProfilePanel
-              :avatar="avatar"
-              :name="profile.name"
-              :bio="profile.bio"
-              :links="socialLinks"
-              square
-              flat
-            />
-            <PlaceholderPanel class="hidden md:flex" flat />
+    <div class="post-page">
+      <GlassPanel class="post-panel">
+        <div class="post-rise-inner">
+          <div class="post-header">
+            <button class="back-btn" @click="goBack" aria-label="返回博文">
+              <span class="back-arrow">◀</span>
+              <span>返回</span>
+            </button>
           </div>
 
-          <!-- 中间面板：玻璃本身静止，内部内容滑入 -->
-          <div class="w-full md:w-[56%] flex-shrink-0">
-            <GlassPanel class="panel-right">
-              <div class="post-rise-inner">
-                <div class="post-header">
-                  <button class="back-btn" @click="goBack" aria-label="返回首页">
-                    <span class="back-arrow">◀</span>
-                    <span>返回</span>
-                  </button>
-                </div>
-                <div v-if="loading" class="text-white/50 mt-8">加载中...</div>
-                <div v-else-if="html" class="prose" v-html="html"></div>
-                <div v-else class="text-white/50 mt-8">文章不存在</div>
+          <div v-if="loading" class="post-state">加载中...</div>
+
+          <div v-else-if="currentPost">
+            <div v-if="currentPost.cover" class="post-cover">
+              <img :src="currentPost.cover" :alt="currentPost.title" />
+            </div>
+
+            <div class="post-meta">
+              <h1 class="post-title">{{ currentPost.title }}</h1>
+              <span v-if="currentPost.date" class="post-date">{{ currentPost.date }}</span>
+              <div class="post-tags-row">
+                <span
+                  v-if="currentPost.category"
+                  class="post-cat"
+                  :class="`cat-${catColorKey(currentPost.category)}`"
+                >
+                  {{ currentPost.category }}
+                </span>
+                <span v-for="tag in currentPost.tags.slice(0, 4)" :key="tag" class="post-tag">#{{ tag }}</span>
               </div>
-            </GlassPanel>
+            </div>
+
+            <div class="prose" v-html="html"></div>
           </div>
 
-          <!-- 右侧列 -->
-          <div class="sticky-panel hidden md:flex w-full md:w-[22%] flex-shrink-0 flex-col gap-6">
-            <CalendarPanel flat />
-            <PostStatsChart flat />
-          </div>
+          <div v-else class="post-state">文章不存在</div>
         </div>
-      </div>
+      </GlassPanel>
     </div>
   </PageBackground>
 </template>
@@ -49,31 +47,48 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
-import ProfilePanel from '@/components/panels/ProfilePanel.vue'
-import PlaceholderPanel from '@/components/panels/PlaceholderPanel.vue'
-import CalendarPanel from '@/components/panels/CalendarPanel.vue'
-import PostStatsChart from '@/components/panels/PostStatsChart.vue'
-import { avatar, profile, socialLinks } from '@/data/profile'
 import { getPost, renderPost } from '@/data/posts'
+import type { Post } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const currentPost = ref<Post | null>(null)
 const html = ref('')
 const loading = ref(true)
 
-// 从首页已下滑状态跳来 → 侧边栏已在位，只动中间内容
+const categoryColors: Record<string, string> = {
+  技术: 'cyan',
+  生活: 'violet',
+  随笔: 'pink',
+  项目: 'emerald',
+  教程: 'blue',
+  前端: 'sky',
+  后端: 'indigo',
+  AI: 'purple',
+  Rust: 'orange',
+  工具: 'teal',
+  算法: 'rose',
+  日记: 'amber',
+}
+
+function catColorKey(cat: string): string {
+  return categoryColors[cat] || 'slate'
+}
+
 async function load(slug: string) {
   loading.value = true
-  if (!getPost(slug)) {
+  const post = getPost(slug)
+  if (!post) {
+    currentPost.value = null
     html.value = ''
     loading.value = false
     return
   }
+  currentPost.value = post
   html.value = (await renderPost(slug)) || ''
   loading.value = false
 }
 
-// 路由参数可能是字符串或数组,统一取字符串
 load(String(route.params.slug))
 watch(
   () => route.params.slug,
@@ -83,51 +98,26 @@ watch(
 )
 
 function goBack() {
-  // 按来源返回:/archive/post/* 回归档页,其余回首页(并恢复首页已展开状态)
-  if (route.path.startsWith('/archive/')) {
-    router.push({ path: '/archive' })
-  } else {
-    router.push({ path: '/', state: { showContent: true, skipLiquidGlassReveal: true } })
-  }
+  router.push('/blog')
 }
 </script>
 
 <style scoped>
-.panels-wrapper {
+.post-page {
   position: relative;
   z-index: 10;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 0;
-  max-width: 96rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 6rem 1rem 3rem;
 }
 
 @media (min-width: 768px) {
-  .panels-wrapper {
-    margin-top: 100px;
-  }
-  .sticky-panel {
-    position: sticky;
-    top: 100px;
-    align-self: flex-start;
+  .post-page {
+    padding-top: 8rem;
   }
 }
 
-@media (max-width: 767px) {
-  .panels-wrapper {
-    /* 移动端顶部导航是 fixed，预留与归档页一致的安全间距，避免文章面板压到按钮。 */
-    margin-top: 6rem;
-  }
-}
-
-.panels-inner {
-  padding-bottom: 1rem;
-}
-
-/* 中间内容滑入，无延迟避免空玻璃闪烁 */
 .post-rise-inner {
   animation: contentRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -144,37 +134,12 @@ function goBack() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .post-rise-inner,
-  .side-rise {
+  .post-rise-inner {
     animation: none;
   }
 }
 
-.panel-right {
-  overflow-y: auto;
-  max-height: calc(100vh - 12rem);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-}
-
-.panel-right::-webkit-scrollbar {
-  width: 6px;
-}
-.panel-right::-webkit-scrollbar-track {
-  background: transparent;
-}
-.panel-right::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-}
-.panel-right::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
 .post-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
   margin-bottom: 1.5rem;
 }
 
@@ -187,56 +152,148 @@ function goBack() {
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
   transition:
     color 0.3s ease,
     background 0.3s ease;
 }
+
 .back-btn:hover {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
   background: rgba(255, 255, 255, 0.12);
 }
+
 .back-arrow {
   font-size: 11px;
 }
 
+.post-state {
+  margin-top: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* ===== 文章封面 ===== */
+.post-cover {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+  border-radius: 1rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.post-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===== 文章元信息 ===== */
+.post-meta {
+  margin-bottom: 2rem;
+}
+
+.post-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.post-date {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.post-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.post-cat {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.post-tag {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cat-cyan { color: #67e8f9; border-color: rgba(103, 232, 249, 0.5); }
+.cat-violet { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.5); }
+.cat-pink { color: #f9a8d4; border-color: rgba(249, 168, 212, 0.5); }
+.cat-emerald { color: #6ee7b7; border-color: rgba(110, 231, 183, 0.5); }
+.cat-blue { color: #93c5fd; border-color: rgba(147, 197, 253, 0.5); }
+.cat-sky { color: #7dd3fc; border-color: rgba(125, 211, 252, 0.5); }
+.cat-indigo { color: #a5b4fc; border-color: rgba(165, 180, 252, 0.5); }
+.cat-purple { color: #d8b4fe; border-color: rgba(216, 180, 254, 0.5); }
+.cat-orange { color: #fdba74; border-color: rgba(253, 186, 116, 0.5); }
+.cat-teal { color: #5eead4; border-color: rgba(94, 234, 212, 0.5); }
+.cat-rose { color: #fda4af; border-color: rgba(253, 164, 175, 0.5); }
+.cat-amber { color: #fcd34d; border-color: rgba(252, 211, 77, 0.5); }
+.cat-slate { color: #cbd5e1; border-color: rgba(203, 213, 225, 0.4); }
+
+/* ===== Markdown 正文 ===== */
 .prose {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
   line-height: 1.8;
   font-size: 1rem;
 }
+
 .prose :deep(h1) {
   font-size: 1.85rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   line-height: 1.3;
   margin: 0 0 1rem;
 }
+
 .prose :deep(h2) {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin: 2rem 0 0.75rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
+
 .prose :deep(h3) {
   font-size: 1.2rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin: 1.5rem 0 0.5rem;
 }
+
 .prose :deep(p) {
   margin-bottom: 1rem;
 }
+
 .prose :deep(code:not(pre code)) {
   background: rgba(255, 255, 255, 0.1);
   padding: 0.15em 0.4em;
   border-radius: 0.25rem;
   font-size: 0.9em;
 }
+
 .prose :deep(pre) {
   background: rgba(0, 0, 0, 0.4);
   padding: 1rem;
@@ -245,58 +302,61 @@ function goBack() {
   margin-bottom: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
+
 .prose :deep(pre code) {
   background: none;
   padding: 0;
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.8);
 }
+
 .prose :deep(ul),
 .prose :deep(ol) {
   padding-left: 1.5rem;
   margin-bottom: 1rem;
 }
+
 .prose :deep(li) {
   margin-bottom: 0.25rem;
 }
+
 .prose :deep(table) {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
 }
+
 .prose :deep(th),
 .prose :deep(td) {
   padding: 0.5rem 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   text-align: left;
 }
+
 .prose :deep(th) {
   background: rgba(255, 255, 255, 0.05);
   font-weight: 600;
 }
+
 .prose :deep(a) {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   text-decoration: underline;
 }
+
 .prose :deep(a:hover) {
-  color: #fff;
+  color: var(--text-primary);
 }
+
 .prose :deep(blockquote) {
   border-left: 3px solid rgba(255, 255, 255, 0.15);
   padding-left: 1rem;
   margin: 1rem 0;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
+
 .prose :deep(hr) {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin: 2rem 0;
-}
-
-@media (max-width: 767px) {
-  .panel-right {
-    max-height: none;
-    overflow-y: visible;
-  }
 }
 </style>

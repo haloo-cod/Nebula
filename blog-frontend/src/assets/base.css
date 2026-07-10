@@ -68,3 +68,21 @@
   --glass-blur-subtle: 10px;
   --glass-blur-strong: 18px;
 }
+
+/* ============================================
+   文字色主题变量（暗色/亮色两套）
+   暗色：白色文字；亮色：黑色文字，alpha 值一致保持层级感
+   ============================================ */
+:root {
+  --text-primary: rgba(255, 255, 255, 0.94);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-faint: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='light'] {
+  --text-primary: rgba(0, 0, 0, 0.85);
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-muted: rgba(0, 0, 0, 0.4);
+  --text-faint: rgba(0, 0, 0, 0.3);
+}

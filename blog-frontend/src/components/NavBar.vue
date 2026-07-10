@@ -466,9 +466,11 @@ const navItems: NavItem[] = [
   { label: '图书', path: '/books', icon: 'book' },
   { label: '归档', path: '/archive', icon: 'archive' },
   { label: '展览', path: '/gallery', icon: 'gallery' },
+  { label: '说说', path: '/moments', icon: 'tooltip' },
   { label: '图片', path: '/images', icon: 'photo' },
   { label: '友链', path: '/friends', icon: 'friends' },
   { label: '藏宝阁', path: '/treasure', icon: 'gift' },
+  { label: '自习室', path: '/study-room', icon: 'local_library' },
   { label: '关于', path: '/about', icon: 'about' },
 ]
 

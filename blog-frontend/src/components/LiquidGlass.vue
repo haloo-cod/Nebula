@@ -88,14 +88,14 @@ void getCachedBackgroundImage(lightBgUrl)
 // 两套液态玻璃参数预设
 const glassPresets = {
   dark: {
-    glassThickness: 41,
-    ior: 1.1,
-    highlightWidth: 3.5,
+    glassThickness: 56,
+    ior: 1.15,
+    highlightWidth: 4.0,
     blurRadius: 0.0,
-    overlayColor: [0.15, 0.2, 0.25] as [number, number, number],
-    normalStrength: 6.4,
+    overlayColor: [0.2, 0.26, 0.32] as [number, number, number],
+    normalStrength: 8.0,
     displacementScale: 1.0,
-    heightTransitionWidth: 8.0,
+    heightTransitionWidth: 10.0,
     sminSmoothing: 20.0,
   },
   light: {
@@ -463,6 +463,8 @@ function initWebGL() {
   uniforms.trailRadius.value = props.rippleRadius
   uniforms.trailStrength.value = props.rippleTrail ? props.rippleStrength : 0
 
+  uploadStaticUniforms()
+
   return true
 }
 
@@ -642,6 +644,7 @@ watch(
   (theme) => {
     if (!gl) return
     applyThemePreset(theme)
+    uploadStaticUniforms()
     syncBackgroundWithTheme(theme)
   },
 )
@@ -650,8 +653,29 @@ watch(
   () => props.blurRadius,
   () => {
     uniforms.blurRadius.value = getEffectiveBlurRadius(props.theme)
+    uploadStaticUniforms()
   },
 )
+
+/** 上传所有静态 uniform（仅在初始化及属性变化时调用，不在每帧调用） */
+function uploadStaticUniforms() {
+  if (!gl || !program) return
+  gl.useProgram(program)
+  gl.uniform1f(uniforms.cornerRadius.loc!, uniforms.cornerRadius.value)
+  gl.uniform1f(uniforms.ior.loc!, uniforms.ior.value)
+  gl.uniform1f(uniforms.glassThickness.loc!, uniforms.glassThickness.value)
+  gl.uniform1f(uniforms.normalStrength.loc!, uniforms.normalStrength.value)
+  gl.uniform1f(uniforms.displacementScale.loc!, uniforms.displacementScale.value)
+  gl.uniform1f(uniforms.heightTransitionWidth.loc!, uniforms.heightTransitionWidth.value)
+  gl.uniform1f(uniforms.sminSmoothing.loc!, uniforms.sminSmoothing.value)
+  gl.uniform1i(uniforms.showNormals.loc!, uniforms.showNormals.value)
+  gl.uniform1f(uniforms.blurRadius.loc!, uniforms.blurRadius.value)
+  gl.uniform4fv(uniforms.overlayColor.loc!, uniforms.overlayColor.value)
+  gl.uniform1f(uniforms.highlightWidth.loc!, uniforms.highlightWidth.value)
+  gl.uniform1f(uniforms.trailRadius.loc!, uniforms.trailRadius.value)
+  gl.uniform1f(uniforms.trailStrength.loc!, uniforms.trailStrength.value)
+  gl.uniform1i(uniforms.backgroundTexture.loc!, 0)
+}
 
 /** 单帧绘制:用于常规 RAF 循环,也用于纹理更新后的立即刷新 */
 function drawFrame() {
@@ -668,30 +692,17 @@ function drawFrame() {
   gl.enableVertexAttribArray((program as any).__posLoc)
   gl.vertexAttribPointer((program as any).__posLoc, 2, gl.FLOAT, false, 0, 0)
 
+  // 仅上传每帧可能变化的 uniform
   gl.uniform2fv(uniforms.resolution.loc!, uniforms.resolution.value)
   gl.uniform2fv(uniforms.mousePos.loc!, uniforms.mousePos.value)
   gl.uniform2fv(uniforms.glassSize.loc!, uniforms.glassSize.value)
   gl.uniform2fv(uniforms.canvasOffset.loc!, uniforms.canvasOffset.value)
-  gl.uniform1f(uniforms.cornerRadius.loc!, uniforms.cornerRadius.value)
-  gl.uniform1f(uniforms.ior.loc!, uniforms.ior.value)
-  gl.uniform1f(uniforms.glassThickness.loc!, uniforms.glassThickness.value)
-  gl.uniform1f(uniforms.normalStrength.loc!, uniforms.normalStrength.value)
-  gl.uniform1f(uniforms.displacementScale.loc!, uniforms.displacementScale.value)
-  gl.uniform1f(uniforms.heightTransitionWidth.loc!, uniforms.heightTransitionWidth.value)
-  gl.uniform1f(uniforms.sminSmoothing.loc!, uniforms.sminSmoothing.value)
-  gl.uniform1i(uniforms.showNormals.loc!, uniforms.showNormals.value)
-  gl.uniform1f(uniforms.blurRadius.loc!, uniforms.blurRadius.value)
-  gl.uniform4fv(uniforms.overlayColor.loc!, uniforms.overlayColor.value)
-  gl.uniform1f(uniforms.highlightWidth.loc!, uniforms.highlightWidth.value)
   uniforms.trailPoints.locs.forEach((loc, index) => {
     if (loc) gl!.uniform4fv(loc, uniforms.trailPoints.value[index])
   })
-  gl.uniform1f(uniforms.trailRadius.loc!, uniforms.trailRadius.value)
-  gl.uniform1f(uniforms.trailStrength.loc!, uniforms.trailStrength.value)
 
   gl.activeTexture(gl.TEXTURE0)
   gl.bindTexture(gl.TEXTURE_2D, bgTexture)
-  gl.uniform1i(uniforms.backgroundTexture.loc!, 0)
 
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -723,7 +734,7 @@ onMounted(() => {
   })
   resizeObserver.observe(containerRef.value!)
 
-  window.addEventListener('resize', resizeCanvas)
+  window.addEventListener('resize', resizeCanvas, { passive: true })
 
   // 滚动时更新 canvas 偏移，使折射效果跟随页面实时变化
   scrollHandler = () => {

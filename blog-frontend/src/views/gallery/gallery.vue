@@ -50,7 +50,7 @@ const projects = getGalleryProjects()
   margin-top: 0.75rem;
   font-weight: 850;
   letter-spacing: -0.06em;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
 }
 
 .section-heading p {
@@ -58,7 +58,7 @@ const projects = getGalleryProjects()
   margin-top: 1rem;
   font-size: 1rem;
   line-height: 1.8;
-  color: rgba(230, 246, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .gallery-section {

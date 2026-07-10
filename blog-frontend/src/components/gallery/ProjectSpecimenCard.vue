@@ -46,7 +46,7 @@ defineProps<{
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(219, 244, 255, 0.62);
+  color: var(--text-muted);
 }
 
 .project-body {
@@ -59,7 +59,7 @@ defineProps<{
   line-height: 1;
   font-weight: 800;
   letter-spacing: -0.05em;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--text-primary);
 }
 
 .project-desc {
@@ -67,7 +67,7 @@ defineProps<{
   margin-top: 1rem;
   font-size: 0.96rem;
   line-height: 1.8;
-  color: rgba(230, 246, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .project-footer {

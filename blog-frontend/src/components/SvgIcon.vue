@@ -33,6 +33,9 @@ const nameMap: Record<string, string> = {
   photo: 'photo',
   download: 'download',
   tooltip: 'tooltip',
+  local_library: 'local_library',
+  folder: 'folder',
+  keep: 'keep',
 }
 
 const props = defineProps<{ name: string }>()

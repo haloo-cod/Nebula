@@ -1,133 +1,437 @@
 <template>
   <PageBackground>
-    <main class="gallery-blog-page">
-      <RouterLink to="/" class="back-link">返回首页</RouterLink>
+    <main class="blog-page">
+      <div class="blog-header">
+        <p class="blog-kicker">Blog</p>
+        <h1 class="blog-title">博文</h1>
+        <p class="blog-desc">一片一片的玻璃卡片。点击任意卡片进入文章页。</p>
+      </div>
 
-      <section class="section-heading">
-        <span class="gallery-kicker">Blog</span>
-        <h1>博文</h1>
-        <p>这里按卡片列出博客文章,详情仍然进入原有文章页。</p>
-      </section>
-
-      <div class="post-grid">
+      <div class="blog-grid">
         <RouterLink
-          v-for="post in posts"
+          v-for="post in visiblePosts"
           :key="post.slug"
           :to="`/post/${post.slug}`"
-          class="post-card glass-subtle"
+          class="blog-link"
         >
-          <span class="post-date">{{ post.date || 'No date' }}</span>
-          <h2>{{ post.title }}</h2>
-          <p>{{ post.description || '暂无摘要。' }}</p>
-          <div class="post-tags">
-            <span v-for="tag in post.tags.slice(0, 4)" :key="tag">{{ tag }}</span>
-          </div>
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="18"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :ripple-trail="true"
+            class="blog-glass"
+          >
+            <article class="post-card post-card--liquid">
+              <span v-if="post.pinned" class="pinned-badge">
+                <SvgIcon name="keep" class="pinned-badge__icon" />
+                <span>置顶</span>
+              </span>
+              <span class="post-date">{{ post.date || '--' }}</span>
+              <h2>{{ post.title }}</h2>
+              <p>{{ post.description || '暂无摘要。' }}</p>
+              <div class="post-meta">
+                <span
+                  v-if="post.category"
+                  class="post-cat"
+                  :class="`cat-${catColorKey(post.category)}`"
+                >
+                  {{ post.category }}
+                </span>
+                <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
+              </div>
+            </article>
+          </LiquidGlass>
+
+          <PanelFallbackGlass v-else tag="article" class="post-card post-card-fallback">
+            <span v-if="post.pinned" class="pinned-badge">
+              <SvgIcon name="keep" class="pinned-badge__icon" />
+              <span>置顶</span>
+            </span>
+            <span class="post-date">{{ post.date || '--' }}</span>
+            <h2>{{ post.title }}</h2>
+            <p>{{ post.description || '暂无摘要。' }}</p>
+            <div class="post-meta">
+              <span
+                v-if="post.category"
+                class="post-cat"
+                :class="`cat-${catColorKey(post.category)}`"
+              >
+                {{ post.category }}
+              </span>
+              <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
+            </div>
+          </PanelFallbackGlass>
         </RouterLink>
+      </div>
+
+      <div v-if="totalPages > 1" class="blog-pagination">
+        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
+          上一页
+        </button>
+        <button
+          v-for="page in pageNumbers"
+          :key="page"
+          class="page-btn"
+          :class="{ 'page-btn-active': page === currentPage }"
+          type="button"
+          @click="currentPage = page"
+        >
+          {{ page }}
+        </button>
+        <button
+          class="page-btn"
+          type="button"
+          :disabled="currentPage === totalPages"
+          @click="goNextPage"
+        >
+          下一页
+        </button>
       </div>
     </main>
   </PageBackground>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
+import LiquidGlass from '@/components/LiquidGlass.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
 import { getPosts } from '@/data/posts'
+import { useUIStore } from '@/stores/ui'
+import type { Post } from '@/types'
 
-const posts = getPosts().filter((post) => !post.draft)
+const ui = useUIStore()
+const PAGE_SIZE = 12
+const posts = ref<Post[]>(getPosts().filter((post) => !post.draft))
+const currentPage = ref(1)
+
+const categoryColors: Record<string, string> = {
+  技术: 'cyan',
+  生活: 'violet',
+  随笔: 'pink',
+  项目: 'emerald',
+  教程: 'blue',
+  前端: 'sky',
+  后端: 'indigo',
+  AI: 'purple',
+  Rust: 'orange',
+  工具: 'teal',
+  算法: 'rose',
+  日记: 'amber',
+}
+
+const totalPages = computed(() => Math.max(1, Math.ceil(posts.value.length / PAGE_SIZE)))
+
+const visiblePosts = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return posts.value.slice(start, start + PAGE_SIZE)
+})
+
+const pageNumbers = computed(() =>
+  Array.from({ length: totalPages.value }, (_, index) => index + 1),
+)
+
+function catColorKey(cat: string): string {
+  return categoryColors[cat] || 'slate'
+}
+
+function tagsOf(post: Post): string[] {
+  return post.tags.slice(0, 4)
+}
+
+function goPrevPage() {
+  if (currentPage.value <= 1) return
+  currentPage.value -= 1
+}
+
+function goNextPage() {
+  if (currentPage.value >= totalPages.value) return
+  currentPage.value += 1
+}
+
+watch(totalPages, (nextTotal) => {
+  if (currentPage.value > nextTotal) currentPage.value = nextTotal
+})
 </script>
 
 <style scoped>
-.gallery-blog-page {
+.blog-page {
   position: relative;
   z-index: 10;
-  width: min(100%, 76rem);
+  width: min(100%, 78rem);
   margin: 0 auto;
-  padding: 7rem 1rem 5rem;
+  padding: 7rem 1rem 4rem;
 }
 
-.back-link {
-  color: rgba(250, 221, 166, 0.82);
-  font-size: 0.86rem;
+.blog-header {
+  margin-bottom: 1.8rem;
+}
+
+.blog-kicker {
+  margin-bottom: 0.3rem;
+  color: rgba(170, 215, 255, 0.74);
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.blog-title {
+  color: var(--text-primary);
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-decoration: none;
 }
 
-.gallery-kicker {
-  display: block;
-  margin-top: 1.5rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(140, 218, 214, 0.74);
+.blog-desc {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
 }
 
-.section-heading h1 {
-  margin-top: 0.75rem;
-  font-size: clamp(2.5rem, 7vw, 5rem);
-  line-height: 1;
-  font-weight: 850;
-  letter-spacing: -0.06em;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.section-heading p {
-  margin-top: 1rem;
-  color: rgba(230, 246, 255, 0.6);
-}
-
-.post-grid {
+.blog-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
-  margin-top: 1.5rem;
+}
+
+.blog-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.6rem;
+}
+
+.page-btn {
+  min-width: 2.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.52rem 0.9rem;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.page-btn-active {
+  border-color: rgba(145, 196, 255, 0.42);
+  background: rgba(110, 165, 255, 0.22);
+  color: #fff;
+}
+
+.blog-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.blog-glass {
+  width: 100%;
+  height: 100%;
+  transition:
+    transform 0.24s ease,
+    filter 0.24s ease;
 }
 
 .post-card {
-  min-height: 13rem;
-  border-radius: 1rem;
-  padding: 1.25rem;
-  color: inherit;
-  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 14rem;
+  border-radius: 1.15rem;
+  padding: 1.5rem 1.6rem;
+  position: relative;
+}
+
+.post-card--liquid {
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.post-card-fallback {
+  transition:
+    transform 0.24s ease,
+    box-shadow 0.24s ease,
+    border-color 0.24s ease;
+}
+
+.blog-link:hover .blog-glass {
+  transform: translateY(-5px);
+  filter: drop-shadow(0 16px 34px rgba(80, 140, 255, 0.18));
+}
+
+.blog-link:hover .post-card-fallback {
+  border-color: rgba(140, 185, 255, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 34px rgba(80, 140, 255, 0.18);
 }
 
 .post-date {
   font-size: 0.72rem;
   letter-spacing: 0.12em;
-  color: rgba(219, 244, 255, 0.62);
+  color: var(--text-muted);
 }
 
 .post-card h2 {
-  margin-top: 1.2rem;
-  font-size: 1.45rem;
-  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-primary);
 }
 
 .post-card p {
-  margin-top: 0.75rem;
+  margin: 0;
   line-height: 1.7;
-  color: rgba(230, 246, 255, 0.58);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.post-tags {
+.post-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.45rem;
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
 }
 
-.post-tags span {
+.post-cat {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.post-tag {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.28rem 0.55rem;
   font-size: 0.72rem;
-  color: rgba(235, 249, 255, 0.68);
+  color: var(--text-muted);
+}
+
+.cat-cyan {
+  color: #67e8f9;
+  border-color: rgba(103, 232, 249, 0.5);
+}
+
+.cat-violet {
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, 0.5);
+}
+
+.cat-pink {
+  color: #f9a8d4;
+  border-color: rgba(249, 168, 212, 0.5);
+}
+
+.cat-emerald {
+  color: #6ee7b7;
+  border-color: rgba(110, 231, 183, 0.5);
+}
+
+.cat-blue {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.5);
+}
+
+.cat-sky {
+  color: #7dd3fc;
+  border-color: rgba(125, 211, 252, 0.5);
+}
+
+.cat-indigo {
+  color: #a5b4fc;
+  border-color: rgba(165, 180, 252, 0.5);
+}
+
+.cat-purple {
+  color: #d8b4fe;
+  border-color: rgba(216, 180, 254, 0.5);
+}
+
+.cat-orange {
+  color: #fdba74;
+  border-color: rgba(253, 186, 116, 0.5);
+}
+
+.cat-teal {
+  color: #5eead4;
+  border-color: rgba(94, 234, 212, 0.5);
+}
+
+.cat-rose {
+  color: #fda4af;
+  border-color: rgba(253, 164, 175, 0.5);
+}
+
+.cat-amber {
+  color: #fcd34d;
+  border-color: rgba(252, 211, 77, 0.5);
+}
+
+.cat-slate {
+  color: #cbd5e1;
+  border-color: rgba(203, 213, 225, 0.4);
+}
+
+.pinned-badge {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.pinned-badge__icon {
+  width: 1.1em;
+  height: 1.1em;
 }
 
 @media (max-width: 900px) {
-  .post-grid {
+  .blog-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .blog-page {
+    padding-top: 6rem;
   }
 }
 </style>
