@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import {
   waitForNextTextureUploadSettled,
   waitForTextureUploadQueueIdle,
-} from '@/components/liquidGlassQueue'
+} from '@/components/liquid-glass/liquidGlassQueue'
 
 /** 站点主题:dark=暗色(默认),light=亮色 */
 export type Theme = 'dark' | 'light'

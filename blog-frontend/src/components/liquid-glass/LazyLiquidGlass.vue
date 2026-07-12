@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import LiquidGlass from '@/components/LiquidGlass.vue'
+import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { useUIStore } from '@/stores/ui'
 
 const MAX_ACTIVE_LIQUID_GLASS = 6

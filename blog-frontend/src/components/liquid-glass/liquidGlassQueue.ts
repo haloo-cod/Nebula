@@ -8,7 +8,7 @@
  * 实现方式：监听渲染器的纹理就绪事件。
  */
 
-import { waitForTexture, hasTexture } from '@/components/liquidGlassRenderer'
+import { waitForTexture, hasTexture } from '@/components/liquid-glass/liquidGlassRenderer'
 import darkBgUrl from '@/assets/img/test3.jpg'
 import lightBgUrl from '@/assets/img/test6.png'
 

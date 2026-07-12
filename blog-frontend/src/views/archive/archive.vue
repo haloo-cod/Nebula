@@ -103,7 +103,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
-import LazyLiquidGlass from '@/components/LazyLiquidGlass.vue'
+import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import { getPosts } from '@/data/posts'
 import { useUIStore } from '@/stores/ui'
 import ArchivePostCard from './ArchivePostCard.vue'

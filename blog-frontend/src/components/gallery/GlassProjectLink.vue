@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import LiquidGlass from '@/components/LiquidGlass.vue'
+import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import ProjectSpecimenCard from '@/components/gallery/ProjectSpecimenCard.vue'
 import { useUIStore } from '@/stores/ui'

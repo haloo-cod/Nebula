@@ -39,7 +39,7 @@ import {
   preloadTexture,
   MAX_TRAIL_POINTS,
   type GlassUniforms,
-} from '@/components/liquidGlassRenderer'
+} from '@/components/liquid-glass/liquidGlassRenderer'
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
