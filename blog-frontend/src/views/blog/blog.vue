@@ -21,7 +21,7 @@
         </div>
       </div>
 
-      <div class="blog-grid" :key="'grid-' + activeCategory">
+      <div class="blog-grid">
         <RouterLink
           v-for="post in visiblePosts"
           :key="post.slug"

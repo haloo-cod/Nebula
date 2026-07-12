@@ -1,106 +1,43 @@
-interface TextureUploadTask {
-  execute: () => void
-}
+/**
+ * 液态玻璃纹理上传协调模块
+ *
+ * 在新架构中,纹理由共享渲染器统一管理,此模块仅保留
+ * waitForNextTextureUploadSettled / waitForTextureUploadQueueIdle 接口
+ * 供 UI store 的 toggleTheme 使用。
+ *
+ * 实现方式：监听渲染器的纹理就绪事件。
+ */
 
-const textureUploadQueue: TextureUploadTask[] = []
-const idleResolvers = new Set<() => void>()
-const firstSettledResolvers = new Set<() => void>()
-let textureUploadFrame = 0
-let textureUploadGeneration = 0
-let settledInGeneration = 0
+import { waitForTexture, hasTexture } from '@/components/liquidGlassRenderer'
+import darkBgUrl from '@/assets/img/test3.jpg'
+import lightBgUrl from '@/assets/img/test6.png'
 
-function waitForSettledGeneration(predicate: () => boolean, timeoutMs: number): Promise<void> {
-  if (predicate()) return Promise.resolve()
-
-  return new Promise((resolve) => {
-    const startedAt = performance.now()
-    let frame = 0
-    const finish = () => {
-      if (frame) cancelAnimationFrame(frame)
-      resolve()
-    }
-    const check = () => {
-      if (predicate() || (timeoutMs > 0 && performance.now() - startedAt >= timeoutMs)) {
-        finish()
-        return
-      }
-      frame = requestAnimationFrame(check)
-    }
-
-    frame = requestAnimationFrame(check)
-  })
-}
-
-// 当前批次里第一个任务完成后立刻通知,用于让全屏主题遮罩开始撤场。
-// 注意这里只关心“首个面板已能展示新纹理”,不是等整批全部完成。
-function notifyFirstSettled() {
-  if (settledInGeneration > 0) return
-  settledInGeneration += 1
-  for (const resolve of firstSettledResolvers) resolve()
-  firstSettledResolvers.clear()
-}
-
-function notifyIdle() {
-  for (const resolve of idleResolvers) resolve()
-  idleResolvers.clear()
-}
-
-function flushTextureUploadQueue() {
-  textureUploadFrame = 0
-  const task = textureUploadQueue.shift()
-  if (!task) {
-    notifyIdle()
-    return
-  }
-
-  // 单帧只处理一个纹理上传任务,把 6 个 LiquidGlass 面板的 GPU 上传分摊开。
-  task.execute()
-  notifyFirstSettled()
-
-  if (textureUploadQueue.length > 0) {
-    textureUploadFrame = requestAnimationFrame(flushTextureUploadQueue)
-  } else {
-    notifyIdle()
-  }
-}
-
-/** 将 WebGL 纹理上传任务分摊到逐帧执行,避免同一帧集中卡顿 */
-export function enqueueTextureUpload(task: TextureUploadTask) {
-  if (textureUploadQueue.length === 0 && !textureUploadFrame) {
-    textureUploadGeneration += 1
-    settledInGeneration = 0
-  }
-  textureUploadQueue.push(task)
-  if (!textureUploadFrame) {
-    textureUploadFrame = requestAnimationFrame(flushTextureUploadQueue)
-  }
-}
-
-/** 等待当前批次第一个纹理上传任务完成,用于启动主题遮罩淡出 */
-export function waitForFirstTextureUploadSettled(): Promise<void> {
-  if (textureUploadGeneration > 0 && settledInGeneration > 0) {
-    return Promise.resolve()
-  }
-  return new Promise((resolve) => {
-    firstSettledResolvers.add(resolve)
-  })
-}
-
-/** 等待调用之后产生的新批次首个纹理完成,无新批次时超时放行避免主题遮罩卡死 */
+/** 等待下次纹理上传完成（主题切换时调用,等待新主题纹理就绪） */
 export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void> {
-  const baseGeneration = textureUploadGeneration
-  return waitForSettledGeneration(
-    () => textureUploadGeneration > baseGeneration && settledInGeneration > 0,
-    timeoutMs,
-  )
+  // 在新架构中,等待当前主题对应的两个纹理 URL 就绪即可
+  // toggleTheme 在调用此函数前已经切换了 theme,此时需要等待的是新 theme 的纹理
+  // 由于调用方无法传入具体 URL,我们等待两个纹理都就绪（它们通常已经预加载好了）
+  return Promise.race([
+    Promise.all([
+      hasTexture(darkBgUrl) ? Promise.resolve() : waitForTexture(darkBgUrl, timeoutMs),
+      hasTexture(lightBgUrl) ? Promise.resolve() : waitForTexture(lightBgUrl, timeoutMs),
+    ]).then(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ])
 }
 
-/** 等待当前纹理上传队列排空 */
+/** 等待纹理上传队列空闲（在新架构中纹理上传是同步的,直接 resolve） */
 export function waitForTextureUploadQueueIdle(): Promise<void> {
-  if (textureUploadQueue.length === 0 && !textureUploadFrame) {
+  return Promise.resolve()
+}
+
+/** 兼容旧接口：等待首个纹理就绪 */
+export function waitForFirstTextureUploadSettled(): Promise<void> {
+  if (hasTexture(darkBgUrl) || hasTexture(lightBgUrl)) {
     return Promise.resolve()
   }
-  return new Promise((resolve) => {
-    idleResolvers.add(resolve)
-  })
+  return Promise.race([
+    waitForTexture(darkBgUrl, 1200),
+    waitForTexture(lightBgUrl, 1200),
+  ])
 }
