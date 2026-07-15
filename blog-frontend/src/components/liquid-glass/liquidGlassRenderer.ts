@@ -147,6 +147,12 @@ const contextRestoredCallbacks = new Set<() => void>()
 // 纹理就绪通知（主题切换协调用）
 const textureReadyCallbacks = new Set<() => void>()
 
+// 渲染缩放比（集显自动降低,独显保持 1.0）
+let renderScale = 1.0
+
+// 帧率节流：无 trail 活跃时降为 30fps（每 2 帧渲染 1 次）
+let frameCount = 0
+
 // ============================================================================
 // Shader 源码
 // ============================================================================
@@ -418,8 +424,28 @@ function initGL(): boolean {
   offscreenCanvas.addEventListener('webglcontextlost', handleContextLost)
   offscreenCanvas.addEventListener('webglcontextrestored', handleContextRestored)
 
+  // 检测 GPU 性能,自动设定渲染缩放比
+  renderScale = detectRenderScale(gl)
+
   initialized = true
   return true
+}
+
+/** 通过 WEBGL_debug_renderer_info 检测 GPU,集显自动降低渲染分辨率 */
+function detectRenderScale(glCtx: WebGLRenderingContext): number {
+  const ext = glCtx.getExtension('WEBGL_debug_renderer_info')
+  if (!ext) return 1.0
+  const renderer = glCtx.getParameter(ext.UNMASKED_RENDERER_WEBGL) as string
+  // 集成显卡关键词匹配（Intel UHD/HD/Iris、AMD Radeon Vega 集显、Apple 低端等）
+  if (/Intel|UHD|HD Graphics|Iris|Vega \d$|Mali|Adreno/i.test(renderer)) {
+    return 0.65
+  }
+  return 1.0
+}
+
+/** 获取当前渲染缩放比（组件用于设置 canvas buffer 尺寸） */
+export function getRenderScale(): number {
+  return renderScale
 }
 
 /** 重新初始化（context restored 后调用） */
@@ -708,11 +734,33 @@ function renderInstance(inst: GlassInstance): boolean {
   return true
 }
 
+/** 检查是否有任何实例存在活跃的 trail 动画 */
+function hasActiveTrails(): boolean {
+  for (const inst of instances.values()) {
+    if (!inst.ready) continue
+    // trailPoints 中 age < 1 的表示仍在动画中
+    for (const tp of inst.uniforms.trailPoints) {
+      if (tp[3] > 0 && tp[2] < 1) return true
+    }
+  }
+  return false
+}
+
 /** 单帧渲染循环:遍历所有可渲染实例 */
 function renderLoop() {
   animationId = requestAnimationFrame(renderLoop)
 
   if (contextLost || !gl || !program) return
+
+  frameCount++
+
+  // 帧率节流：无 trail 活跃时降为 30fps（跳帧）,减轻集显负载
+  // 首次渲染回调未完成的实例不受节流影响（确保淡入不延迟）
+  const hasTrail = hasActiveTrails()
+  const hasPendingFirstRender = [...instances.values()].some(
+    (inst) => inst.ready && !inst.hasRenderedOnce,
+  )
+  if (!hasTrail && !hasPendingFirstRender && frameCount % 2 !== 0) return
 
   for (const inst of instances.values()) {
     if (!inst.ready) continue
@@ -722,7 +770,7 @@ function renderLoop() {
     if (!success) continue
 
     // 拷贝到实例的 2D canvas
-    // canvas.width/height 已经是像素尺寸（乘过 dpr）,2D context 操作使用像素坐标
+    // canvas.width/height 已经是像素尺寸（乘过 dpr * renderScale）,2D context 操作使用像素坐标
     const { canvas, ctx2d } = inst
 
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)

@@ -4,7 +4,7 @@
       <GlassPanel class="post-panel">
         <div class="post-rise-inner">
           <div class="post-header">
-            <button class="back-btn" @click="goBack" aria-label="返回博文">
+            <button class="back-btn" @click="goBack" aria-label="返回">
               <span class="back-arrow">◀</span>
               <span>返回</span>
             </button>
@@ -98,7 +98,12 @@ watch(
 )
 
 function goBack() {
-  router.push('/blog')
+  // 从归档页进入时路径以 /archive/ 开头,应返回归档页
+  if (route.path.startsWith('/archive/')) {
+    router.push('/archive')
+  } else {
+    router.push('/blog')
+  }
 }
 </script>
 

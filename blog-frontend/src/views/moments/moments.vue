@@ -1,115 +1,190 @@
 <template>
   <PageBackground>
-    <div class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full">
-      <div class="moments-wrapper">
-        <GlassPanel class="moments-panel">
-          <div class="moments-header">
-            <p class="moments-kicker">Moments</p>
-            <h1 class="moments-title">说说</h1>
-            <p class="moments-desc">一些碎碎念，和偶然闪过的灵感。</p>
+    <div class="moments-page">
+      <!-- 页头 -->
+      <header class="moments-header post-rise-inner">
+        <p class="moments-kicker">Moments</p>
+        <h1 class="moments-title">说说</h1>
+        <p class="moments-desc">一些碎碎念，和偶然闪过的灵感。</p>
+        <span class="moments-count">共 {{ total }} 条</span>
+      </header>
+
+      <!-- 时间线区域 -->
+      <div class="moments-timeline">
+        <template v-for="(group, gi) in dayGroups" :key="group.date">
+          <!-- 日期分隔条 -->
+          <div
+            class="moments-day-divider post-rise-inner"
+            :style="{ animationDelay: `${gi * 0.08 + 0.2}s` }"
+          >
+            <span class="moments-day-line"></span>
+            <span class="moments-day-label">{{ group.label }} · {{ group.moments.length }}条</span>
+            <span class="moments-day-line"></span>
           </div>
 
-          <div v-if="moments.length === 0" class="moments-empty">
-            还没有说过什么…
-          </div>
-
-          <div v-else class="moments-list">
-            <article
-              v-for="moment in moments"
-              :key="moment.id"
-              class="moment-card"
+          <!-- 每条说说:独立液态玻璃卡片 -->
+          <div
+            v-for="(moment, mi) in group.moments"
+            :key="moment.id"
+            class="moments-card-wrap post-rise-inner"
+            :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
+          >
+            <!-- 液态玻璃开启时 -->
+            <LazyLiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              class="moments-glass"
+              :corner-radius="18"
+              :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
+              :ripple-trail="true"
+              realtime-offset
             >
-              <div class="moment-head">
-                <span class="moment-date">{{ moment.date }}</span>
-                <span v-if="moment.tags.length" class="moment-tags">
-                  <span v-for="tag in moment.tags" :key="tag" class="moment-tag">#{{ tag }}</span>
-                </span>
-              </div>
-              <p class="moment-content">{{ moment.content }}</p>
-              <div v-if="moment.images.length" class="moment-images">
-                <img
-                  v-for="(img, i) in moment.images"
-                  :key="i"
-                  :src="img"
-                  :alt="`image ${i + 1}`"
-                  class="moment-image"
-                  loading="lazy"
-                />
-              </div>
-            </article>
+              <MomentCard :moment="moment" @select="openDetail" />
+            </LazyLiquidGlass>
+
+            <!-- 液态玻璃关闭时的 fallback -->
+            <PanelFallbackGlass v-else class="moments-panel">
+              <MomentCard :moment="moment" @select="openDetail" />
+            </PanelFallbackGlass>
           </div>
-        </GlassPanel>
+        </template>
+
+        <!-- 无限滚动哨兵 -->
+        <div ref="sentinelRef" class="moments-sentinel">
+          <span v-if="loadingMore" class="moments-loading">加载中...</span>
+          <span v-else-if="noMore" class="moments-no-more">— 没有更多了 —</span>
+        </div>
       </div>
     </div>
+
+    <!-- 详情 overlay -->
+    <MomentDetail :moment="selectedMoment" @close="closeDetail" />
   </PageBackground>
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
-import GlassPanel from '@/components/panels/GlassPanel.vue'
+import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
+import { useUIStore } from '@/stores/ui'
+import { getMoments } from '@/data/moments'
+import type { Moment } from '@/types'
+import MomentCard from './MomentCard.vue'
+import MomentDetail from './MomentDetail.vue'
 
-/** 一条说说/碎碎念 */
-interface Moment {
-  id: number
-  date: string
-  content: string
-  tags: string[]
-  images: string[]
+const ui = useUIStore()
+
+// ============ 详情 overlay 状态 ============
+
+const selectedMoment = ref<Moment | null>(null)
+
+function openDetail(moment: Moment) {
+  selectedMoment.value = moment
 }
 
-const moments: Moment[] = [
-  {
-    id: 1,
-    date: '2026-07-10',
-    content: '阳光透过云层洒在桌上的那一刻，突然觉得代码也变得温柔了。',
-    tags: ['日常'],
-    images: [],
-  },
-  {
-    id: 2,
-    date: '2026-07-08',
-    content: '在 Vue 里把一个 UI 拆成小组件的时候，就像在搭积木一样有成就感。',
-    tags: ['前端', 'vue'],
-    images: [],
-  },
-  {
-    id: 3,
-    date: '2026-07-05',
-    content: '晚上路过河边，看见有人在桥下弹吉他，声音飘在水面上，像另一种波光粼粼。',
-    tags: ['生活', '夜晚'],
-    images: [],
-  },
-  {
-    id: 4,
-    date: '2026-07-01',
-    content: '终于把博客的归档树做好了，看着那些树枝上挂着文章卡片的样子，七月快乐。',
-    tags: ['博客', '开发'],
-    images: [],
-  },
-]
+function closeDetail() {
+  selectedMoment.value = null
+}
+
+// ============ 无限滚动分页 ============
+
+const PAGE_SIZE = 10
+const allLoaded = ref<Moment[]>([])
+const total = ref(0)
+const currentPage = ref(0)
+const loadingMore = ref(false)
+const noMore = ref(false)
+const sentinelRef = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+function loadNextPage() {
+  if (loadingMore.value || noMore.value) return
+  loadingMore.value = true
+  currentPage.value++
+  const { items, total: t } = getMoments(currentPage.value, PAGE_SIZE)
+  total.value = t
+  allLoaded.value = [...allLoaded.value, ...items]
+  if (allLoaded.value.length >= t) {
+    noMore.value = true
+  }
+  loadingMore.value = false
+}
+
+// ============ 按天分组 ============
+
+interface DayGroup {
+  date: string // 'YYYY-MM-DD'
+  label: string // 'X月X日'
+  moments: Moment[]
+}
+
+const dayGroups = computed<DayGroup[]>(() => {
+  const map = new Map<string, Moment[]>()
+  for (const m of allLoaded.value) {
+    const key = m.date.slice(0, 10)
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(m)
+  }
+  return Array.from(map.entries()).map(([key, items]) => ({
+    date: key,
+    label: formatDayLabel(key),
+    moments: items,
+  }))
+})
+
+function formatDayLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+// ============ IntersectionObserver ============
+
+onMounted(() => {
+  // 首次加载
+  loadNextPage()
+
+  // 设置无限滚动监听
+  if (!sentinelRef.value) return
+  observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        loadNextPage()
+      }
+    },
+    { root: null, rootMargin: '200px', threshold: 0.01 },
+  )
+  observer.observe(sentinelRef.value)
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+})
 </script>
 
 <style scoped>
-.moments-wrapper {
+.moments-page {
   position: relative;
   z-index: 10;
   width: 100%;
   max-width: 42rem;
-  margin: 4rem auto 0;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  margin: 0 auto;
+  padding: 6rem 1rem 3rem;
 }
 
-.moments-panel {
-  min-height: 60vh;
+@media (min-width: 768px) {
+  .moments-page {
+    padding-top: 8rem;
+  }
 }
 
+/* ===== 页头 ===== */
 .moments-header {
-  margin-bottom: 1.6rem;
+  margin-bottom: 2.5rem;
 }
 
 .moments-kicker {
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.25rem;
   color: rgba(160, 205, 255, 0.7);
   font-size: 0.72rem;
   letter-spacing: 0.18em;
@@ -117,105 +192,153 @@ const moments: Moment[] = [
 }
 
 .moments-title {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 1.45rem;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
 .moments-desc {
-  margin-top: 0.45rem;
-  color: rgba(255, 255, 255, 0.48);
+  margin: 0.4rem 0 0;
+  color: var(--text-secondary);
   font-size: 0.86rem;
 }
 
-.moments-empty {
-  padding: 3rem 0;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 0.9rem;
+.moments-count {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.moments-list {
+/* ===== 时间线 ===== */
+.moments-timeline {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.moment-card {
-  position: relative;
-  padding: 1.25rem 1.5rem;
+/* ===== 日期分隔线 ===== */
+.moments-day-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0;
+}
+
+.moments-day-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(140, 200, 255, 0.2),
+    transparent
+  );
+}
+
+.moments-day-label {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+/* ===== 卡片外壳 ===== */
+.moments-card-wrap {
+  width: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.moments-glass {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 1.1rem;
+  transition:
+    transform 0.24s ease,
+    filter 0.24s ease;
+}
+
+.moments-glass :deep(.liquid-glass-content) {
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  height: auto;
+}
+
+.moments-glass :deep(.liquid-glass) {
+  height: auto;
+}
+
+.moments-panel {
+  width: 100%;
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
   transition:
     border-color 0.25s ease,
-    background 0.25s ease,
     box-shadow 0.25s ease;
 }
 
-.moment-card:hover {
-  border-color: rgba(140, 185, 255, 0.25);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 8px 24px rgba(80, 120, 255, 0.1);
+.moments-panel:hover {
+  border-color: rgba(140, 185, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 20px rgba(255, 255, 255, 0.06),
+    0 12px 36px rgba(80, 120, 255, 0.1);
 }
 
-.moment-head {
+/* ===== 无限滚动哨兵 ===== */
+.moments-sentinel {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.6rem;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  justify-content: center;
+  padding: 2rem 0 1rem;
 }
 
-.moment-date {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.4);
+.moments-loading {
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
-.moment-tags {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+.moments-no-more {
+  color: var(--text-faint);
+  font-size: 0.78rem;
 }
 
-.moment-tag {
-  font-size: 0.68rem;
-  color: rgba(140, 205, 255, 0.6);
+/* ===== 入场动画 ===== */
+.post-rise-inner {
+  animation: contentRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.moment-content {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.95rem;
-  line-height: 1.8;
-  margin: 0;
-}
-
-.moment-images {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.moment-image {
-  width: 6rem;
-  height: 6rem;
-  border-radius: 0.6rem;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-@media (min-width: 768px) {
-  .moments-wrapper {
-    margin-top: 100px;
+@keyframes contentRise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .post-rise-inner {
+    animation: none;
+  }
+}
+
+/* ===== 移动端适配 ===== */
 @media (max-width: 767px) {
-  .moments-wrapper {
-    margin-top: 6rem;
+  .moments-page {
+    padding-top: 5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }
 </style>

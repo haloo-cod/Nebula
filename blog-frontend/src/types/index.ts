@@ -104,3 +104,35 @@ export interface HolidayApiResponse {
   // key 为 'MM-DD' 格式的日期字符串
   holiday?: Record<string, HolidayApiInfo>
 }
+
+// ---------------------------------------------------------------------------
+// 说说(Moments)
+// ---------------------------------------------------------------------------
+
+/** 一条说说/碎碎念 */
+export interface Moment {
+  id: number
+  date: string // ISO 日期时间,如 '2026-07-10T13:37:15'
+  content: string // 纯文本正文
+  mood?: string // 心情标签,如 '开心'、'疲惫'、'灵感'
+  tags: string[]
+  images: string[] // 图片 URL 列表
+  likes: number // 点赞数
+}
+
+/** 说说评论(一层平铺,暂不支持嵌套回复) */
+export interface MomentComment {
+  id: number
+  momentId: number // 所属说说 ID
+  nickname: string // 评论者昵称
+  avatar?: string // 评论者头像 URL
+  content: string // 评论正文
+  date: string // ISO 日期时间
+  likes: number // 评论点赞数
+}
+
+/** getMoments 分页返回结构 */
+export interface MomentPage {
+  items: Moment[]
+  total: number
+}

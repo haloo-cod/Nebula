@@ -37,6 +37,7 @@ import {
   uploadTexture,
   hasTexture,
   preloadTexture,
+  getRenderScale,
   MAX_TRAIL_POINTS,
   type GlassUniforms,
 } from '@/components/liquid-glass/liquidGlassRenderer'
@@ -198,23 +199,31 @@ function syncCanvasSize() {
   const canvas = canvasRef.value
   if (!container || !canvas) return
 
-  const rect = container.getBoundingClientRect()
-  if (rect.width < 1 || rect.height < 1) return
+  // 用 offsetWidth/offsetHeight 获取布局尺寸(不受 CSS transform 影响)
+  // getBoundingClientRect 在 Transition 动画期间返回动画中的视觉尺寸,
+  // 导致 canvas 在动画结束后尺寸不正确
+  const w = container.offsetWidth
+  const h = container.offsetHeight
+  if (w < 1 || h < 1) return
 
   const dpr = window.devicePixelRatio || 1
-  const w = rect.width * dpr
-  const h = rect.height * dpr
+  const scale = getRenderScale()
+  const pw = w * dpr * scale
+  const ph = h * dpr * scale
 
-  canvas.width = w
-  canvas.height = h
-  canvas.style.width = rect.width + 'px'
-  canvas.style.height = rect.height + 'px'
+  canvas.width = pw
+  canvas.height = ph
+  canvas.style.width = w + 'px'
+  canvas.style.height = h + 'px'
 
   // 更新 uniforms
-  uniforms.resolution = [window.innerWidth * dpr, window.innerHeight * dpr]
-  uniforms.glassSize = [w, h]
-  uniforms.mousePos = [w / 2, h / 2]
-  uniforms.canvasOffset = [rect.left * dpr, rect.top * dpr]
+  uniforms.resolution = [window.innerWidth * dpr * scale, window.innerHeight * dpr * scale]
+  uniforms.glassSize = [pw, ph]
+  uniforms.mousePos = [pw / 2, ph / 2]
+
+  // canvasOffset 仍需要 getBoundingClientRect(计算视口相对位置)
+  const rect = container.getBoundingClientRect()
+  uniforms.canvasOffset = [rect.left * dpr * scale, rect.top * dpr * scale]
 
   // 清除 trail
   trailPoints = []
@@ -226,8 +235,9 @@ function syncCanvasOffset() {
   if (!container) return
   const rect = container.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
-  uniforms.resolution = [window.innerWidth * dpr, window.innerHeight * dpr]
-  uniforms.canvasOffset = [rect.left * dpr, rect.top * dpr]
+  const scale = getRenderScale()
+  uniforms.resolution = [window.innerWidth * dpr * scale, window.innerHeight * dpr * scale]
+  uniforms.canvasOffset = [rect.left * dpr * scale, rect.top * dpr * scale]
 }
 
 // ============================================================================
@@ -239,10 +249,11 @@ function getPointerCanvasPoint(event: PointerEvent): [number, number] | null {
   if (!container) return null
   const rect = container.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
+  const scale = getRenderScale()
   const [width, height] = uniforms.glassSize
   return [
-    (event.clientX - rect.left) * dpr - width / 2,
-    (event.clientY - rect.top) * dpr - height / 2,
+    (event.clientX - rect.left) * dpr * scale - width / 2,
+    (event.clientY - rect.top) * dpr * scale - height / 2,
   ]
 }
 
@@ -254,7 +265,8 @@ function addTrailPoint(event: PointerEvent) {
     const dx = point[0] - lastTrailPoint[0]
     const dy = point[1] - lastTrailPoint[1]
     const dpr = window.devicePixelRatio || 1
-    if (Math.hypot(dx, dy) < TRAIL_MIN_DISTANCE * dpr) return
+    const scale = getRenderScale()
+    if (Math.hypot(dx, dy) < TRAIL_MIN_DISTANCE * dpr * scale) return
   }
   lastTrailPoint = point
   trailPoints.push({ x: point[0], y: point[1], startedAt: performance.now(), strength: 1 })
@@ -276,7 +288,7 @@ function updateTrailUniforms() {
       ? [p.x, p.y, (now - p.startedAt) / duration, p.strength]
       : [0, 0, 1, 0]
   }
-  uniforms.trailRadius = props.rippleRadius * (window.devicePixelRatio || 1)
+  uniforms.trailRadius = props.rippleRadius * (window.devicePixelRatio || 1) * getRenderScale()
   uniforms.trailStrength = props.rippleTrail ? props.rippleStrength : 0
 }
 
@@ -464,6 +476,9 @@ watch(
     uniforms.blurRadius = getEffectiveBlurRadius(props.theme)
   },
 )
+
+// 暴露 syncCanvasSize 供父组件在需要时手动触发(如 Transition 动画结束后)
+defineExpose({ syncCanvasSize })
 </script>
 
 <style scoped>

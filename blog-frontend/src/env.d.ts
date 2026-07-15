@@ -27,6 +27,17 @@ declare module '*.svg?url' {
   export default url
 }
 
+// 大写扩展名图片模块声明(Vite 默认只覆盖小写扩展名)
+declare module '*.PNG' {
+  const src: string
+  export default src
+}
+
+declare module '*.JPG' {
+  const src: string
+  export default src
+}
+
 // ---------------------------------------------------------------------------
 // i18n-jsautotranslate 类型 shim
 // 该库无官方类型声明,这里仅按本项目实际用到的 API 补一个最小声明。

@@ -288,6 +288,11 @@ function cardStyle(index: number) {
     filter 0.24s ease;
 }
 
+/* 液态玻璃开启时,内容区域需要与 .archive-panel 一致的内收 padding */
+.archive-glass :deep(.liquid-glass-content) {
+  padding: 0.45rem;
+}
+
 .archive-panel {
   display: flex;
   flex-direction: column;
