@@ -20,7 +20,7 @@ import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUIStore } from '@/stores/ui'
 import darkBg from '@/assets/img/test3.jpg'
-import lightBg from '@/assets/img/test6.png'
+import lightBg from '@/assets/img/test6.PNG'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
 withDefaults(defineProps<{ overlay?: number }>(), {

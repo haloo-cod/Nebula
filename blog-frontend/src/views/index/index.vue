@@ -112,7 +112,7 @@
               <DigitalClockPanel />
             </PanelFallbackGlass>
           </div>
-          <!-- 右侧下：文章缩略 + 日记（占位） -->
+          <!-- 右侧下：博文轮播 + 说说轮播 -->
           <div class="bottom-right-bottom">
             <div class="bottom-right-bottom-inner">
               <LiquidGlass
@@ -121,18 +121,28 @@
                 :theme="ui.theme"
                 :blur-radius="ui.liquidGlassBlur"
                 :allow-reveal="allowLiquidGlassReveal"
+                :ripple-trail="true"
                 class="panel-liquid-glass"
-              />
-              <PanelFallbackGlass v-else class="panel-fallback-glass--empty"></PanelFallbackGlass>
+              >
+                <PostCarousel />
+              </LiquidGlass>
+              <PanelFallbackGlass v-else>
+                <PostCarousel />
+              </PanelFallbackGlass>
               <LiquidGlass
                 v-if="ui.liquidGlassEnabled"
                 :cornerRadius="16"
                 :theme="ui.theme"
                 :blur-radius="ui.liquidGlassBlur"
                 :allow-reveal="allowLiquidGlassReveal"
+                :ripple-trail="true"
                 class="panel-liquid-glass"
-              />
-              <PanelFallbackGlass v-else class="panel-fallback-glass--empty"></PanelFallbackGlass>
+              >
+                <MomentCarousel />
+              </LiquidGlass>
+              <PanelFallbackGlass v-else>
+                <MomentCarousel />
+              </PanelFallbackGlass>
             </div>
           </div>
         </div>
@@ -150,6 +160,8 @@ import DataDashboard from '@/components/panels/DataDashboard.vue'
 import CalendarPanel from '@/components/panels/CalendarPanel.vue'
 import DigitalClockPanel from '@/components/panels/DigitalClockPanel.vue'
 import Carousel from '@/components/panels/Carousel.vue'
+import PostCarousel from '@/components/panels/PostCarousel.vue'
+import MomentCarousel from '@/components/panels/MomentCarousel.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
@@ -459,27 +471,17 @@ const containerClass = computed(() => {
   grid-column: 2;
   grid-row: 3;
   display: flex;
-  min-height: 220px;
+  height: 300px;
 }
 
 .bottom-right-bottom-inner {
-  height: 300px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 12px;
   width: 100%;
-  /* padding: 14px; */
-  box-sizing: border-box;
-}
-
-.posts-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 0.75rem;
   height: 100%;
   box-sizing: border-box;
 }
+
 
 @media (max-width: 768px) {
   .home-bottom {
@@ -497,17 +499,18 @@ const containerClass = computed(() => {
     padding: 12px;
   }
 
+  .bottom-right-bottom {
+    height: auto;
+  }
+
   .bottom-right-bottom-inner {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    height: auto;
+    min-height: 400px;
   }
 
   .bottom-right-top {
     padding: 12px;
-  }
-
-  .posts-grid {
-    grid-template-columns: 1fr;
-    padding: 0.5rem;
   }
 }
 </style>

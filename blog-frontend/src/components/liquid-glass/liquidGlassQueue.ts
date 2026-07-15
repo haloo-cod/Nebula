@@ -10,7 +10,7 @@
 
 import { waitForTexture, hasTexture } from '@/components/liquid-glass/liquidGlassRenderer'
 import darkBgUrl from '@/assets/img/test3.jpg'
-import lightBgUrl from '@/assets/img/test6.png'
+import lightBgUrl from '@/assets/img/test6.PNG'
 
 /** 等待下次纹理上传完成（主题切换时调用,等待新主题纹理就绪） */
 export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void> {

@@ -21,7 +21,7 @@
  */
 import { ref, watch, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import darkBgUrl from '@/assets/img/test3.jpg'
-import lightBgUrl from '@/assets/img/test6.png'
+import lightBgUrl from '@/assets/img/test6.PNG'
 import { useUIStore } from '@/stores/ui'
 import {
   registerInstance,

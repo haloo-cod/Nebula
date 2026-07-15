@@ -26,13 +26,15 @@
           <div
             v-for="(moment, mi) in group.moments"
             :key="moment.id"
-            class="moments-card-wrap post-rise-inner"
-            :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
+            :id="`moment-${moment.id}`"
+            class="moments-card-wrap"
+            :class="{ 'moments-card-highlight': highlightId === moment.id }"
           >
             <!-- 液态玻璃开启时 -->
             <LazyLiquidGlass
               v-if="ui.liquidGlassEnabled"
-              class="moments-glass"
+              class="moments-glass post-rise-inner"
+              :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
               :corner-radius="18"
               :theme="ui.theme"
               :blur-radius="ui.liquidGlassBlur"
@@ -43,7 +45,11 @@
             </LazyLiquidGlass>
 
             <!-- 液态玻璃关闭时的 fallback -->
-            <PanelFallbackGlass v-else class="moments-panel">
+            <PanelFallbackGlass
+              v-else
+              class="moments-panel post-rise-inner"
+              :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
+            >
               <MomentCard :moment="moment" @select="openDetail" />
             </PanelFallbackGlass>
           </div>
@@ -63,7 +69,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
@@ -74,6 +81,11 @@ import MomentCard from './MomentCard.vue'
 import MomentDetail from './MomentDetail.vue'
 
 const ui = useUIStore()
+const route = useRoute()
+
+// ============ hash 定位高亮 ============
+
+const highlightId = ref<number | null>(null)
 
 // ============ 详情 overlay 状态 ============
 
@@ -143,6 +155,27 @@ function formatDayLabel(dateStr: string): string {
 onMounted(() => {
   // 首次加载
   loadNextPage()
+
+  // hash 定位：如果 URL 中带有 #moment-{id}，加载全部数据后滚动到对应卡片
+  const hash = route.hash
+  const hashMatch = hash.match(/^#moment-(\d+)$/)
+  if (hashMatch) {
+    const targetId = Number(hashMatch[1])
+    // 确保目标说说已加载（持续加载直到找到或全部加载完）
+    while (!allLoaded.value.some((m) => m.id === targetId) && !noMore.value) {
+      loadNextPage()
+    }
+    nextTick(() => {
+      const el = document.getElementById(`moment-${targetId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        highlightId.value = targetId
+        setTimeout(() => {
+          highlightId.value = null
+        }, 2000)
+      }
+    })
+  }
 
   // 设置无限滚动监听
   if (!sentinelRef.value) return
@@ -254,8 +287,23 @@ onUnmounted(() => {
 /* ===== 卡片外壳 ===== */
 .moments-card-wrap {
   width: 100%;
-  overflow: hidden;
   min-width: 0;
+}
+
+/* hash 定位高亮闪烁 */
+.moments-card-highlight {
+  animation: momentHighlight 2s ease-out;
+}
+
+@keyframes momentHighlight {
+  0%,
+  20% {
+    box-shadow: 0 0 0 2px rgba(140, 200, 255, 0.6), 0 0 24px rgba(140, 200, 255, 0.3);
+    border-radius: 1.1rem;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+  }
 }
 
 .moments-glass {
@@ -323,12 +371,14 @@ onUnmounted(() => {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .post-rise-inner {
+    opacity: 1;
+    transform: none;
     animation: none;
   }
 }
