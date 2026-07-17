@@ -1,105 +1,309 @@
 <template>
   <PageBackground>
-    <div class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full">
-      <div class="friends-wrapper">
-        <GlassPanel class="friends-panel">
-          <div class="friends-header">
-            <p class="friends-kicker">Friends</p>
-            <h1 class="friends-title">友链</h1>
-            <p class="friends-desc">一些有趣、温和且持续发光的站点。</p>
-          </div>
+    <main class="friends-page">
+      <!-- 页面标题 -->
+      <header class="friends-header">
+        <p class="friends-kicker">Friends</p>
+        <h1 class="friends-title">友链</h1>
+        <p class="friends-desc">一些有趣、温和且持续发光的站点。</p>
+      </header>
 
-          <div class="friends-grid">
+      <!-- 顶部液态玻璃鱼缸 -->
+      <section class="aquarium-section" aria-label="友链头像墙">
+        <LiquidGlass
+          class="friends-aquarium"
+          :theme="ui.theme"
+          :corner-radius="24"
+          :ripple-trail="true"
+        >
+          <div ref="aquariumRef" class="aquarium-content">
             <a
-              v-for="friend in friends"
-              :key="friend.name"
-              :href="friend.url"
-              class="friend-card"
+              v-for="item in floatingItems"
+              :key="item.name"
+              :href="item.url"
               target="_blank"
               rel="noopener noreferrer"
+              class="floating-avatar"
+              :style="item.style"
+              @mouseenter="pause(item.name)"
+              @mouseleave="resume(item.name)"
+              @focus="pause(item.name)"
+              @blur="resume(item.name)"
             >
-              <img :src="friend.avatar" :alt="`${friend.name} avatar`" class="friend-avatar" />
+              <img
+                :src="item.avatar"
+                :alt="`${item.name} avatar`"
+                class="floating-avatar__img"
+                loading="lazy"
+              />
+              <span class="floating-avatar__name">{{ item.name }}</span>
+            </a>
+          </div>
+        </LiquidGlass>
+      </section>
+
+      <!-- 下方友链列表 -->
+      <section class="friends-list-section" aria-label="友链列表">
+        <div class="friends-grid">
+          <a
+            v-for="friend in friends"
+            :key="friend.name"
+            :href="friend.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="friend-link"
+          >
+            <LiquidGlass
+              v-if="ui.liquidGlassEnabled"
+              class="friend-card-glass"
+              :theme="ui.theme"
+              :corner-radius="16"
+              :ripple-trail="true"
+            >
+              <article class="friend-card friend-card--liquid">
+                <img
+                  :src="friend.avatar"
+                  :alt="`${friend.name} avatar`"
+                  class="friend-avatar"
+                  loading="lazy"
+                />
+                <div class="friend-info">
+                  <h2 class="friend-name">{{ friend.name }}</h2>
+                  <p class="friend-bio">{{ friend.bio }}</p>
+                </div>
+                <SvgIcon name="arrow_forward_ios" class="friend-external" />
+              </article>
+            </LiquidGlass>
+
+            <PanelFallbackGlass v-else tag="article" class="friend-card friend-card-fallback">
+              <img
+                :src="friend.avatar"
+                :alt="`${friend.name} avatar`"
+                class="friend-avatar"
+                loading="lazy"
+              />
               <div class="friend-info">
                 <h2 class="friend-name">{{ friend.name }}</h2>
                 <p class="friend-bio">{{ friend.bio }}</p>
               </div>
-            </a>
+              <SvgIcon name="arrow_forward_ios" class="friend-external" />
+            </PanelFallbackGlass>
+          </a>
+        </div>
+      </section>
+
+      <!-- 交换友链 -->
+      <section class="friends-exchange-section" aria-label="交换友链">
+        <LiquidGlass
+          v-if="ui.liquidGlassEnabled"
+          class="exchange-glass"
+          :theme="ui.theme"
+          :corner-radius="16"
+          :ripple-trail="true"
+        >
+          <article class="exchange-card exchange-card--liquid">
+            <h2 class="exchange-title">交换友链</h2>
+
+            <div class="exchange-site">
+              <img
+                :src="exchangeInfo.avatar"
+                :alt="`${exchangeInfo.name} avatar`"
+                class="exchange-avatar"
+                loading="lazy"
+              />
+              <div class="exchange-site-info">
+                <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
+                <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
+                <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+              </div>
+            </div>
+
+            <div class="exchange-block">
+              <h3 class="exchange-block-title">申请要求</h3>
+              <ul class="exchange-list">
+                <li v-for="(req, index) in exchangeInfo.requirements" :key="index">
+                  {{ req }}
+                </li>
+              </ul>
+            </div>
+
+            <div class="exchange-block">
+              <h3 class="exchange-block-title">联系方式</h3>
+              <p class="exchange-contact">{{ exchangeInfo.contact }}</p>
+            </div>
+          </article>
+        </LiquidGlass>
+
+        <PanelFallbackGlass
+          v-else
+          tag="article"
+          class="exchange-card exchange-card-fallback"
+        >
+          <h2 class="exchange-title">交换友链</h2>
+
+          <div class="exchange-site">
+            <img
+              :src="exchangeInfo.avatar"
+              :alt="`${exchangeInfo.name} avatar`"
+              class="exchange-avatar"
+              loading="lazy"
+            />
+            <div class="exchange-site-info">
+              <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
+              <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
+              <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+            </div>
           </div>
-        </GlassPanel>
-      </div>
-    </div>
+
+          <div class="exchange-block">
+            <h3 class="exchange-block-title">申请要求</h3>
+            <ul class="exchange-list">
+              <li v-for="(req, index) in exchangeInfo.requirements" :key="index">
+                {{ req }}
+              </li>
+            </ul>
+          </div>
+
+          <div class="exchange-block">
+            <h3 class="exchange-block-title">联系方式</h3>
+            <p class="exchange-contact">{{ exchangeInfo.contact }}</p>
+          </div>
+        </PanelFallbackGlass>
+      </section>
+    </main>
   </PageBackground>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
-import GlassPanel from '@/components/panels/GlassPanel.vue'
+import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
+import { getFriends } from '@/data/friends'
+import { useUIStore } from '@/stores/ui'
+import { useFloatingAvatars } from '@/composables/useFloatingAvatars'
 
-/** 友链条目 */
-interface Friend {
-  name: string // 站点名
-  bio: string // 简介
-  avatar: string // 头像 URL
-  url: string // 站点地址
+const ui = useUIStore()
+const friends = getFriends()
+const aquariumRef = ref<HTMLElement | null>(null)
+
+// 交换友链占位信息，后续替换为真实内容
+const exchangeInfo = {
+  name: '你的站点名称',
+  url: 'https://example.com',
+  avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=myblog',
+  bio: '这里填写你的站点简介。',
+  requirements: ['原创内容优先', '站点稳定可访问', '无违法违规内容', '最好有定期更新'],
+  contact: 'your-email@example.com',
 }
 
-const friends: Friend[] = [
-  {
-    name: '暮色工坊',
-    bio: '记录前端、设计和一些慢慢变好的日常。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=twilight',
-    url: 'https://example.com',
-  },
-  {
-    name: '星河手札',
-    bio: '关于 Vue、工程化和个人知识库的碎片笔记。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=galaxy',
-    url: 'https://vuejs.org',
-  },
-  {
-    name: '北巷代码',
-    bio: '偏爱干净代码，也喜欢把复杂问题讲清楚。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=lane',
-    url: 'https://vite.dev',
-  },
-  {
-    name: '浮光档案',
-    bio: '照片、旅行和那些值得被保存的小瞬间。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=glimmer',
-    url: 'https://developer.mozilla.org',
-  },
-  {
-    name: '青柠实验室',
-    bio: '折腾工具、自动化和效率系统的个人实验田。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=lime',
-    url: 'https://github.com',
-  },
-  {
-    name: '半夏书房',
-    bio: '读书、写作和偶尔出现的技术长文。',
-    avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=summer',
-    url: 'https://www.wikipedia.org',
-  },
-]
+const { items: floatingItems, pause, resume } = useFloatingAvatars({
+  containerRef: aquariumRef,
+  friends,
+  mode: 'bounce',
+  avatarSize: 72,
+  speed: 0.8,
+})
 </script>
 
 <style scoped>
-.friends-wrapper {
+.friends-page {
   position: relative;
   z-index: 10;
   width: 100%;
   max-width: 72rem;
-  margin: 4rem auto 0;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  margin: 0 auto;
+  padding: 7rem 1rem 5rem;
 }
 
-.friends-panel {
-  min-height: 60vh;
+/* ============ 液态玻璃鱼缸 ============ */
+.aquarium-section {
+  width: 100%;
+  height: 55vh;
+  min-height: 320px;
+  margin-bottom: 4rem;
+}
+
+.friends-aquarium {
+  width: 100%;
+  height: 100%;
+}
+
+.aquarium-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.floating-avatar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  text-decoration: none;
+  will-change: transform;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.floating-avatar:hover,
+.floating-avatar:focus-visible {
+  z-index: 10;
+  filter: brightness(1.15);
+}
+
+.floating-avatar__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: var(--glass-bg);
+  object-fit: cover;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.floating-avatar:hover .floating-avatar__img,
+.floating-avatar:focus-visible .floating-avatar__img {
+  transform: scale(1.12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.floating-avatar__name {
+  position: absolute;
+  bottom: -1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-subtle);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.floating-avatar:hover .floating-avatar__name,
+.floating-avatar:focus-visible .floating-avatar__name {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-0.25rem);
+}
+
+/* ============ 列表区 ============ */
+.friends-list-section {
+  padding-top: 1rem;
 }
 
 .friends-header {
-  margin-bottom: 1.6rem;
+  margin-bottom: 1.5rem;
 }
 
 .friends-kicker {
@@ -110,8 +314,12 @@ const friends: Friend[] = [
   text-transform: uppercase;
 }
 
+[data-theme='light'] .friends-kicker {
+  color: rgba(14, 116, 110, 0.74);
+}
+
 .friends-title {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   font-size: 1.45rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -119,7 +327,7 @@ const friends: Friend[] = [
 
 .friends-desc {
   margin-top: 0.45rem;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--text-secondary);
   font-size: 0.86rem;
 }
 
@@ -129,48 +337,41 @@ const friends: Friend[] = [
   gap: 1rem;
 }
 
+.friend-link {
+  display: block;
+  text-decoration: none;
+}
+
+.friend-card-glass {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .friend-card {
   position: relative;
   display: flex;
   align-items: center;
   gap: 0.9rem;
   min-height: 7.2rem;
+  padding: 1rem;
+  transition: transform 0.25s ease;
+}
+
+.friend-card--liquid {
+  width: 100%;
+  height: 100%;
+}
+
+.friend-card-fallback {
   overflow: hidden;
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    radial-gradient(circle at 18% 20%, rgba(140, 185, 255, 0.14), transparent 36%),
-    rgba(255, 255, 255, 0.04);
-  padding: 1rem;
-  text-decoration: none;
-  transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    background 0.25s ease,
-    box-shadow 0.25s ease;
+  border: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
 }
 
-.friend-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 45%);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-
-.friend-card:hover {
+.friend-link:hover .friend-card {
   transform: translateY(-3px);
-  border-color: rgba(140, 185, 255, 0.3);
-  background:
-    radial-gradient(circle at 18% 20%, rgba(140, 185, 255, 0.2), transparent 40%),
-    rgba(255, 255, 255, 0.06);
-  box-shadow: 0 10px 28px rgba(80, 120, 255, 0.14);
-}
-
-.friend-card:hover::after {
-  opacity: 1;
 }
 
 .friend-avatar {
@@ -179,7 +380,7 @@ const friends: Friend[] = [
   flex-shrink: 0;
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-subtle);
   object-fit: cover;
 }
 
@@ -187,11 +388,12 @@ const friends: Friend[] = [
   position: relative;
   z-index: 1;
   min-width: 0;
+  flex: 1;
 }
 
 .friend-name {
   margin-bottom: 0.35rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-size: 0.98rem;
   font-weight: 700;
 }
@@ -199,23 +401,140 @@ const friends: Friend[] = [
 .friend-bio {
   display: -webkit-box;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   font-size: 0.76rem;
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-@media (min-width: 768px) {
-  .friends-wrapper {
-    margin-top: 100px;
-  }
+.friend-external {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.friend-link:hover .friend-external {
+  color: rgba(140, 218, 214, 0.95);
+}
+
+[data-theme='light'] .friend-link:hover .friend-external {
+  color: rgba(14, 116, 110, 0.95);
+}
+
+/* ============ 交换友链 ============ */
+.friends-exchange-section {
+  margin-top: 4rem;
+}
+
+.exchange-glass {
+  display: block;
+  width: 100%;
+}
+
+.exchange-card {
+  padding: 1.5rem;
+}
+
+.exchange-card--liquid {
+  width: 100%;
+  height: 100%;
+}
+
+.exchange-card-fallback {
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
+}
+
+.exchange-title {
+  margin-bottom: 1.25rem;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.exchange-site {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.exchange-avatar {
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--glass-bg-subtle);
+  object-fit: cover;
+}
+
+.exchange-site-name {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.exchange-site-url {
+  margin-top: 0.2rem;
+  color: rgba(140, 218, 214, 0.85);
+  font-size: 0.8rem;
+}
+
+[data-theme='light'] .exchange-site-url {
+  color: rgba(14, 116, 110, 0.85);
+}
+
+.exchange-site-bio {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.exchange-block {
+  margin-bottom: 1rem;
+}
+
+.exchange-block:last-child {
+  margin-bottom: 0;
+}
+
+.exchange-block-title {
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.exchange-list {
+  padding-left: 1.25rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.exchange-contact {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 @media (max-width: 767px) {
-  .friends-wrapper {
-    /* 移动端顶部导航是 fixed，预留安全间距，避免友链面板压到按钮。 */
-    margin-top: 6rem;
+  .friends-page {
+    padding-top: 6rem;
+  }
+
+  .aquarium-section {
+    height: 45vh;
+    min-height: 280px;
   }
 
   .friends-grid {

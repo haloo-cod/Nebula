@@ -83,6 +83,14 @@ export interface ExtractedBookMeta {
   cover?: string // EPUB 内封面解析出的 blob URL
 }
 
+/** 友链条目(友链页鱼缸与列表共用) */
+export interface Friend {
+  name: string // 站点名
+  bio: string // 简介
+  avatar: string // 头像 URL
+  url: string // 站点地址
+}
+
 /** 个人资料 */
 export interface Profile {
   name: string // 昵称
