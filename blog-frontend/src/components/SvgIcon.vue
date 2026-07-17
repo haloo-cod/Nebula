@@ -36,6 +36,8 @@ const nameMap: Record<string, string> = {
   local_library: 'local_library',
   folder: 'folder',
   keep: 'keep',
+  github: 'github',
+  bilibili: 'bilibili',
 }
 
 const props = defineProps<{ name: string }>()

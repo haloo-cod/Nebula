@@ -267,3 +267,48 @@ function moodEmoji(mood: string): string {
   opacity: 0.6;
 }
 </style>
+
+<style>
+/* ============================================
+   light 模式详情内容适配
+   通过 .detail-inner 前缀限定,不泄漏到其他组件
+   ============================================ */
+
+/* 心情标签:改为深蓝色系 */
+[data-theme='light'] .detail-inner .detail-inner__mood {
+  color: rgba(30, 80, 140, 0.8);
+  background: rgba(30, 100, 180, 0.08);
+  border-color: rgba(30, 100, 180, 0.18);
+}
+
+/* #tag 标签:深蓝色系 */
+[data-theme='light'] .detail-inner .detail-inner__tag {
+  color: rgba(30, 80, 140, 0.75);
+  background: rgba(30, 100, 180, 0.07);
+}
+
+/* 交互栏分隔线 */
+[data-theme='light'] .detail-inner .detail-inner__actions {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 点赞按钮 */
+[data-theme='light'] .detail-inner .detail-inner__like-btn {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='light'] .detail-inner .detail-inner__like-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* 评论区分隔线 */
+[data-theme='light'] .detail-inner .detail-inner__comments {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 评论输入框 */
+[data-theme='light'] .detail-inner .detail-inner__comment-input {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+}
+</style>

@@ -1,6 +1,6 @@
 <template>
   <header class="liquid-glass-nav">
-    <!-- 左侧：Logo + 翻译按钮 -->
+    <!-- 左侧：Logo + 翻译按钮 + 移动端主题切换 -->
     <div class="nav-left">
       <span class="logo">Starlit'blog</span>
       <div ref="translateRef" class="translate-wrap" translate="no">
@@ -23,6 +23,15 @@
           </ul>
         </Transition>
       </div>
+      <!-- 移动端主题切换按钮(仅小屏可见,桌面端隐藏) -->
+      <button
+        class="mobile-theme-toggle"
+        type="button"
+        :aria-label="themeIcon === 'moon' ? '切换到亮色主题' : '切换到暗色主题'"
+        @click="toggleThemeIcon"
+      >
+        <SvgIcon :name="themeIcon === 'moon' ? 'moon' : 'sun'" class="mobile-theme-icon" />
+      </button>
     </div>
 
     <!-- 中部菜单（仅桌面端可见） -->
@@ -1177,14 +1186,25 @@ onUnmounted(() => {
     padding: 0 16px;
     margin: 0;
     border-radius: 0 0 16px 16px;
+    gap: 8px;
   }
 
+  /* Logo 绝对居中(脱离 flex 流,水平居中显示为标题) */
   .logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     font-size: 1rem;
   }
 
+  /* 左侧:翻译 + 主题切换,紧凑间距 */
+  .nav-left {
+    gap: 8px;
+    position: static;
+  }
+
   .translate-btn {
-    padding: 5px 10px;
+    padding: 5px 8px;
     font-size: 12px;
   }
 
@@ -1201,13 +1221,34 @@ onUnmounted(() => {
   }
 }
 
-/* 移动端：隐藏桌面菜单和功能区 */
+/* 移动端：隐藏桌面菜单,显示设置按钮但隐藏主题拉绳 */
 @media (max-width: 767px) {
   .nav-menu {
     display: none;
   }
+
+  /* nav-actions 保持可见,推到右侧,只隐藏桌面端专属的主题拉绳和弹窗 */
   .nav-actions {
-    display: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .theme-pull-switch,
+  .theme-toast,
+  .tavern-confirm {
+    display: none !important;
+  }
+
+  /* 设置按钮在移动端的尺寸适配 */
+  .nav-actions .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .nav-actions .action-icon {
+    font-size: 18px;
   }
 }
 
@@ -1219,6 +1260,39 @@ onUnmounted(() => {
   .mobile-menu {
     display: none !important;
   }
+  .mobile-theme-toggle {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   移动端主题切换按钮
+   ============================================ */
+.mobile-theme-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.mobile-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.mobile-theme-icon {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* ============================================

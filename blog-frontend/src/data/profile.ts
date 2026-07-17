@@ -10,10 +10,8 @@ export const profile: Profile = {
   bio: '分享技术、生活和思考的个人博客',
 }
 
-// 社交链接列表
+// 社交链接列表(icon 对应 SvgIcon 的 name)
 export const socialLinks: SocialLink[] = [
-  { label: 'GitHub', icon: '🐙', url: 'https://github.com' },
-  { label: 'Twitter', icon: '🐦', url: 'https://twitter.com' },
-  { label: 'Email', icon: '✉️', url: 'mailto:example@example.com' },
-  { label: 'RSS', icon: '📡', url: '/rss' },
+  { label: 'GitHub', icon: 'github', url: 'https://github.com' },
+  { label: 'Bilibili', icon: 'bilibili', url: 'https://space.bilibili.com' },
 ]

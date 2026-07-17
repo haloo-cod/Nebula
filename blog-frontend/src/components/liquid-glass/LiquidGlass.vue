@@ -37,6 +37,7 @@ import {
   uploadTexture,
   hasTexture,
   preloadTexture,
+  getTextureAspect,
   getRenderScale,
   MAX_TRAIL_POINTS,
   type GlassUniforms,
@@ -114,6 +115,37 @@ const glassPresets = {
   },
 }
 
+// 移动端专属预设:小面板上折射/叠加色/法线强度增大,补偿面积缩小带来的"薄感"
+const mobileGlassPresets = {
+  dark: {
+    glassThickness: 70,
+    ior: 1.2,
+    highlightWidth: 5.0,
+    blurRadius: 0.0,
+    overlayColor: [0.25, 0.32, 0.4] as [number, number, number],
+    normalStrength: 10.0,
+    displacementScale: 1.2,
+    heightTransitionWidth: 10.0,
+    sminSmoothing: 20.0,
+  },
+  light: {
+    glassThickness: 38,
+    ior: 1.1,
+    highlightWidth: 3.5,
+    blurRadius: 0.5,
+    overlayColor: [0.65, 0.7, 0.8] as [number, number, number],
+    normalStrength: 7.0,
+    displacementScale: 1.0,
+    heightTransitionWidth: 6.0,
+    sminSmoothing: 15.0,
+  },
+}
+
+/** 判断当前是否为移动端视口 */
+function isMobileViewport(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth <= 768
+}
+
 // ============================================================================
 // 实例状态
 // ============================================================================
@@ -139,6 +171,7 @@ const uniforms: GlassUniforms = {
   mousePos: [0, 0],
   glassSize: [0, 0],
   canvasOffset: [0, 0],
+  texAspect: 1,
   cornerRadius: 0,
   ior: 0,
   glassThickness: 0,
@@ -168,9 +201,10 @@ function getEffectiveBlurRadius(theme: 'light' | 'dark') {
   return glassPresets[theme].blurRadius
 }
 
-/** 应用主题预设到 uniforms */
+/** 应用主题预设到 uniforms(移动端自动选用更厚重的参数) */
 function applyThemePreset(theme: 'light' | 'dark') {
-  const p = glassPresets[theme]
+  const presets = isMobileViewport() ? mobileGlassPresets : glassPresets
+  const p = presets[theme]
   uniforms.ior = p.ior
   uniforms.glassThickness = p.glassThickness
   uniforms.normalStrength = p.normalStrength
@@ -319,6 +353,9 @@ async function syncBackgroundWithTheme(theme: LiquidGlassTheme) {
     }
   }
 
+  // 更新纹理宽高比(cover 模式 UV 校正用)
+  uniforms.texAspect = getTextureAspect(url)
+
   // 更新实例的背景 URL
   if (instanceId) {
     setInstanceBackground(instanceId, url)
@@ -390,6 +427,8 @@ onMounted(() => {
         console.warn('[LiquidGlass] Failed to load background:', e)
       }
     }
+    // 更新纹理宽高比(cover 模式 UV 校正用)
+    uniforms.texAspect = getTextureAspect(bgUrl)
     // 确保 canvas 尺寸有效后标记为就绪
     const [gw, gh] = uniforms.glassSize
     if (gw >= 1 && gh >= 1) {

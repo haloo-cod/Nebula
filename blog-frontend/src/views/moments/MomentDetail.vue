@@ -175,3 +175,41 @@ onUnmounted(() => {
   transform: scale(0.95) translateY(10px);
 }
 </style>
+
+<style>
+/* ============================================
+   light 模式详情面板适配
+   通过 .detail-overlay 前缀限定作用范围,不影响其他组件
+   ============================================ */
+
+/* 遮罩层:柔和的浅灰半透明,避免纯白刺眼 */
+[data-theme='light'] .detail-overlay {
+  background: rgba(240, 240, 245, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 关闭按钮:深色系,在白色遮罩上可见 */
+[data-theme='light'] .detail-overlay .detail-close {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='light'] .detail-overlay .detail-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* 面板背景:带微灰调的半透明白底,柔和且保证文字可读 */
+[data-theme='light'] .detail-overlay .panel-fallback-glass {
+  background: rgba(248, 248, 250, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* 滚动条 thumb:深色,在白底面板上可见 */
+[data-theme='light'] .detail-overlay .detail-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+</style>

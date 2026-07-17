@@ -400,9 +400,13 @@ const containerClass = computed(() => {
 
 @media (max-width: 768px) {
   .home-panels {
-    top: 80px;
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
     width: 92%;
     max-height: none;
+    margin: 70px auto 0;
     display: block;
   }
 
@@ -417,6 +421,11 @@ const containerClass = computed(() => {
   .home-panels-inner > :last-child {
     flex: none;
     width: 100%;
+  }
+
+  /* 隐藏玻璃横条标题 */
+  .title-container {
+    display: none;
   }
 }
 
@@ -485,32 +494,50 @@ const containerClass = computed(() => {
 
 @media (max-width: 768px) {
   .home-bottom {
-    top: calc(50vh + 30px);
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
     width: 92%;
+    margin: 16px auto 2rem;
   }
 
   .bottom-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 
+  /* 隐藏轮播图(移动端不显示) */
   .bottom-left {
-    height: auto;
-    min-height: 400px;
-    padding: 12px;
+    display: none;
+  }
+
+  /* 隐藏电子时钟(移动端不显示) */
+  .bottom-right-middle {
+    display: none;
+  }
+
+  /* 覆写桌面端的 grid 定位,让剩余面板按源码顺序排列 */
+  .bottom-right-top {
+    grid-column: 1;
+    grid-row: auto;
+    height: 320px;
   }
 
   .bottom-right-bottom {
+    grid-column: 1;
+    grid-row: auto;
     height: auto;
   }
 
   .bottom-right-bottom-inner {
     flex-direction: column;
     height: auto;
-    min-height: 400px;
+    gap: 16px;
   }
 
-  .bottom-right-top {
-    padding: 12px;
+  .bottom-right-bottom-inner > * {
+    min-height: 280px;
   }
 }
 </style>

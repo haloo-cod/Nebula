@@ -27,6 +27,7 @@ export interface GlassUniforms {
   mousePos: [number, number]
   glassSize: [number, number]
   canvasOffset: [number, number]
+  texAspect: number // 纹理原始宽高比(width/height),用于 cover 模式 UV 校正
   cornerRadius: number
   ior: number
   glassThickness: number
@@ -82,6 +83,7 @@ interface UniformLocations {
   mousePos: WebGLUniformLocation | null
   glassSize: WebGLUniformLocation | null
   canvasOffset: WebGLUniformLocation | null
+  texAspect: WebGLUniformLocation | null
   backgroundTexture: WebGLUniformLocation | null
   cornerRadius: WebGLUniformLocation | null
   ior: WebGLUniformLocation | null
@@ -107,6 +109,7 @@ function createEmptyLocs(): UniformLocations {
     mousePos: null,
     glassSize: null,
     canvasOffset: null,
+    texAspect: null,
     backgroundTexture: null,
     cornerRadius: null,
     ior: null,
@@ -128,6 +131,7 @@ function createEmptyLocs(): UniformLocations {
 // 纹理缓存：按 URL 索引
 interface TextureEntry {
   texture: WebGLTexture
+  aspect: number // 纹理原始宽高比(width/height)
 }
 
 const textureMap = new Map<string, TextureEntry>()
@@ -164,12 +168,27 @@ const vsSource = `
     uniform vec2 u_mousePos;
     uniform vec2 u_glassSize;
     uniform vec2 u_canvasOffset;
+    uniform float u_texAspect;
     varying vec2 v_screenTexCoord;
     varying vec2 v_shapeCoord;
     void main() {
         gl_Position = vec4(a_position * 2.0 * vec2(1.0, -1.0), 0.0, 1.0);
         vec2 screenPos = u_canvasOffset + u_mousePos + a_position * u_glassSize;
-        v_screenTexCoord = screenPos / u_resolution;
+        vec2 uv = screenPos / u_resolution;
+
+        // Cover 模式:保持纹理宽高比,等比裁切覆盖视口
+        float viewAspect = u_resolution.x / u_resolution.y;
+        if (viewAspect > u_texAspect) {
+            // 视口更宽(横屏):纹理高度填满,上下裁切
+            float scale = u_texAspect / viewAspect;
+            uv.y = (uv.y - 0.5) * scale + 0.5;
+        } else {
+            // 视口更窄(竖屏):纹理宽度填满,左右裁切
+            float scale = viewAspect / u_texAspect;
+            uv.x = (uv.x - 0.5) * scale + 0.5;
+        }
+
+        v_screenTexCoord = uv;
         v_screenTexCoord.y = 1.0 - v_screenTexCoord.y;
         v_shapeCoord = a_position;
     }
@@ -401,6 +420,7 @@ function initGL(): boolean {
     mousePos: gl.getUniformLocation(program, 'u_mousePos'),
     glassSize: gl.getUniformLocation(program, 'u_glassSize'),
     canvasOffset: gl.getUniformLocation(program, 'u_canvasOffset'),
+    texAspect: gl.getUniformLocation(program, 'u_texAspect'),
     backgroundTexture: gl.getUniformLocation(program, 'u_backgroundTexture'),
     cornerRadius: gl.getUniformLocation(program, 'u_cornerRadius'),
     ior: gl.getUniformLocation(program, 'u_ior'),
@@ -527,7 +547,7 @@ export function uploadTexture(url: string, image: HTMLImageElement): boolean {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
-  textureMap.set(url, { texture })
+  textureMap.set(url, { texture, aspect: image.naturalWidth / (image.naturalHeight || 1) })
 
   // 通知纹理就绪
   for (const cb of textureReadyCallbacks) cb()
@@ -539,6 +559,12 @@ export function uploadTexture(url: string, image: HTMLImageElement): boolean {
 /** 检查纹理是否已就绪 */
 export function hasTexture(url: string): boolean {
   return textureMap.has(url)
+}
+
+/** 获取已上传纹理的原始宽高比(width/height),未就绪时返回 1 */
+export function getTextureAspect(url: string): number {
+  const entry = textureMap.get(url)
+  return entry ? entry.aspect : 1
 }
 
 /** 删除指定 URL 的纹理（可选,用于内存清理） */
@@ -700,6 +726,7 @@ function renderInstance(inst: GlassInstance): boolean {
   gl.uniform2fv(locs.mousePos!, uniforms.mousePos)
   gl.uniform2fv(locs.glassSize!, uniforms.glassSize)
   gl.uniform2fv(locs.canvasOffset!, uniforms.canvasOffset)
+  gl.uniform1f(locs.texAspect!, uniforms.texAspect)
   gl.uniform1f(locs.cornerRadius!, uniforms.cornerRadius)
   gl.uniform1f(locs.ior!, uniforms.ior)
   gl.uniform1f(locs.glassThickness!, uniforms.glassThickness)

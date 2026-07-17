@@ -38,8 +38,9 @@
           target="_blank"
           rel="noopener"
           class="hp-social-icon"
-          >{{ link.icon }}</a
         >
+          <SvgIcon :name="link.icon" class="hp-social-svg" />
+        </a>
       </div>
     </div>
   </div>
@@ -49,6 +50,7 @@
 import { computed } from 'vue'
 import type { SocialLink } from '@/types'
 import { getPosts } from '@/data/posts'
+import SvgIcon from '@/components/SvgIcon.vue'
 
 const posts = getPosts()
 
@@ -208,5 +210,68 @@ withDefaults(
 .hp-social-icon:hover {
   color: var(--text-primary);
   transform: translateY(-2px);
+}
+
+.hp-social-svg {
+  font-size: 1.3rem;
+}
+
+/* ============================================
+   移动端适配(竖向堆叠布局)
+   ============================================ */
+@media (max-width: 768px) {
+  .home-profile {
+    padding: 1rem;
+  }
+
+  .hp-top {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    min-height: auto;
+  }
+
+  .hp-avatar {
+    width: 64px;
+    height: 64px;
+  }
+
+  .hp-info {
+    align-items: center;
+  }
+
+  .hp-name {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .hp-bio {
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  .hp-bottom {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .hp-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .stat-box {
+    padding: 0.6rem 0.8rem;
+  }
+
+  .stat-value {
+    font-size: 1.1rem;
+  }
+
+  .hp-social {
+    justify-content: center;
+  }
 }
 </style>
