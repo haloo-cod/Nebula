@@ -58,6 +58,23 @@ export interface Book {
   file: string // EPUB 文件访问地址,测试阶段指向 public/books,后续可换后端 URL
 }
 
+/** 相册中的单张照片 */
+export interface AlbumPhoto {
+  url: string // 照片 URL,当前来自本地 assets,后续可换后端图床
+  caption?: string // 照片说明文字,灯箱与悬停遮罩中展示,可缺省
+}
+
+/** 相册元数据(照片墙概览与相册详情共用) */
+export interface Album {
+  id: string // 相册唯一标识
+  title: string // 相册标题
+  description: string // 相册简介,可能为空串
+  cover: string // 封面照片 URL(照片堆叠最上层)
+  date: string // 相册日期标签,格式不限(如 2026.05)
+  orientation: 'landscape' | 'portrait' // 照片墙堆叠方向,管理后台可按相册选择;决定概览照片栈的宽高比
+  photos: AlbumPhoto[] // 全部照片;堆叠的中/底层取 photos[1]/photos[2],不足时条件渲染
+}
+
 /** 从 EPUB 内部自动解析出的图书元数据 */
 export interface ExtractedBookMeta {
   title?: string // EPUB metadata.title

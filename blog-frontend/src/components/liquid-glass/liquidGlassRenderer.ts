@@ -157,6 +157,14 @@ let renderScale = 1.0
 // 帧率节流：无 trail 活跃时降为 30fps（每 2 帧渲染 1 次）
 let frameCount = 0
 
+// 滚动感知：滚动期间保持 60fps，停止后 200ms 缓冲再退回 30fps
+let lastScrollTime = 0
+if (typeof window !== 'undefined') {
+  window.addEventListener('scroll', () => {
+    lastScrollTime = performance.now()
+  }, { passive: true })
+}
+
 // ============================================================================
 // Shader 源码
 // ============================================================================
@@ -781,13 +789,17 @@ function renderLoop() {
 
   frameCount++
 
-  // 帧率节流：无 trail 活跃时降为 30fps（跳帧）,减轻集显负载
+  // 帧率节流：无 trail/无滚动时降为 30fps（跳帧）,减轻集显负载
   // 首次渲染回调未完成的实例不受节流影响（确保淡入不延迟）
+  // 滚动期间 + 停止后 200ms 缓冲期内保持 60fps，消除拖拽感
+  const SCROLL_BUFFER_MS = 200
+  const scrollActive = performance.now() - lastScrollTime < SCROLL_BUFFER_MS
   const hasTrail = hasActiveTrails()
   const hasPendingFirstRender = [...instances.values()].some(
     (inst) => inst.ready && !inst.hasRenderedOnce,
   )
-  if (!hasTrail && !hasPendingFirstRender && frameCount % 2 !== 0) return
+  const needsFullFps = hasTrail || hasPendingFirstRender || scrollActive
+  if (!needsFullFps && frameCount % 2 !== 0) return
 
   for (const inst of instances.values()) {
     if (!inst.ready) continue
