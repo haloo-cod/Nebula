@@ -93,6 +93,89 @@ Routes: `/` (index), `/archive`, `/archive/tree`, `/archive/post/:slug`, `/books
 - `i18n-jsautotranslate` — client-side i18n via `window.translate` (Edge translation service)
 - Node: `^20.19.0 || >=22.12.0`
 
+## Git 工作流规范
+
+### 仓库结构
+
+Monorepo，`.git` 位于项目根目录 `My_blog/`，前后端并列：
+
+```
+My_blog/
+├── blog-frontend/
+└── blog-backend/
+```
+
+### 分支策略
+
+| 分支 | 用途 | 说明 |
+|------|------|------|
+| `main` | 稳定版 | 只接受合并，不直接提交 |
+| `dev` | 日常集成 | 前后端开发完成后合并到这里，测试通过后再合入 main |
+| `feat/frontend-*` | 前端功能 | 如 `feat/frontend-music-player` |
+| `feat/backend-*` | 后端功能 | 如 `feat/backend-post-api` |
+| `fix/*` | Bug 修复 | 如 `fix/router-scroll-restore` |
+| `chore/*` | 杂务 | 如 `chore/upgrade-deps` |
+
+### 提交规范（Conventional Commits）
+
+格式：`<type>(<scope>): <简要描述>`
+
+```
+feat(frontend): 完成说说页评论功能
+feat(backend): 新增文章列表 API
+fix(backend): 修复分页越界问题
+fix(frontend): 修复暗色模式切换闪白
+chore: 升级依赖版本
+docs: 补充接口文档
+refactor(frontend): 重构液态玻璃渲染逻辑
+style(frontend): 调整归档页间距
+```
+
+**type 列表：**
+
+- `feat` — 新功能
+- `fix` — Bug 修复
+- `docs` — 文档变更
+- `style` — 样式调整（不影响逻辑）
+- `refactor` — 重构（不改变外部行为）
+- `perf` — 性能优化
+- `chore` — 构建/依赖/配置等杂务
+- `test` — 测试相关
+
+**scope（可选）：** `frontend` / `backend` / 省略（影响全局时）
+
+### 日常开发流程
+
+```bash
+# 1. 从 dev 创建功能分支
+git checkout dev
+git pull origin dev
+git checkout -b feat/backend-post-api
+
+# 2. 开发，提交（多次小提交）
+git add blog-backend/...
+git commit -m "feat(backend): 新增文章 CRUD 接口"
+
+# 3. 开发完成，合并回 dev
+git checkout dev
+git merge feat/backend-post-api
+
+# 4. 测试通过后，合并 dev 到 main
+git checkout main
+git merge dev
+git push origin main
+
+# 5. 清理功能分支
+git branch -d feat/backend-post-api
+```
+
+### 注意事项
+
+- 不要在 `main` 上直接开发
+- 提交前确保 `pnpm type-check` 通过（前端）
+- 单次提交尽量原子化：一个提交解决一个问题
+- 避免提交 `debug`、`test`、`wip` 等无意义信息（如确需临时提交，合并前 squash）
+
 ## Skill awareness
 
 - The `cc-frontend-dev` skill (at `.agents/skills/cc-frontend-dev/SKILL.md`) provides Vue 3 / TS conventions. Its UI prohibitions (no glass morphism, no emoji, no neon gradients) are for admin dashboard projects and do **not** apply to this blog — this project deliberately uses liquid-glass effects, Chinese + emoji comments, and decorative visuals.
