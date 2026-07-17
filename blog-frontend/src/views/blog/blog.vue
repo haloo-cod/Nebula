@@ -21,7 +21,7 @@
         </div>
       </div>
 
-      <div class="blog-grid">
+      <TransitionGroup name="grid-item" tag="div" class="blog-grid">
         <RouterLink
           v-for="post in visiblePosts"
           :key="post.slug"
@@ -77,7 +77,7 @@
             </div>
           </PanelFallbackGlass>
         </RouterLink>
-      </div>
+      </TransitionGroup>
 
       <div v-if="totalPages > 1" class="blog-pagination">
         <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
@@ -335,16 +335,18 @@ watch(totalPages, (nextTotal) => {
     border-color 0.24s ease;
 }
 
-.blog-link:hover .blog-glass {
-  transform: translateY(-5px);
-  filter: drop-shadow(0 16px 34px rgba(80, 140, 255, 0.18));
-}
+@media (hover: hover) {
+  .blog-link:hover .blog-glass {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 16px 34px rgba(80, 140, 255, 0.18));
+  }
 
-.blog-link:hover .post-card-fallback {
-  border-color: rgba(140, 185, 255, 0.24);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 16px 34px rgba(80, 140, 255, 0.18);
+  .blog-link:hover .post-card-fallback {
+    border-color: rgba(140, 185, 255, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 16px 34px rgba(80, 140, 255, 0.18);
+  }
 }
 
 .post-date {
@@ -492,5 +494,30 @@ watch(totalPages, (nextTotal) => {
   .blog-page {
     padding-top: 6rem;
   }
+}
+
+/* ===== TransitionGroup 切换动画 ===== */
+.grid-item-enter-active {
+  transition: transform 0.3s ease;
+}
+
+.grid-item-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  position: absolute;
+}
+
+.grid-item-enter-from {
+  transform: translateY(16px);
+}
+
+.grid-item-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.grid-item-move {
+  transition: transform 0.3s ease;
 }
 </style>

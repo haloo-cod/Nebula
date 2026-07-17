@@ -161,3 +161,64 @@ export interface MomentPage {
   items: Moment[]
   total: number
 }
+
+// ---------------------------------------------------------------------------
+// 藏宝阁（Treasure）
+// ---------------------------------------------------------------------------
+
+/** 藏宝阁分类（未来可由后端动态提供） */
+export type TreasureCategory = '开源项目' | '工具' | '资源下载'
+
+/** 藏宝阁条目 */
+export interface Treasure {
+  slug: string // 唯一标识
+  title: string // 名称
+  description: string // 简介
+  category: TreasureCategory // 分类
+  icon: string // 图标（emoji 或 SVG 路径）
+  url: string // 外链地址（开源项目跳 GitHub 等）
+  downloadUrl?: string // 可选下载链接（未来由后端提供）
+  tags: string[] // 标签
+}
+
+// ---------------------------------------------------------------------------
+// 自习室（Study Room）
+// ---------------------------------------------------------------------------
+
+/** 自习室待办（每个待办自带独立专注+休息倒计时） */
+export interface StudyTodo {
+  id: string // 唯一标识
+  title: string // 任务名称
+  durationMinutes: number // 专注时长（分钟）
+  breakMinutes: number // 休息时长（分钟）
+  remainingSeconds: number // 当前剩余秒数
+  completedPomodoros: number // 累计完成番茄钟数
+  todayCompleted: number // 今日完成番茄钟数（每日自动清零）
+  isRunning: boolean // 是否正在倒计时
+  isCompleted: boolean // 是否已手动完成
+  createdAt: string // ISO 日期时间
+}
+
+/** 今日日程条目（时间段可选） */
+export interface ScheduleItem {
+  id: string // 唯一标识
+  title: string // 日程内容
+  startTime?: string // 开始时间，如 "09:00"
+  endTime?: string // 结束时间，如 "10:00"
+  isCompleted: boolean // 是否已完成
+  createdAt: string // ISO 日期时间
+}
+
+/** 自习室历史记录（按天汇总） */
+export interface StudyHistoryRecord {
+  date: string // 日期 YYYY-MM-DD
+  completedPomodoros: number // 完成番茄钟数
+  totalFocusMinutes: number // 总专注分钟数
+}
+
+/** 自习室数据存储结构 */
+export interface StudyRoomData {
+  todos: StudyTodo[]
+  schedule: ScheduleItem[]
+  history: StudyHistoryRecord[]
+}

@@ -9,5 +9,8 @@
 # Agent 技能锁定（本地工具链产物）
 skills-lock.json
 
+# 参考代码与示例文件（仅本地参考，不入库）
+sample_code/
+
 # macOS
 .DS_Store

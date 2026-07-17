@@ -7,6 +7,22 @@
         <p class="books-desc">一块一块的玻璃书格。点击任意图书后进入全屏 EPUB 阅读器。</p>
       </div>
 
+      <!-- 搜索栏（UI 占位，未来接后端搜索） -->
+      <div class="books-search">
+        <span class="books-search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </span>
+        <input
+          v-model="searchQuery"
+          class="books-search-input"
+          type="text"
+          placeholder="搜索书名或作者..."
+        />
+      </div>
+
       <div class="books-grid">
         <RouterLink
           v-for="book in visibleBooks"
@@ -90,6 +106,7 @@ const ui = useUIStore()
 const PAGE_SIZE = 16
 const books = ref<Book[]>(getBooks())
 const currentPage = ref(1)
+const searchQuery = ref('')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(books.value.length / PAGE_SIZE)))
 
@@ -137,6 +154,50 @@ watch(totalPages, (nextTotal) => {
 
 .books-header {
   margin-bottom: 1.8rem;
+}
+
+/* ===== 搜索栏 ===== */
+.books-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 22rem;
+  margin-bottom: 1.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.books-search:focus-within {
+  border-color: rgba(145, 196, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.books-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.books-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.books-search-input::placeholder {
+  color: var(--text-muted);
 }
 
 .books-kicker {
@@ -337,21 +398,38 @@ watch(totalPages, (nextTotal) => {
 
   .books-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.8rem;
+    gap: 0.6rem;
   }
 
   .book-card {
     min-height: auto;
+    padding: 0.3rem;
   }
 
   .book-glass {
     aspect-ratio: auto;
   }
-}
 
-@media (max-width: 440px) {
-  .books-grid {
-    grid-template-columns: 1fr;
+  .book-link {
+    aspect-ratio: 1 / 1.6;
+  }
+
+  .book-cover {
+    aspect-ratio: 1 / 1.3;
+    border-radius: 0.6rem;
+  }
+
+  .book-name {
+    font-size: 0.82rem;
+    -webkit-line-clamp: 2;
+  }
+
+  .book-author {
+    font-size: 0.72rem;
+  }
+
+  .book-info {
+    padding: 0.3rem 0.1rem 0.1rem 0.2rem;
   }
 }
 </style>

@@ -1,144 +1,349 @@
 <template>
   <PageBackground>
-    <div class="relative flex flex-col items-center justify-start pt-24 md:pt-0 w-full">
+    <div class="study-page">
+      <!-- 左右抽屉开关 -->
+      <button class="drawer-trigger drawer-trigger--left" type="button" aria-label="打开待办清单" @click="leftOpen = true">
+        <SvgIcon name="arrow_forward_ios" class="trigger-icon" />
+      </button>
+      <button class="drawer-trigger drawer-trigger--right" type="button" aria-label="打开今日日程" @click="rightOpen = true">
+        <SvgIcon name="arrow_back_ios" class="trigger-icon" />
+      </button>
+
+      <!-- 中央番茄钟面板 -->
       <div class="study-wrapper">
-        <GlassPanel class="study-panel">
-          <div class="study-header">
-            <p class="study-kicker">Study Room</p>
-            <h1 class="study-title">自习室</h1>
-            <p class="study-desc">静下心来，和一段专注的时光相处。</p>
-          </div>
+        <LiquidGlass
+          v-if="ui.liquidGlassEnabled"
+          class="study-glass"
+          :theme="ui.theme"
+          :corner-radius="28"
+          :blur-radius="ui.liquidGlassBlur"
+          :glass-thickness="48"
+          :highlight-width="3.5"
+          ripple-trail
+        >
+          <StudyRoomContent
+            :mode="mode"
+            :active-todo="activeTodo"
+            :formatted-time="formattedTime"
+            :is-running="isRunning"
+            :is-flashing="isFlashing"
+            @toggle="toggleTimer"
+            @reset="resetTimer"
+          />
+        </LiquidGlass>
 
-          <!-- 番茄钟 -->
-          <div class="pomodoro-section">
-            <div class="pomodoro-tabs">
-              <button
-                v-for="opt in timerPresets"
-                :key="opt.label"
-                class="pomodoro-tab"
-                :class="{ active: selectedPreset === opt.minutes }"
-                @click="selectPreset(opt.minutes)"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
+        <PanelFallbackGlass v-else tag="div" class="study-glass study-glass--fallback">
+          <StudyRoomContent
+            :mode="mode"
+            :active-todo="activeTodo"
+            :formatted-time="formattedTime"
+            :is-running="isRunning"
+            :is-flashing="isFlashing"
+            @toggle="toggleTimer"
+            @reset="resetTimer"
+          />
+        </PanelFallbackGlass>
+      </div>
 
-            <div class="pomodoro-display">
-              <span class="pomodoro-time">{{ formattedTime }}</span>
-            </div>
-
-            <div class="pomodoro-controls">
-              <button class="pomodoro-btn" @click="toggleTimer">
-                {{ isRunning ? '暂停' : '开始' }}
-              </button>
-              <button class="pomodoro-btn pomodoro-btn--ghost" @click="resetTimer">
-                重置
-              </button>
-            </div>
-
-            <p v-if="timerState === 'focus'" class="pomodoro-tip">专注中，别分心。</p>
-            <p v-else-if="timerState === 'break'" class="pomodoro-tip">休息一下，起来走走。</p>
-            <p v-else class="pomodoro-tip">选择一个时段，点击开始。</p>
-          </div>
-
-          <!-- 完成记录 -->
-          <div v-if="completedSessions > 0" class="record-section">
-            <p class="record-text">
-              今日已完成 <span class="record-num">{{ completedSessions }}</span> 个番茄钟
-            </p>
-          </div>
-        </GlassPanel>
+      <!-- 历史摘要 -->
+      <div class="history-wrapper">
+        <HistorySummary :history="history" />
       </div>
     </div>
+
+    <!-- 左抽屉：待办 -->
+    <StudyDrawer v-model="leftOpen" position="left">
+      <TodoPanel
+        :todos="todos"
+        :active-id="activeTodoId"
+        @add="addTodo"
+        @select="selectTodo"
+        @delete="deleteTodo"
+        @toggle="toggleTodo"
+      />
+    </StudyDrawer>
+
+    <!-- 右抽屉：日程 -->
+    <StudyDrawer v-model="rightOpen" position="right">
+      <SchedulePanel
+        :schedule="schedule"
+        @add="addSchedule"
+        @delete="deleteSchedule"
+        @toggle="toggleSchedule"
+      />
+    </StudyDrawer>
   </PageBackground>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
-import GlassPanel from '@/components/panels/GlassPanel.vue'
+import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
+import StudyDrawer from '@/components/study/StudyDrawer.vue'
+import TodoPanel from '@/components/study/TodoPanel.vue'
+import SchedulePanel from '@/components/study/SchedulePanel.vue'
+import HistorySummary from '@/components/study/HistorySummary.vue'
+import StudyRoomContent from './StudyRoomContent.vue'
+import { useUIStore } from '@/stores/ui'
+import type { StudyTodo, ScheduleItem, StudyHistoryRecord } from '@/types'
 
-/** 番茄钟预设 */
-interface TimerPreset {
-  label: string
-  minutes: number
+const ui = useUIStore()
+
+// localStorage keys
+const STORAGE_KEYS = {
+  todos: 'starlit-study-todos',
+  schedule: 'starlit-study-schedule',
+  history: 'starlit-study-history',
+  lastDate: 'starlit-study-last-date',
 }
 
-type TimerState = 'idle' | 'focus' | 'break'
-
-const timerPresets: TimerPreset[] = [
-  { label: '25 分钟', minutes: 25 },
-  { label: '45 分钟', minutes: 45 },
-  { label: '15 分钟', minutes: 15 },
-]
-
-const selectedPreset = ref(25)
-const remainingSeconds = ref(25 * 60)
-const isRunning = ref(false)
-const timerState = ref<TimerState>('idle')
-const completedSessions = ref(0)
+// State
+const todos = ref<StudyTodo[]>([])
+const schedule = ref<ScheduleItem[]>([])
+const history = ref<StudyHistoryRecord[]>([])
+const activeTodoId = ref<string | null>(null)
+const leftOpen = ref(false)
+const rightOpen = ref(false)
+const mode = ref<'focus' | 'break'>('focus')
+const isFlashing = ref(false)
 let timerInterval: ReturnType<typeof setInterval> | null = null
 
-const formattedTime = computed(() => {
-  const mins = Math.floor(remainingSeconds.value / 60)
-  const secs = remainingSeconds.value % 60
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+// Active todo
+const activeTodo = computed(() => todos.value.find((t) => t.id === activeTodoId.value))
+
+// Time display
+const displaySeconds = computed(() => {
+  if (activeTodo.value) return activeTodo.value.remainingSeconds
+  return 25 * 60
 })
 
-function selectPreset(minutes: number) {
-  if (isRunning.value) return
-  selectedPreset.value = minutes
-  remainingSeconds.value = minutes * 60
-  timerState.value = 'idle'
+const formattedTime = computed(() => {
+  const total = displaySeconds.value
+  const hours = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  const parts = [
+    String(mins).padStart(2, '0'),
+    String(secs).padStart(2, '0'),
+  ]
+  if (hours > 0) parts.unshift(String(hours).padStart(2, '0'))
+  return parts.join(':')
+})
+
+const isRunning = computed(() => activeTodo.value?.isRunning ?? false)
+
+// Provide data and methods to child content component
+// Utility: generate id
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function toggleTimer() {
-  if (isRunning.value) {
-    stopTimer()
-  } else {
-    startTimer()
+// Utility: today string
+function getToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// Load from localStorage
+function loadFromStorage() {
+  try {
+    const storedTodos = localStorage.getItem(STORAGE_KEYS.todos)
+    const storedSchedule = localStorage.getItem(STORAGE_KEYS.schedule)
+    const storedHistory = localStorage.getItem(STORAGE_KEYS.history)
+    const lastDate = localStorage.getItem(STORAGE_KEYS.lastDate)
+    const today = getToday()
+
+    if (storedTodos) {
+      todos.value = JSON.parse(storedTodos) as StudyTodo[]
+      // Reset daily counters if new day
+      if (lastDate !== today) {
+        todos.value = todos.value.map((t) => ({ ...t, todayCompleted: 0, isRunning: false }))
+      }
+    }
+
+    if (storedSchedule) schedule.value = JSON.parse(storedSchedule) as ScheduleItem[]
+    if (storedHistory) history.value = JSON.parse(storedHistory) as StudyHistoryRecord[]
+
+    localStorage.setItem(STORAGE_KEYS.lastDate, today)
+  } catch (err) {
+    console.warn('[study-room] 读取本地数据失败:', err)
   }
 }
 
+// Save to localStorage
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.todos, JSON.stringify(todos.value))
+    localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(schedule.value))
+    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history.value))
+  } catch (err) {
+    console.warn('[study-room] 保存本地数据失败:', err)
+  }
+}
+
+// Watch and persist
+watch([todos, schedule, history], saveToStorage, { deep: true })
+
+// Timer logic
 function startTimer() {
-  if (timerState.value === 'idle') {
-    timerState.value = 'focus'
-  }
-  isRunning.value = true
+  if (!activeTodo.value) return
+  stopTimer()
+  activeTodo.value.isRunning = true
   timerInterval = setInterval(() => {
-    if (remainingSeconds.value <= 0) {
-      handleTimerEnd()
+    const todo = activeTodo.value
+    if (!todo || !todo.isRunning) return
+
+    if (todo.remainingSeconds > 0) {
+      todo.remainingSeconds -= 1
       return
     }
-    remainingSeconds.value -= 1
+
+    handleTimerEnd()
   }, 1000)
 }
 
 function stopTimer() {
-  isRunning.value = false
+  if (activeTodo.value) activeTodo.value.isRunning = false
   if (timerInterval) {
     clearInterval(timerInterval)
     timerInterval = null
   }
 }
 
-function handleTimerEnd() {
-  stopTimer()
-  if (timerState.value === 'focus') {
-    completedSessions.value += 1
-    timerState.value = 'break'
-    remainingSeconds.value = 5 * 60
-  } else {
-    timerState.value = 'idle'
-    remainingSeconds.value = selectedPreset.value * 60
-  }
+function toggleTimer() {
+  if (isRunning.value) stopTimer()
+  else startTimer()
 }
 
 function resetTimer() {
   stopTimer()
-  remainingSeconds.value = selectedPreset.value * 60
-  timerState.value = 'idle'
+  if (!activeTodo.value) return
+  if (mode.value === 'break') {
+    activeTodo.value.remainingSeconds = activeTodo.value.breakMinutes * 60
+  } else {
+    activeTodo.value.remainingSeconds = activeTodo.value.durationMinutes * 60
+  }
+  isFlashing.value = false
 }
+
+function handleTimerEnd() {
+  stopTimer()
+  isFlashing.value = true
+  const todo = activeTodo.value
+  if (!todo) return
+
+  if (mode.value === 'focus') {
+    // Update todo stats
+    todo.completedPomodoros += 1
+    todo.todayCompleted += 1
+
+    // Update history
+    recordFocus(todo.durationMinutes)
+
+    // Auto switch to break
+    mode.value = 'break'
+    todo.remainingSeconds = todo.breakMinutes * 60
+
+    // Start break after a short delay
+    window.setTimeout(() => {
+      isFlashing.value = false
+      startTimer()
+    }, 1500)
+  } else {
+    // Break ends, back to focus
+    mode.value = 'focus'
+    todo.remainingSeconds = todo.durationMinutes * 60
+
+    window.setTimeout(() => {
+      isFlashing.value = false
+    }, 1500)
+  }
+}
+
+function recordFocus(minutes: number) {
+  const today = getToday()
+  const record = history.value.find((h) => h.date === today)
+  if (record) {
+    record.completedPomodoros += 1
+    record.totalFocusMinutes += minutes
+  } else {
+    history.value.push({
+      date: today,
+      completedPomodoros: 1,
+      totalFocusMinutes: minutes,
+    })
+  }
+}
+
+// Todo CRUD
+function addTodo(payload: Omit<StudyTodo, 'id' | 'createdAt' | 'completedPomodoros' | 'todayCompleted' | 'isRunning' | 'isCompleted'>) {
+  const todo: StudyTodo = {
+    ...payload,
+    id: generateId(),
+    completedPomodoros: 0,
+    todayCompleted: 0,
+    isRunning: false,
+    isCompleted: false,
+    createdAt: new Date().toISOString(),
+  }
+  todos.value.push(todo)
+  if (!activeTodoId.value) activeTodoId.value = todo.id
+}
+
+function selectTodo(id: string) {
+  stopTimer()
+  activeTodoId.value = id
+  const todo = activeTodo.value
+  if (todo) {
+    mode.value = 'focus'
+    todo.remainingSeconds = todo.durationMinutes * 60
+  }
+}
+
+function deleteTodo(id: string) {
+  todos.value = todos.value.filter((t) => t.id !== id)
+  if (activeTodoId.value === id) {
+    activeTodoId.value = todos.value[0]?.id ?? null
+  }
+}
+
+function toggleTodo(id: string) {
+  const todo = todos.value.find((t) => t.id === id)
+  if (!todo) return
+  todo.isCompleted = !todo.isCompleted
+  if (todo.isCompleted && activeTodoId.value === id && isRunning.value) {
+    stopTimer()
+  }
+}
+
+// Schedule CRUD
+function addSchedule(payload: Omit<ScheduleItem, 'id' | 'createdAt' | 'isCompleted'>) {
+  const item: ScheduleItem = {
+    ...payload,
+    id: generateId(),
+    isCompleted: false,
+    createdAt: new Date().toISOString(),
+  }
+  schedule.value.push(item)
+}
+
+function deleteSchedule(id: string) {
+  schedule.value = schedule.value.filter((s) => s.id !== id)
+}
+
+function toggleSchedule(id: string) {
+  const item = schedule.value.find((s) => s.id === id)
+  if (item) item.isCompleted = !item.isCompleted
+}
+
+// Lifecycle
+onMounted(() => {
+  loadFromStorage()
+  if (todos.value.length > 0 && !activeTodoId.value) {
+    activeTodoId.value = todos.value[0].id
+  }
+})
 
 onUnmounted(() => {
   stopTimer()
@@ -146,161 +351,105 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.study-wrapper {
+@font-face {
+  font-family: 'DS-DIGIT';
+  src: url('@/assets/front/DS-DIGIT.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.study-page {
   position: relative;
   z-index: 10;
-  width: 100%;
-  max-width: 42rem;
-  margin: 4rem auto 0;
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-.study-panel {
-  min-height: 60vh;
-}
-
-.study-header {
-  margin-bottom: 2rem;
-}
-
-.study-kicker {
-  margin-bottom: 0.25rem;
-  color: rgba(160, 205, 255, 0.7);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.study-title {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.study-desc {
-  margin-top: 0.45rem;
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 0.86rem;
-}
-
-/* 番茄钟 */
-.pomodoro-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: 6rem 1rem 2rem;
 }
 
-.pomodoro-tabs {
+.drawer-trigger {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 55;
+  width: 2.6rem;
+  height: 2.6rem;
   display: flex;
-  gap: 0.5rem;
-}
-
-.pomodoro-tab {
-  padding: 0.45rem 1.2rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.82rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(16px) saturate(1.14);
+  -webkit-backdrop-filter: blur(16px) saturate(1.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    0 4px 12px rgba(85, 109, 124, 0.14);
+  color: rgba(45, 42, 36, 0.8);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.pomodoro-tab:hover {
-  border-color: rgba(140, 185, 255, 0.35);
-  color: rgba(255, 255, 255, 0.85);
+.drawer-trigger:hover {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(140, 185, 255, 0.7);
 }
 
-.pomodoro-tab.active {
-  border-color: rgba(140, 185, 255, 0.5);
-  background: rgba(100, 150, 255, 0.15);
-  color: rgba(180, 210, 255, 1);
+.drawer-trigger--left {
+  left: 1rem;
 }
 
-.pomodoro-display {
-  padding: 2rem 0;
+.drawer-trigger--right {
+  right: 1rem;
 }
 
-.pomodoro-time {
-  font-size: 4rem;
-  font-weight: 200;
-  color: rgba(255, 255, 255, 0.92);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+.trigger-icon {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
-.pomodoro-controls {
-  display: flex;
-  gap: 0.75rem;
+.study-wrapper {
+  width: 100%;
+  max-width: 42rem;
 }
 
-.pomodoro-btn {
-  padding: 0.6rem 2rem;
-  border-radius: 999px;
-  border: 1px solid rgba(140, 185, 255, 0.35);
-  background: rgba(100, 150, 255, 0.12);
-  color: rgba(180, 210, 255, 0.9);
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.study-glass {
+  width: 100%;
+  min-height: 60vh;
+  border-radius: 1.5rem;
+  overflow: hidden;
 }
 
-.pomodoro-btn:hover {
-  background: rgba(100, 150, 255, 0.22);
-  border-color: rgba(140, 185, 255, 0.5);
+.study-glass--fallback {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.pomodoro-btn--ghost {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.pomodoro-btn--ghost:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.pomodoro-tip {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.35);
-  margin: 0;
-}
-
-/* 记录 */
-.record-section {
-  margin-top: 2rem;
-  text-align: center;
-}
-
-.record-text {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.45);
-  margin: 0;
-}
-
-.record-num {
-  color: rgba(160, 210, 255, 0.8);
-  font-weight: 600;
-}
-
-@media (min-width: 768px) {
-  .study-wrapper {
-    margin-top: 100px;
-  }
+.history-wrapper {
+  width: 100%;
+  max-width: 42rem;
+  margin-top: 1rem;
 }
 
 @media (max-width: 767px) {
-  .study-wrapper {
-    margin-top: 6rem;
+  .study-page {
+    padding-top: 5rem;
   }
 
-  .pomodoro-time {
-    font-size: 3rem;
+  .drawer-trigger {
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 0.55rem;
+  }
+
+  .drawer-trigger--left {
+    left: 0.5rem;
+  }
+
+  .drawer-trigger--right {
+    right: 0.5rem;
   }
 }
 </style>

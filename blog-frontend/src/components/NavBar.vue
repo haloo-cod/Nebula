@@ -28,7 +28,7 @@
         class="mobile-theme-toggle"
         type="button"
         :aria-label="themeIcon === 'moon' ? '切换到亮色主题' : '切换到暗色主题'"
-        @click="toggleThemeIcon"
+        @click="onMobileThemeClick"
       >
         <SvgIcon :name="themeIcon === 'moon' ? 'moon' : 'sun'" class="mobile-theme-icon" />
       </button>
@@ -275,6 +275,12 @@ const pullStyle = computed(() => {
 
 function toggleThemeIcon() {
   ui.toggleTheme()
+}
+
+/** 移动端主题按钮：切换主题 + 记录彩蛋点击（连点5次触发酒馆入口） */
+function onMobileThemeClick() {
+  toggleThemeIcon()
+  recordThemeEggTrigger()
 }
 
 function clearThemeResetTimer() {
@@ -1235,9 +1241,7 @@ onUnmounted(() => {
     margin-left: auto;
   }
 
-  .theme-pull-switch,
-  .theme-toast,
-  .tavern-confirm {
+  .theme-pull-switch {
     display: none !important;
   }
 

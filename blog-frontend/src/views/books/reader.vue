@@ -12,11 +12,23 @@
     <div class="reader-ambient reader-ambient-one"></div>
     <div class="reader-ambient reader-ambient-two"></div>
 
-    <header class="reader-toolbar">
-      <button class="reader-back" type="button" @click="goBack">返回书架</button>
+    <!-- 左上角常驻的工具栏 toggle 按钮 -->
+    <button
+      class="toolbar-toggle"
+      type="button"
+      aria-label="展开/收起工具栏"
+      @click="toggleToolbar"
+    >
+      <span class="toolbar-toggle-icon">{{ toolbarVisible ? '✕' : '≡' }}</span>
+    </button>
+    <header class="reader-toolbar" :class="{ 'reader-toolbar--hidden': !toolbarVisible }">
+      <button class="reader-back reader-back--desktop" type="button" @click="goBack">返回书架</button>
 
       <div class="reader-title-wrap">
-        <p class="reader-kicker">Glass Study</p>
+        <div class="reader-title-head">
+          <p class="reader-kicker">Glass Study</p>
+          <button class="reader-back reader-back--mobile" type="button" @click="goBack">返回书架</button>
+        </div>
         <h1 class="reader-title">{{ book?.title || '图书阅读器' }}</h1>
         <p v-if="book?.author" class="reader-author">{{ book.author }}</p>
       </div>
@@ -212,11 +224,14 @@ const fontScale = ref(defaultReaderPreferences.fontScale)
 const tocOpen = ref(false)
 const tocItems = ref<TocEntry[]>([])
 const activeTocHref = ref('')
+// 移动端工具栏默认隐藏,点击内容区 toggle 显隐
+const toolbarVisible = ref(true)
 let epubBook: EpubBook | null = null
 let loadRunId = 0
 let isUnmounted = false
 let currentCfi: string | undefined
 let currentHref: string | undefined
+let scrollAutoLoadUnlisten: (() => void) | null = null
 
 function isReadingMode(value: unknown): value is ReadingMode {
   return value === 'paginated' || value === 'scrolled'
@@ -342,6 +357,7 @@ function flattenToc(items: NavItem[], depth = 0): TocEntry[] {
 }
 
 function cleanupReader() {
+  cleanupScrollAutoLoad()
   if (rendition.value) {
     rendition.value.destroy()
     rendition.value = null
@@ -416,6 +432,15 @@ function toggleToc() {
   tocOpen.value = !tocOpen.value
 }
 
+/** 点击左上角按钮 toggle 工具栏显隐 */
+function toggleToolbar() {
+  toolbarVisible.value = !toolbarVisible.value
+  // 收起工具栏时同时关闭目录面板
+  if (!toolbarVisible.value && tocOpen.value) {
+    tocOpen.value = false
+  }
+}
+
 function normalizeTocHref(href: string): string {
   return href.split('#')[0]
 }
@@ -441,6 +466,35 @@ async function displayTocItem(href: string) {
   } finally {
     isReaderBusy.value = false
   }
+}
+
+/** 滚动模式：监听 epub-container 滚动，到底时自动加载下一章 */
+function setupScrollAutoLoad() {
+  cleanupScrollAutoLoad()
+  if (readingMode.value !== 'scrolled') return
+  const container = viewerRef.value?.querySelector('.epub-container') as HTMLElement | null
+  if (!container) return
+
+  let isLoadingNext = false
+  const onScroll = () => {
+    if (isLoadingNext || !rendition.value) return
+    const { scrollTop, scrollHeight, clientHeight } = container
+    if (scrollTop + clientHeight >= scrollHeight - 40) {
+      isLoadingNext = true
+      nextPage()
+      // 加载完成后重置标志
+      window.setTimeout(() => {
+        isLoadingNext = false
+      }, 400)
+    }
+  }
+  container.addEventListener('scroll', onScroll, { passive: true })
+  scrollAutoLoadUnlisten = () => container.removeEventListener('scroll', onScroll)
+}
+
+function cleanupScrollAutoLoad() {
+  scrollAutoLoadUnlisten?.()
+  scrollAutoLoadUnlisten = null
 }
 
 function decreaseFontSize() {
@@ -501,6 +555,16 @@ async function loadReader(anchor?: ReaderAnchor) {
     if (!isCurrentRun(runId)) return
     loading.value = false
     isReaderBusy.value = false
+
+    // 滚动模式下设置自动加载下一章监听
+    await nextTick()
+    setupScrollAutoLoad()
+
+    // 滚动模式下首次加载封面后预热下一章，避免必须点一次按钮才出现内容
+    if (readingMode.value === 'scrolled') {
+      await nextPage()
+      await prevPage()
+    }
   } catch (err) {
     if (!isCurrentRun(runId)) return
     console.warn('[books] EPUB 阅读器加载失败:', err)
@@ -596,6 +660,91 @@ onUnmounted(() => {
   background: rgba(172, 145, 112, 0.2);
 }
 
+/* ===== 左上角常驻的 toolbar toggle 按钮 ===== */
+.toolbar-toggle {
+  position: fixed;
+  top: 1.1rem;
+  left: 1.1rem;
+  z-index: 32;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(16px) saturate(1.14);
+  -webkit-backdrop-filter: blur(16px) saturate(1.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    0 4px 12px rgba(85, 109, 124, 0.14);
+  color: rgba(45, 42, 36, 0.8);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.toolbar-toggle:hover {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(76, 106, 126, 0.24);
+}
+
+.toolbar-toggle:active {
+  transform: scale(0.92);
+}
+
+.toolbar-toggle-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.reader-page--night .toolbar-toggle {
+  border-color: rgba(255, 244, 221, 0.14);
+  background: rgba(34, 42, 49, 0.62);
+  color: rgba(239, 228, 207, 0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 221, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.reader-page--night .toolbar-toggle:hover {
+  background: rgba(255, 244, 221, 0.14);
+  border-color: rgba(255, 244, 221, 0.24);
+}
+
+/* 桌面端：toolbar 始终可见 */
+@media (min-width: 861px) {
+  .reader-toolbar--hidden {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .reader-title-head {
+    justify-content: center;
+  }
+
+  .reader-back--mobile {
+    display: none;
+  }
+}
+
+/* 移动端：显示左上角 toggle 按钮 */
+@media (max-width: 860px) {
+  .toolbar-toggle {
+    display: flex;
+    top: 0.85rem;
+    left: 0.85rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.65rem;
+  }
+}
+
 .reader-toolbar {
   position: fixed;
   top: 1rem;
@@ -615,6 +764,15 @@ onUnmounted(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.66),
     0 18px 44px rgba(85, 109, 124, 0.2);
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s ease;
+}
+
+.reader-toolbar--hidden {
+  transform: translateY(calc(-100% - 2rem));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .reader-page--night .reader-toolbar,
@@ -647,6 +805,14 @@ onUnmounted(() => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.45);
   padding: 0.52rem 0.86rem;
+}
+
+.reader-back {
+  flex-shrink: 0;
+}
+
+.reader-back--mobile {
+  display: none;
 }
 
 .reader-page--night .reader-back,
@@ -686,6 +852,17 @@ onUnmounted(() => {
 .reader-title-wrap {
   min-width: 0;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.reader-title-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .reader-kicker {
@@ -958,6 +1135,8 @@ onUnmounted(() => {
 
 .reader-page--scrolled .reader-viewer {
   overflow: hidden;
+  /* 防止 epub.js 滚动模式下章节边界处的滚动锚定回弹 */
+  overflow-anchor: none;
 }
 
 .reader-viewer-hidden {
@@ -1083,13 +1262,33 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
     gap: 0.62rem;
     align-items: stretch;
+    left: 0.75rem;
+    right: 0.75rem;
   }
 
-  .reader-back {
-    justify-self: start;
+  .reader-back--desktop {
+    display: none;
+  }
+
+  .reader-back--mobile {
+    display: inline-flex;
   }
 
   .reader-title-wrap {
+    text-align: left;
+    gap: 0.5rem;
+  }
+
+  .reader-title-head {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .reader-kicker {
+    margin-bottom: 0;
+  }
+
+  .reader-title {
     text-align: left;
   }
 
@@ -1098,23 +1297,25 @@ onUnmounted(() => {
   }
 
   .reader-main {
-    padding-top: 11.5rem;
+    padding-top: 4rem;
+  }
+
+  .toc-panel {
+    top: 4rem;
   }
 }
 
 @media (max-width: 640px) {
   .reader-toolbar {
-    left: 0.75rem;
-    right: 0.75rem;
     border-radius: 1.1rem;
   }
 
   .reader-main {
-    padding: 12rem 0.75rem 4.7rem;
+    padding: 4rem 0.75rem 4.7rem;
   }
 
   .toc-panel {
-    top: 11.2rem;
+    top: 4rem;
   }
 
   .paper-shell {

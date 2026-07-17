@@ -1,0 +1,266 @@
+// ---------------------------------------------------------------------------
+// 藏宝阁数据源
+// 当前为静态数据，未来接入后端 API 后替换为异步获取。
+// ---------------------------------------------------------------------------
+
+import type { Treasure, TreasureCategory } from '@/types'
+
+/** 全部藏宝条目（静态占位示例，可按需替换为真实数据） */
+const treasures: Treasure[] = [
+  // ===== 开源项目 =====
+  {
+    slug: 'vue3',
+    title: 'Vue 3',
+    description: '渐进式 JavaScript 框架，组合式 API + 响应式系统，构建现代 Web 应用的首选。',
+    category: '开源项目',
+    icon: '💚',
+    url: 'https://github.com/vuejs/core',
+    tags: ['前端', '框架', 'TypeScript'],
+  },
+  {
+    slug: 'vite',
+    title: 'Vite',
+    description: '下一代前端构建工具，极速冷启动 + 即时热更新，开发体验飞跃。',
+    category: '开源项目',
+    icon: '⚡',
+    url: 'https://github.com/vitejs/vite',
+    tags: ['构建工具', '前端'],
+  },
+  {
+    slug: 'tailwindcss',
+    title: 'Tailwind CSS',
+    description: '实用优先的 CSS 框架，用 class 组合构建任意设计，无需离开 HTML。',
+    category: '开源项目',
+    icon: '🎨',
+    url: 'https://github.com/tailwindlabs/tailwindcss',
+    tags: ['CSS', '样式'],
+  },
+  {
+    slug: 'fastapi',
+    title: 'FastAPI',
+    description: '高性能 Python Web 框架，基于类型注解自动生成文档，异步优先。',
+    category: '开源项目',
+    icon: '🚀',
+    url: 'https://github.com/tiangolo/fastapi',
+    tags: ['Python', '后端', 'API'],
+  },
+  {
+    slug: 'pinia',
+    title: 'Pinia',
+    description: 'Vue 官方状态管理库，轻量直觉，完美支持 TypeScript 和 DevTools。',
+    category: '开源项目',
+    icon: '🍍',
+    url: 'https://github.com/vuejs/pinia',
+    tags: ['Vue', '状态管理'],
+  },
+  {
+    slug: 'nuxt',
+    title: 'Nuxt 3',
+    description: '基于 Vue 3 的全栈框架，SSR/SSG/ISR 开箱即用，文件路由 + 自动导入。',
+    category: '开源项目',
+    icon: '🌊',
+    url: 'https://github.com/nuxt/nuxt',
+    tags: ['Vue', '全栈', 'SSR'],
+  },
+  {
+    slug: 'prisma',
+    title: 'Prisma',
+    description: '下一代 Node.js ORM，类型安全的数据库操作，自动生成查询客户端。',
+    category: '开源项目',
+    icon: '💎',
+    url: 'https://github.com/prisma/prisma',
+    tags: ['数据库', 'ORM', 'TypeScript'],
+  },
+  {
+    slug: 'shadcn-vue',
+    title: 'shadcn-vue',
+    description: '基于 Radix Vue 的精美组件集合，复制粘贴到项目里，完全可控。',
+    category: '开源项目',
+    icon: '🧩',
+    url: 'https://github.com/radix-vue/shadcn-vue',
+    tags: ['Vue', 'UI', '组件库'],
+  },
+  {
+    slug: 'unocss',
+    title: 'UnoCSS',
+    description: '即时按需的原子化 CSS 引擎，极快、灵活，兼容 Tailwind/Windi 语法。',
+    category: '开源项目',
+    icon: '🎯',
+    url: 'https://github.com/unocss/unocss',
+    tags: ['CSS', '原子化'],
+  },
+  {
+    slug: 'drizzle-orm',
+    title: 'Drizzle ORM',
+    description: '轻量级 TypeScript ORM，SQL-like 查询语法，零依赖，边缘运行时友好。',
+    category: '开源项目',
+    icon: '💧',
+    url: 'https://github.com/drizzle-team/drizzle-orm',
+    tags: ['数据库', 'ORM', 'TypeScript'],
+  },
+
+  // ===== 工具 =====
+  {
+    slug: 'excalidraw',
+    title: 'Excalidraw',
+    description: '手绘风格的在线白板工具，支持协作，适合头脑风暴和架构草图。',
+    category: '工具',
+    icon: '✏️',
+    url: 'https://excalidraw.com',
+    tags: ['绘图', '协作'],
+  },
+  {
+    slug: 'squoosh',
+    title: 'Squoosh',
+    description: 'Google 出品的在线图片压缩工具，支持多种格式和编解码器对比。',
+    category: '工具',
+    icon: '🖼️',
+    url: 'https://squoosh.app',
+    tags: ['图片', '压缩'],
+  },
+  {
+    slug: 'ray-so',
+    title: 'Ray.so',
+    description: '生成精美代码截图，支持自定义主题、字体、背景，分享代码更好看。',
+    category: '工具',
+    icon: '📸',
+    url: 'https://ray.so',
+    tags: ['代码', '截图'],
+  },
+  {
+    slug: 'regex101',
+    title: 'Regex101',
+    description: '在线正则表达式测试器，实时匹配高亮、详细解释、多语言支持。',
+    category: '工具',
+    icon: '🔍',
+    url: 'https://regex101.com',
+    tags: ['正则', '调试'],
+  },
+  {
+    slug: 'figma',
+    title: 'Figma',
+    description: '云端协作设计工具，UI/UX 设计行业标准，实时多人编辑。',
+    category: '工具',
+    icon: '🖌️',
+    url: 'https://www.figma.com',
+    tags: ['设计', 'UI', '协作'],
+  },
+  {
+    slug: 'linear',
+    title: 'Linear',
+    description: '为开发者打造的项目管理工具，极简高效，流畅体验碾压 Jira。',
+    category: '工具',
+    icon: '📐',
+    url: 'https://linear.app',
+    tags: ['项目管理', '效率'],
+  },
+  {
+    slug: 'can-i-use',
+    title: 'Can I Use',
+    description: '查询前端 API 和 CSS 属性的浏览器兼容性，开发前端的必备参考。',
+    category: '工具',
+    icon: '🌐',
+    url: 'https://caniuse.com',
+    tags: ['兼容性', '前端'],
+  },
+  {
+    slug: 'json-crack',
+    title: 'JSON Crack',
+    description: '将 JSON 数据可视化为交互式图表，快速理解复杂嵌套结构。',
+    category: '工具',
+    icon: '🧬',
+    url: 'https://jsoncrack.com',
+    tags: ['JSON', '可视化'],
+  },
+  {
+    slug: 'devtoys',
+    title: 'DevToys',
+    description: '开发者瑞士军刀，集合编解码、格式化、Hash 等几十种小工具。',
+    category: '工具',
+    icon: '🧰',
+    url: 'https://devtoys.app',
+    tags: ['效率', '多合一'],
+  },
+
+  // ===== 资源下载 =====
+  {
+    slug: 'jetbrains-mono',
+    title: 'JetBrains Mono',
+    description: '专为开发者设计的等宽字体，连字美观，长时间阅读不疲劳。',
+    category: '资源下载',
+    icon: '🔤',
+    url: 'https://www.jetbrains.com/lp/mono/',
+    downloadUrl: 'https://github.com/JetBrains/JetBrainsMono/releases',
+    tags: ['字体', '开发'],
+  },
+  {
+    slug: 'vscode-icons',
+    title: 'Material Icon Theme',
+    description: 'VSCode 最受欢迎的图标主题之一，文件类型一目了然。',
+    category: '资源下载',
+    icon: '📁',
+    url: 'https://marketplace.visualstudio.com/items?itemName=PKief.material-icon-theme',
+    tags: ['VSCode', '主题'],
+  },
+  {
+    slug: 'developer-wallpapers',
+    title: '开发者壁纸合集',
+    description: '精选极简/暗色系桌面壁纸，适合程序员的审美和屏幕。',
+    category: '资源下载',
+    icon: '🌌',
+    url: '#',
+    downloadUrl: '#',
+    tags: ['壁纸', '美化'],
+  },
+  {
+    slug: 'fira-code',
+    title: 'Fira Code',
+    description: '带编程连字的等宽字体，免费开源，主流编辑器全支持。',
+    category: '资源下载',
+    icon: '✒️',
+    url: 'https://github.com/tonsky/FiraCode',
+    downloadUrl: 'https://github.com/tonsky/FiraCode/releases',
+    tags: ['字体', '开源'],
+  },
+  {
+    slug: 'cascadia-code',
+    title: 'Cascadia Code',
+    description: '微软出品的等宽字体，专为 Windows Terminal 设计，清晰利落。',
+    category: '资源下载',
+    icon: '💠',
+    url: 'https://github.com/microsoft/cascadia-code',
+    downloadUrl: 'https://github.com/microsoft/cascadia-code/releases',
+    tags: ['字体', '终端'],
+  },
+  {
+    slug: 'catppuccin-theme',
+    title: 'Catppuccin',
+    description: '社区驱动的柔和配色方案，覆盖 200+ 应用和编辑器，护眼又美观。',
+    category: '资源下载',
+    icon: '🐱',
+    url: 'https://github.com/catppuccin/catppuccin',
+    downloadUrl: 'https://github.com/catppuccin/catppuccin',
+    tags: ['主题', '配色'],
+  },
+  {
+    slug: 'nerd-fonts',
+    title: 'Nerd Fonts',
+    description: '给编程字体打补丁，注入 3000+ 图标字形，终端美化必备。',
+    category: '资源下载',
+    icon: '🤓',
+    url: 'https://www.nerdfonts.com',
+    downloadUrl: 'https://github.com/ryanoasis/nerd-fonts/releases',
+    tags: ['字体', '图标', '终端'],
+  },
+]
+
+/** 获取所有藏宝条目 */
+export function getTreasures(): Treasure[] {
+  return treasures
+}
+
+/** 获取所有分类列表（去重） */
+export function getTreasureCategories(): TreasureCategory[] {
+  const categories = [...new Set(treasures.map((t) => t.category))]
+  return categories
+}
