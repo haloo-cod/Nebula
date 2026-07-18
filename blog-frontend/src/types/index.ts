@@ -222,3 +222,16 @@ export interface StudyRoomData {
   schedule: ScheduleItem[]
   history: StudyHistoryRecord[]
 }
+
+// ---------------------------------------------------------------------------
+// 关于页（About）
+// ---------------------------------------------------------------------------
+
+/** 关于页研究动态条目 */
+export interface ActivityRecord {
+  id: string // 唯一标识
+  type: '文章' // 类型（后续可扩展 '杂谈' | '说说'）
+  title: string // 标题
+  date: string // 日期
+  url: string // 跳转链接
+}
