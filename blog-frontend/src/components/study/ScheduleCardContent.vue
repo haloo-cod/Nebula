@@ -20,14 +20,16 @@
       </div>
     </div>
 
-    <button
-      class="schedule-delete"
-      type="button"
-      aria-label="删除"
-      @click.stop="$emit('delete', item.id)"
-    >
-      🗑
-    </button>
+    <div class="schedule-actions">
+      <button
+        class="schedule-delete"
+        type="button"
+        aria-label="删除"
+        @click.stop="$emit('delete', item.id)"
+      >
+        🗑
+      </button>
+    </div>
   </div>
 </template>
 
@@ -54,7 +56,7 @@ function formatTimeRange(start?: string, end?: string): string {
 <style scoped>
 .schedule-card-content {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
@@ -99,7 +101,7 @@ function formatTimeRange(start?: string, end?: string): string {
 .schedule-title {
   margin: 0;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1.4;
   overflow: hidden;
@@ -114,8 +116,16 @@ function formatTimeRange(start?: string, end?: string): string {
 
 .schedule-time {
   margin: 0.2rem 0 0;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
+  color: rgba(220, 235, 255, 1);
+  font-size: 0.75rem;
+}
+
+.schedule-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .schedule-delete {
@@ -124,9 +134,9 @@ function formatTimeRange(start?: string, end?: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-muted);
   font-size: 0.85rem;
   cursor: pointer;
@@ -137,5 +147,12 @@ function formatTimeRange(start?: string, end?: string): string {
 .schedule-delete:hover {
   background: rgba(255, 100, 100, 0.15);
   color: rgba(255, 140, 140, 0.9);
+}
+</style>
+
+<!-- Light 主题适配：时间文字在亮色背景下可读 -->
+<style>
+[data-theme='light'] .schedule-card-content .schedule-time {
+  color: rgba(40, 80, 160, 1);
 }
 </style>

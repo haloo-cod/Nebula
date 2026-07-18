@@ -7,6 +7,7 @@
     :blur-radius="ui.liquidGlassBlur"
     :glass-thickness="32"
     :highlight-width="2.5"
+    ripple-trail
   >
     <HistorySummaryContent :today="todayRecord" :total-pomodoros="totalPomodoros" :total-minutes="totalMinutes" />
   </LiquidGlass>

@@ -194,3 +194,16 @@ function handleAdd() {
   font-size: 0.8rem;
 }
 </style>
+
+<!-- Light 主题适配：按钮在亮色背景下可读 -->
+<style>
+[data-theme='light'] .schedule-panel .panel-submit {
+  background: rgba(50, 100, 220, 0.12);
+  border-color: rgba(50, 100, 220, 0.35);
+  color: rgba(30, 70, 180, 1);
+}
+
+[data-theme='light'] .schedule-panel .panel-submit:hover:not(:disabled) {
+  background: rgba(50, 100, 220, 0.2);
+}
+</style>

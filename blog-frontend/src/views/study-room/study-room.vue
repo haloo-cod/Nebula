@@ -11,6 +11,13 @@
 
       <!-- 中央番茄钟面板 -->
       <div class="study-wrapper">
+        <!-- 页面头部：定位到玻璃面板左上方 -->
+        <header class="study-header">
+          <span class="study-kicker">Study Room</span>
+          <h1 class="study-title">自习室</h1>
+          <p class="study-desc">静下心来，和一段专注的时光相处。</p>
+        </header>
+
         <LiquidGlass
           v-if="ui.liquidGlassEnabled"
           class="study-glass"
@@ -370,6 +377,37 @@ onUnmounted(() => {
   padding: 6rem 1rem 2rem;
 }
 
+.study-header {
+  position: absolute;
+  top: 0.5rem;
+  right: calc(100% + 1.5rem);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.study-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(160, 205, 255, 0.7);
+}
+
+.study-title {
+  margin: 0.4rem 0 0;
+  color: var(--text-primary);
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.study-desc {
+  margin: 0.5rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
 .drawer-trigger {
   position: fixed;
   top: 50%;
@@ -412,6 +450,7 @@ onUnmounted(() => {
 }
 
 .study-wrapper {
+  position: relative;
   width: 100%;
   max-width: 42rem;
 }
@@ -436,6 +475,13 @@ onUnmounted(() => {
 @media (max-width: 767px) {
   .study-page {
     padding-top: 5rem;
+  }
+
+  .study-header {
+    position: static;
+    margin-bottom: 1.2rem;
+    text-align: center;
+    white-space: normal;
   }
 
   .drawer-trigger {

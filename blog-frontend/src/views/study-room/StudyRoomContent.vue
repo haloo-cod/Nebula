@@ -1,11 +1,5 @@
 <template>
   <div class="study-content">
-    <header class="study-header">
-      <p class="study-kicker">Study Room</p>
-      <h1 class="study-title">自习室</h1>
-      <p class="study-desc">静下心来，和一段专注的时光相处。</p>
-    </header>
-
     <!-- 当前任务 -->
     <div class="active-task">
       <span class="active-task-label">当前任务</span>
@@ -66,54 +60,28 @@ defineEmits<{
   min-height: inherit;
 }
 
-.study-header {
-  margin-bottom: 1.5rem;
-}
-
-.study-kicker {
-  margin: 0 0 0.25rem;
-  color: rgba(160, 205, 255, 0.7);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.study-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.study-desc {
-  margin: 0.45rem 0 0;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-}
-
 .active-task {
   margin-bottom: 1.5rem;
-  padding: 0.6rem 1.2rem;
+  padding: 0.75rem 1.5rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   max-width: 90%;
 }
 
 .active-task-label {
   display: block;
-  color: var(--text-muted);
-  font-size: 0.65rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
 }
 
 .active-task-title {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -122,12 +90,12 @@ defineEmits<{
 
 .active-task-mode {
   display: inline-block;
-  margin-top: 0.2rem;
-  padding: 0.1rem 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.12rem 0.55rem;
   border-radius: 999px;
-  background: rgba(255, 200, 100, 0.12);
-  color: rgba(255, 220, 140, 0.9);
-  font-size: 0.65rem;
+  background: rgba(255, 200, 100, 0.14);
+  color: rgba(255, 220, 140, 0.95);
+  font-size: 0.7rem;
 }
 
 .timer-section {

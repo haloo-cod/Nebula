@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition name="drawer-overlay">
       <div
-        v-if="modelValue"
+        v-show="modelValue"
         class="drawer-overlay"
         @click="close"
       ></div>
@@ -10,7 +10,7 @@
 
     <Transition :name="slideTransitionName">
       <aside
-        v-if="modelValue"
+        v-show="modelValue"
         class="study-drawer"
         :class="[`study-drawer--${position}`]"
         :style="drawerStyle"
@@ -159,19 +159,17 @@ function close() {
 .drawer-slide-left-leave-active,
 .drawer-slide-right-enter-active,
 .drawer-slide-right-leave-active {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .drawer-slide-left-enter-from,
 .drawer-slide-left-leave-to {
   transform: translateX(-100%);
-  opacity: 0;
 }
 
 /* 右侧滑入 */
 .drawer-slide-right-enter-from,
 .drawer-slide-right-leave-to {
   transform: translateX(100%);
-  opacity: 0;
 }
 </style>
