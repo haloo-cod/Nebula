@@ -56,7 +56,7 @@ defineEmits<{
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 2rem 1.5rem;
+  padding: 6rem 1.5rem;
   min-height: inherit;
 }
 
@@ -144,29 +144,30 @@ defineEmits<{
 .timer-btn {
   padding: 0.65rem 2.2rem;
   border-radius: 999px;
-  border: 1px solid rgba(140, 185, 255, 0.35);
-  background: rgba(100, 150, 255, 0.12);
-  color: rgba(180, 210, 255, 0.9);
+  border: 1px solid rgba(140, 185, 255, 0.5);
+  background: rgba(100, 150, 255, 0.2);
+  color: rgba(220, 235, 255, 1);
   font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .timer-btn:hover {
-  background: rgba(100, 150, 255, 0.22);
-  border-color: rgba(140, 185, 255, 0.5);
+  background: rgba(100, 150, 255, 0.3);
+  border-color: rgba(140, 185, 255, 0.65);
 }
 
 .timer-btn--ghost {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .timer-btn--ghost:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.75);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .study-tip {
@@ -182,7 +183,36 @@ defineEmits<{
   }
 
   .study-content {
-    padding: 1.5rem 1rem;
+    padding: 4rem 1.25rem;
   }
+
+  .timer-btn {
+    padding: 0.6rem 1.6rem;
+  }
+}
+</style>
+
+<style>
+[data-theme='light'] .study-content .timer-btn {
+  background: rgba(50, 100, 220, 0.12);
+  border-color: rgba(50, 100, 220, 0.35);
+  color: rgba(30, 70, 180, 1);
+}
+
+[data-theme='light'] .study-content .timer-btn:hover {
+  background: rgba(50, 100, 220, 0.2);
+  border-color: rgba(50, 100, 220, 0.5);
+}
+
+[data-theme='light'] .study-content .timer-btn--ghost {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: rgba(80, 80, 80, 0.9);
+}
+
+[data-theme='light'] .study-content .timer-btn--ghost:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.2);
+  color: rgba(40, 40, 40, 1);
 }
 </style>

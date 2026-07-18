@@ -14,7 +14,7 @@
       type="button"
       @click="$emit('change', 'activity')"
     >
-      研究动态
+      活动日志
     </button>
   </div>
 </template>

@@ -1,9 +1,10 @@
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
 import {
   waitForNextTextureUploadSettled,
   waitForTextureUploadQueueIdle,
 } from '@/components/liquid-glass/liquidGlassQueue'
+import { darkBackgrounds, lightBackgrounds, mobileDarkBackgrounds, mobileLightBackgrounds } from '@/data/backgrounds'
 
 /** 站点主题:dark=暗色(默认),light=亮色 */
 export type Theme = 'dark' | 'light'
@@ -13,6 +14,10 @@ const BACKGROUND_BLUR_ENABLED_KEY = 'blog-background-blur-enabled'
 const BACKGROUND_BLUR_KEY = 'blog-background-blur'
 const LIQUID_GLASS_ENABLED_KEY = 'blog-liquid-glass-enabled'
 const LIQUID_GLASS_BLUR_KEY = 'blog-liquid-glass-blur'
+const DARK_BG_KEY = 'blog-dark-bg'
+const LIGHT_BG_KEY = 'blog-light-bg'
+const MOBILE_DARK_BG_KEY = 'blog-mobile-dark-bg'
+const MOBILE_LIGHT_BG_KEY = 'blog-mobile-light-bg'
 const MIN_BACKGROUND_BLUR = 0
 const MAX_BACKGROUND_BLUR = 24
 const DEFAULT_BACKGROUND_BLUR = 5
@@ -83,6 +88,14 @@ function waitForNextFrames(count = 2): Promise<void> {
   })
 }
 
+/** 读取持久化的背景图索引 */
+function readStoredBgIndex(key: string, maxIndex: number): number {
+  if (typeof localStorage === 'undefined') return 0
+  const saved = Number(localStorage.getItem(key))
+  if (Number.isInteger(saved) && saved >= 0 && saved < maxIndex) return saved
+  return 0
+}
+
 /** 全局 UI 状态 — 控制导航栏显隐、站点主题等 */
 export const useUIStore = defineStore('ui', () => {
   const showNavbar = ref(true)
@@ -91,8 +104,31 @@ export const useUIStore = defineStore('ui', () => {
   const backgroundBlur = ref(readStoredBackgroundBlur() ?? DEFAULT_BACKGROUND_BLUR)
   const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, false))
   const liquidGlassBlur = ref(readStoredLiquidGlassBlur())
+  const darkBgIndex = ref(readStoredBgIndex(DARK_BG_KEY, darkBackgrounds.length))
+  const lightBgIndex = ref(readStoredBgIndex(LIGHT_BG_KEY, lightBackgrounds.length))
+  const mobileDarkBgIndex = ref(readStoredBgIndex(MOBILE_DARK_BG_KEY, mobileDarkBackgrounds.length))
+  const mobileLightBgIndex = ref(readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBackgrounds.length))
+  const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
   const themeTransitioning = ref(false)
   const themeTransitionRevealStarted = ref(false)
+
+  /** 当前主题下选中的背景图 URL（桌面端/移动端自动切换） */
+  const currentBgUrl = computed(() => {
+    const darkGroup = isMobile.value ? mobileDarkBackgrounds : darkBackgrounds
+    const lightGroup = isMobile.value ? mobileLightBackgrounds : lightBackgrounds
+    const group = theme.value === 'dark' ? darkGroup : lightGroup
+    const idx = theme.value === 'dark'
+      ? (isMobile.value ? mobileDarkBgIndex.value : darkBgIndex.value)
+      : (isMobile.value ? mobileLightBgIndex.value : lightBgIndex.value)
+    return group[Math.min(idx, group.length - 1)].src
+  })
+
+  // 视口变化时更新 isMobile
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', () => {
+      isMobile.value = window.innerWidth <= 768
+    })
+  }
 
   // 初始化即应用一次,保证刷新后样式与状态一致
   applyTheme(theme.value)
@@ -138,6 +174,30 @@ export const useUIStore = defineStore('ui', () => {
     }
   })
 
+  watch(darkBgIndex, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(DARK_BG_KEY, String(next))
+    }
+  })
+
+  watch(lightBgIndex, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIGHT_BG_KEY, String(next))
+    }
+  })
+
+  watch(mobileDarkBgIndex, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MOBILE_DARK_BG_KEY, String(next))
+    }
+  })
+
+  watch(mobileLightBgIndex, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MOBILE_LIGHT_BG_KEY, String(next))
+    }
+  })
+
   /** 设置背景模糊是否启用 */
   function setBackgroundBlurEnabled(enabled: boolean) {
     backgroundBlurEnabled.value = enabled
@@ -159,6 +219,34 @@ export const useUIStore = defineStore('ui', () => {
   /** 设置液态玻璃内部模糊强度(px) */
   function setLiquidGlassBlur(value: number) {
     liquidGlassBlur.value = clampLiquidGlassBlur(value)
+  }
+
+  /** 设置 dark 主题背景图索引 */
+  function setDarkBg(index: number) {
+    if (index >= 0 && index < darkBackgrounds.length) {
+      darkBgIndex.value = index
+    }
+  }
+
+  /** 设置 light 主题背景图索引 */
+  function setLightBg(index: number) {
+    if (index >= 0 && index < lightBackgrounds.length) {
+      lightBgIndex.value = index
+    }
+  }
+
+  /** 设置移动端 dark 主题背景图索引 */
+  function setMobileDarkBg(index: number) {
+    if (index >= 0 && index < mobileDarkBackgrounds.length) {
+      mobileDarkBgIndex.value = index
+    }
+  }
+
+  /** 设置移动端 light 主题背景图索引 */
+  function setMobileLightBg(index: number) {
+    if (index >= 0 && index < mobileLightBackgrounds.length) {
+      mobileLightBgIndex.value = index
+    }
   }
 
   /** 在亮/暗主题之间切换 */
@@ -202,12 +290,22 @@ export const useUIStore = defineStore('ui', () => {
     backgroundBlur,
     liquidGlassEnabled,
     liquidGlassBlur,
+    darkBgIndex,
+    lightBgIndex,
+    mobileDarkBgIndex,
+    mobileLightBgIndex,
+    isMobile,
+    currentBgUrl,
     themeTransitioning,
     themeTransitionRevealStarted,
     setBackgroundBlurEnabled,
     setBackgroundBlur,
     setLiquidGlassEnabled,
     setLiquidGlassBlur,
+    setDarkBg,
+    setLightBg,
+    setMobileDarkBg,
+    setMobileLightBg,
     toggleTheme,
   }
 })

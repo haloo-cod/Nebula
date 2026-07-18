@@ -56,6 +56,8 @@
 
     <!-- 右侧功能区（仅桌面端可见） -->
     <div class="nav-actions">
+      <button class="auth-btn" type="button">登录</button>
+      <button class="auth-btn auth-btn--primary" type="button">注册</button>
       <button
         class="theme-pull-switch"
         :class="{ 'is-moon': themeIcon === 'moon', 'is-dragging': isThemeDragging }"
@@ -125,6 +127,11 @@
         <Transition name="settings-drop">
           <div v-if="settingsOpen" class="settings-panel" role="dialog" aria-label="显示设置面板">
             <div class="settings-section">
+              <span class="settings-title settings-title--block">背景图片</span>
+              <BackgroundPicker />
+            </div>
+
+            <div class="settings-section settings-section--divider">
               <div class="settings-head">
                 <div class="settings-copy">
                   <span class="settings-title">背景模糊</span>
@@ -204,6 +211,11 @@
     <!-- 移动端下拉菜单 -->
     <Transition name="menu-slide">
       <ul v-if="menuOpen" class="mobile-menu">
+        <li class="mobile-auth-row">
+          <button class="mobile-auth-btn" type="button" @click="closeMenu">登录</button>
+          <button class="mobile-auth-btn mobile-auth-btn--primary" type="button" @click="closeMenu">注册</button>
+        </li>
+        <li class="mobile-menu-divider" aria-hidden="true"></li>
         <li v-for="item in navItems" :key="item.path">
           <RouterLink
             :to="
@@ -230,6 +242,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
+import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import { useUIStore } from '@/stores/ui'
 
 const ui = useUIStore()
@@ -1057,6 +1070,42 @@ onUnmounted(() => {
   font-size: 20px;
 }
 
+/* 登录/注册按钮 — 与 NavBar 主题保持一致 */
+.auth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.auth-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.auth-btn--primary {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(140, 185, 255, 0.3);
+  color: rgba(200, 225, 255, 0.95);
+}
+
+.auth-btn--primary:hover {
+  background: rgba(100, 150, 255, 0.25);
+  border-color: rgba(140, 185, 255, 0.5);
+}
+
 .settings-panel {
   position: absolute;
   top: calc(100% + 10px);
@@ -1108,6 +1157,11 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
+}
+
+.settings-title--block {
+  display: block;
+  margin-bottom: 0.6rem;
 }
 
 .settings-subtitle {
@@ -1245,6 +1299,10 @@ onUnmounted(() => {
     display: none !important;
   }
 
+  .nav-actions .auth-btn {
+    display: none !important;
+  }
+
   /* 设置按钮在移动端的尺寸适配 */
   .nav-actions .icon-btn {
     width: 36px;
@@ -1358,9 +1416,9 @@ onUnmounted(() => {
   left: 1rem;
   right: 1rem;
   z-index: 55;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   padding: 10px;
   border-radius: 1.5rem;
   background: rgba(20, 20, 40, 0.94);
@@ -1369,12 +1427,54 @@ onUnmounted(() => {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
+.mobile-menu li {
+  list-style: none;
+}
+
+.mobile-auth-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-auth-btn {
+  flex: 1;
+  padding: 0.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.mobile-auth-btn--primary {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(140, 185, 255, 0.3);
+  color: rgba(200, 225, 255, 0.95);
+}
+
+.mobile-menu-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.1);
+  list-style: none;
+}
+
 .mobile-link {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  font-size: 16px;
+  gap: 4px;
+  padding: 10px 6px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 12px;
   text-decoration: none;
@@ -1416,5 +1516,42 @@ onUnmounted(() => {
 .menu-slide-leave-to {
   opacity: 0;
   transform: translateY(-6px);
+}
+</style>
+
+<style>
+[data-theme='light'] .auth-btn {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(50, 50, 50, 0.85);
+}
+
+[data-theme='light'] .auth-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(20, 20, 20, 0.95);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] .auth-btn--primary {
+  background: rgba(50, 100, 220, 0.1);
+  border-color: rgba(50, 100, 220, 0.3);
+  color: rgba(30, 70, 180, 0.95);
+}
+
+[data-theme='light'] .auth-btn--primary:hover {
+  background: rgba(50, 100, 220, 0.18);
+  border-color: rgba(50, 100, 220, 0.45);
+}
+
+[data-theme='light'] .mobile-auth-btn {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(50, 50, 50, 0.85);
+}
+
+[data-theme='light'] .mobile-auth-btn--primary {
+  background: rgba(50, 100, 220, 0.1);
+  border-color: rgba(50, 100, 220, 0.3);
+  color: rgba(30, 70, 180, 0.95);
 }
 </style>

@@ -19,34 +19,29 @@
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUIStore } from '@/stores/ui'
-import darkBg from '@/assets/img/test3.jpg'
-import lightBg from '@/assets/img/test6.PNG'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
 withDefaults(defineProps<{ overlay?: number }>(), {
   overlay: 0.09,
 })
 
-const { theme, backgroundBlur, backgroundBlurEnabled } = storeToRefs(useUIStore())
-
-// 背景图随主题切换:亮色用 test6,暗色用 test3
-const bgImage = computed(() => (theme.value === 'light' ? lightBg : darkBg))
+const { backgroundBlur, backgroundBlurEnabled, currentBgUrl } = storeToRefs(useUIStore())
 
 const bgLayerStyle = computed(() => {
   const blur = backgroundBlurEnabled.value ? backgroundBlur.value : 0
   const scale = blur > 0 ? 1 + Math.min(blur / 240, 0.08) : 1
   return {
-    backgroundImage: `url(${bgImage.value})`,
+    backgroundImage: `url(${currentBgUrl.value})`,
     filter: `blur(${blur}px)`,
     transform: `translateZ(0) scale(${scale})`,
   }
 })
 
-// 主题切换时,背景层被提升为独立合成层(translateZ + will-change),
+// 背景图切换时,背景层被提升为独立合成层(translateZ + will-change),
 // backdrop-filter 会采样该层的缓存快照,导致换图后毛玻璃仍显示旧背景。
 // 切换瞬间临时撤销合成层提升,强制 backdrop-filter 重新采样新背景。
 const recompositing = ref(false)
-watch(theme, () => {
+watch(currentBgUrl, () => {
   recompositing.value = true
   // 跨两帧再恢复合成层优化,确保浏览器已用新背景重绘
   requestAnimationFrame(() => {

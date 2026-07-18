@@ -59,7 +59,13 @@ const todayMinutes = computed(() => props.today?.totalFocusMinutes ?? 0)
 
 .history-label {
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size: 0.88rem;
   text-align: center;
+}
+
+@media (max-width: 767px) {
+  .history-label {
+    font-size: 0.78rem;
+  }
 }
 </style>

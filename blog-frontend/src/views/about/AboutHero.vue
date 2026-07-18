@@ -3,7 +3,6 @@
     <!-- 封面图 -->
     <div class="hero-cover">
       <img :src="coverImage" alt="About Cover" class="hero-cover-img" />
-      <div class="hero-cover-overlay"></div>
     </div>
 
     <!-- 头像 + 个人信息 -->
@@ -63,12 +62,6 @@ import { avatar, coverImage, profile, socialLinks } from '@/data/profile'
 
 .hero-cover:hover .hero-cover-img {
   transform: scale(1.05);
-}
-
-.hero-cover-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
 }
 
 .hero-profile {

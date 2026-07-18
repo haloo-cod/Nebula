@@ -26,7 +26,7 @@
               <AboutActivity />
             </div>
           </div>
-          <AboutComments />
+          <AboutComments v-show="activeTab === 'intro'" />
         </div>
       </LiquidGlass>
 
@@ -45,7 +45,7 @@
               <AboutActivity />
             </div>
           </div>
-          <AboutComments />
+          <AboutComments v-show="activeTab === 'intro'" />
         </div>
       </PanelFallbackGlass>
     </div>
