@@ -30,6 +30,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import type { Moment } from '@/types'
+import { likeMoment } from '@/api/moments'
 
 const props = defineProps<{
   moment: Moment
@@ -75,6 +76,7 @@ const displayLikes = computed(() => props.moment.likes + localLikeDelta.value)
 function toggleLike() {
   const ids = getLikedIds()
   if (isLiked.value) {
+    // 取消点赞（本地记忆，API 不支持取消）
     ids.delete(props.moment.id)
     localLikeDelta.value--
     isLiked.value = false
@@ -84,13 +86,15 @@ function toggleLike() {
     isLiked.value = true
     justLiked.value = true
     setTimeout(() => { justLiked.value = false }, 400)
+    // 调用后端 API 点赞（静默，不阻塞 UI）
+    likeMoment(props.moment.id).catch(() => {})
   }
   saveLikedIds(ids)
 }
 
-// ============ Mock 评论数 ============
+// ============ 评论数（从 API 响应的 commentCount 字段获取） ============
 
-const commentCount = 0
+const commentCount = computed(() => props.moment.commentCount || 0)
 
 // ============ 工具函数 ============
 

@@ -18,7 +18,6 @@
           <span class="todo-time">专注 {{ todo.durationMinutes }} 分钟</span>
           <span class="todo-break">休息 {{ todo.breakMinutes }} 分钟</span>
           <span v-if="todo.todayCompleted > 0" class="todo-today">今日 {{ todo.todayCompleted }} 个</span>
-          <span v-else-if="todo.completedPomodoros > 0" class="todo-total">累计 {{ todo.completedPomodoros }} 个</span>
         </div>
       </div>
     </div>

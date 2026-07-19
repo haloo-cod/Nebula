@@ -164,6 +164,8 @@
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getBook } from '@/data/books'
+import { fetchBook } from '@/api/books'
+import { resolveUrl } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import type { Book } from '@/types'
 import type EpubBook from 'epubjs/types/book'
@@ -517,7 +519,17 @@ async function loadReader(anchor?: ReaderAnchor) {
   error.value = ''
 
   const slug = String(route.params.slug || '')
-  const currentBook = getBook(slug)
+  let currentBook: Book | null = null
+
+  // 优先从 API 获取
+  try {
+    const apiBook = await fetchBook(slug)
+    currentBook = { ...apiBook, file: resolveUrl(apiBook.file), cover: resolveUrl(apiBook.cover) }
+  } catch {
+    // 后端不可用时 fallback 到本地 glob
+    currentBook = getBook(slug)
+  }
+
   if (!currentBook) {
     error.value = '图书不存在'
     loading.value = false

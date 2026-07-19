@@ -35,16 +35,31 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllMoments } from '@/data/moments'
+import { fetchMoments } from '@/api/moments'
+import type { Moment } from '@/types'
 
 const router = useRouter()
 
-// 取最新 5 条说说
-const slides = getAllMoments().slice(0, 5)
+// 取最新 5 条说说（先用 mock fallback）
+const slides = ref<Moment[]>(getAllMoments().slice(0, 5))
 
 const current = ref(0)
 const paused = ref(false)
 let timer: number | null = null
 const INTERVAL = 6000
+
+// 启动时尝试从 API 获取
+onMounted(async () => {
+  try {
+    const res = await fetchMoments(1, 5)
+    if (res.items.length > 0) {
+      slides.value = res.items
+    }
+  } catch {
+    // 后端不可用时保持 mock 数据
+  }
+  resetTimer()
+})
 
 /** 心情 → emoji */
 function moodEmoji(mood?: string): string {
@@ -83,13 +98,13 @@ function relativeTime(dateStr: string): string {
 /** 根据索引计算 slide 的 CSS class */
 function slideClass(i: number): string {
   if (i === current.value) return 'slide--active'
-  const prev = (current.value - 1 + slides.length) % slides.length
+  const prev = (current.value - 1 + slides.value.length) % slides.value.length
   if (i === prev) return 'slide--prev'
   return 'slide--next'
 }
 
 function next() {
-  current.value = (current.value + 1) % slides.length
+  current.value = (current.value + 1) % slides.value.length
 }
 
 function goTo(i: number) {
@@ -114,15 +129,11 @@ function resume() {
 
 /** 点击跳转到说说页对应位置 */
 function handleClick() {
-  const moment = slides[current.value]
+  const moment = slides.value[current.value]
   if (moment) {
     router.push({ path: '/moments', hash: `#moment-${moment.id}` })
   }
 }
-
-onMounted(() => {
-  resetTimer()
-})
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)

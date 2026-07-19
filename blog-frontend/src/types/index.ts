@@ -143,6 +143,7 @@ export interface Moment {
   tags: string[]
   images: string[] // 图片 URL 列表
   likes: number // 点赞数
+  commentCount?: number // 评论数（从 API 获取时填充）
 }
 
 /** 说说评论(一层平铺,暂不支持嵌套回复) */
@@ -230,7 +231,7 @@ export interface StudyRoomData {
 /** 关于页研究动态条目 */
 export interface ActivityRecord {
   id: string // 唯一标识
-  type: '文章' // 类型（后续可扩展 '杂谈' | '说说'）
+  type: '文章' | '说说' | '相册' // 活动类型
   title: string // 标题
   date: string // 日期
   url: string // 跳转链接

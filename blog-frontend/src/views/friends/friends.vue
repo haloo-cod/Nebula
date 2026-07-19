@@ -3,9 +3,9 @@
     <main class="friends-page">
       <!-- 页面标题 -->
       <header class="friends-header">
-        <p class="friends-kicker">Friends</p>
-        <h1 class="friends-title">友链</h1>
-        <p class="friends-desc">一些有趣、温和且持续发光的站点。</p>
+        <p class="friends-kicker">{{ siteText.friends.kicker }}</p>
+        <h1 class="friends-title">{{ siteText.friends.title }}</h1>
+        <p class="friends-desc">{{ siteText.friends.subtitle }}</p>
       </header>
 
       <!-- 顶部液态玻璃鱼缸 -->
@@ -175,17 +175,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { getFriends } from '@/data/friends'
+import { fetchFriends } from '@/api/friends'
+import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
 import { useFloatingAvatars } from '@/composables/useFloatingAvatars'
 
 const ui = useUIStore()
-const friends = getFriends()
+const friends = ref(getFriends())
 const aquariumRef = ref<HTMLElement | null>(null)
 
 // 交换友链占位信息，后续替换为真实内容
@@ -204,6 +206,18 @@ const { items: floatingItems, pause, resume } = useFloatingAvatars({
   mode: 'bounce',
   avatarSize: 72,
   speed: 0.8,
+})
+
+// 尝试从后端 API 加载友链列表
+onMounted(async () => {
+  try {
+    const apiFriends = await fetchFriends()
+    if (apiFriends.length > 0) {
+      friends.value = apiFriends
+    }
+  } catch {
+    // API 失败，保留本地 fallback 数据
+  }
 })
 </script>
 

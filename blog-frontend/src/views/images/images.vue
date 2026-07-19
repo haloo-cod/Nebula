@@ -6,9 +6,9 @@
         <RouterLink to="/" class="back-link">返回首页</RouterLink>
 
         <section class="section-heading">
-          <span class="gallery-kicker">Images</span>
-          <h1>图片</h1>
-          <p>定格时间,封存每一次心跳。</p>
+          <span class="gallery-kicker">{{ siteText.images.kicker }}</span>
+          <h1>{{ siteText.images.title }}</h1>
+          <p>{{ siteText.images.subtitle }}</p>
         </section>
 
         <div class="album-grid">
@@ -107,17 +107,29 @@ import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import AlbumCard from './AlbumCard.vue'
 import { getAlbums } from '@/data/albums'
+import { fetchAlbums, fetchAlbumDetail } from '@/api/albums'
+import { siteText } from '@/data/site-text'
 import type { Album } from '@/types'
 
-const albums = getAlbums()
+const albums = ref<Album[]>(getAlbums())
 
 // ============ 相册详情状态(页内切换,不进路由) ============
 
 const currentAlbum = ref<Album | null>(null)
 
-function openAlbum(album: Album) {
+async function openAlbum(album: Album) {
   currentAlbum.value = album
   window.scrollTo({ top: 0 })
+
+  // 尝试从 API 获取完整照片列表（列表接口 photos 为空）
+  try {
+    const detail = await fetchAlbumDetail(Number(album.id))
+    if (detail.photos.length > 0) {
+      currentAlbum.value = detail
+    }
+  } catch {
+    // API 失败，保留 fallback 数据
+  }
 }
 
 function closeAlbum() {
@@ -164,8 +176,18 @@ function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowRight') nextPhoto()
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
+
+  // 尝试从后端 API 获取相册列表
+  try {
+    const apiAlbums = await fetchAlbums()
+    if (apiAlbums.length > 0) {
+      albums.value = apiAlbums
+    }
+  } catch {
+    // API 失败，保留本地 fallback 数据
+  }
 })
 
 onUnmounted(() => {

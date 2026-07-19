@@ -147,9 +147,16 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-// Utility: today string
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10)
+/**
+ * 获取"逻辑日期"：凌晨 4:00 前算前一天
+ * 这样深夜学习不会被意外重置日程和计数
+ */
+function getLogicalDate(): string {
+  const now = new Date()
+  if (now.getHours() < 4) {
+    now.setDate(now.getDate() - 1)
+  }
+  return now.toISOString().slice(0, 10)
 }
 
 // Load from localStorage
@@ -159,18 +166,41 @@ function loadFromStorage() {
     const storedSchedule = localStorage.getItem(STORAGE_KEYS.schedule)
     const storedHistory = localStorage.getItem(STORAGE_KEYS.history)
     const lastDate = localStorage.getItem(STORAGE_KEYS.lastDate)
-    const today = getToday()
+    const today = getLogicalDate()
+
+    if (storedHistory) history.value = JSON.parse(storedHistory) as StudyHistoryRecord[]
 
     if (storedTodos) {
       todos.value = JSON.parse(storedTodos) as StudyTodo[]
-      // Reset daily counters if new day
+      // 日期不同 → 新的一天，先结算历史再重置每日计数
       if (lastDate !== today) {
+        // 结算：把昨日的 todayCompleted 写入历史（补偿未被 recordFocus 覆盖的情况）
+        if (lastDate) {
+          const totalPomodoros = todos.value.reduce((sum, t) => sum + t.todayCompleted, 0)
+          const totalMinutes = todos.value.reduce((sum, t) => sum + t.todayCompleted * t.durationMinutes, 0)
+          if (totalPomodoros > 0) {
+            const existing = history.value.find((h) => h.date === lastDate)
+            if (!existing) {
+              history.value.push({
+                date: lastDate,
+                completedPomodoros: totalPomodoros,
+                totalFocusMinutes: totalMinutes,
+              })
+            }
+          }
+        }
+        // 重置每日计数
         todos.value = todos.value.map((t) => ({ ...t, todayCompleted: 0, isRunning: false }))
       }
     }
 
-    if (storedSchedule) schedule.value = JSON.parse(storedSchedule) as ScheduleItem[]
-    if (storedHistory) history.value = JSON.parse(storedHistory) as StudyHistoryRecord[]
+    if (storedSchedule) {
+      schedule.value = JSON.parse(storedSchedule) as ScheduleItem[]
+      // 新一天，日程完成状态重置
+      if (lastDate !== today) {
+        schedule.value = schedule.value.map((s) => ({ ...s, isCompleted: false }))
+      }
+    }
 
     localStorage.setItem(STORAGE_KEYS.lastDate, today)
   } catch (err) {
@@ -269,7 +299,7 @@ function handleTimerEnd() {
 }
 
 function recordFocus(minutes: number) {
-  const today = getToday()
+  const today = getLogicalDate()
   const record = history.value.find((h) => h.date === today)
   if (record) {
     record.completedPomodoros += 1

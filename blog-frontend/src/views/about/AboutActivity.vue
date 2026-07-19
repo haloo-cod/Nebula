@@ -87,25 +87,94 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getPosts } from '@/data/posts'
 import { avatar, profile } from '@/data/profile'
+import { fetchPosts, toFrontendPost } from '@/api/posts'
+import { fetchMoments } from '@/api/moments'
+import { fetchAlbums } from '@/api/albums'
 import type { ActivityRecord } from '@/types'
 
-// 从 getPosts() 生成活动记录
-const activities = computed<ActivityRecord[]>(() => {
+// 从本地 getPosts() 生成 fallback 活动记录
+function buildFallbackActivities(): ActivityRecord[] {
   const posts = getPosts()
   return posts
     .filter((p) => !p.draft && p.date)
     .map((p) => ({
-      id: p.slug,
+      id: `post-${p.slug}`,
       type: '文章' as const,
       title: p.title,
       date: p.date,
       url: `/post/${p.slug}`,
     }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+
+const activities = ref<ActivityRecord[]>(buildFallbackActivities())
+
+// 从后端 API 加载多类型活动
+onMounted(async () => {
+  try {
+    const [postsResp, momentsResp, albumsResp] = await Promise.all([
+      fetchPosts(1, 200).catch(() => null),
+      fetchMoments(1, 50).catch(() => null),
+      fetchAlbums().catch(() => null),
+    ])
+
+    const records: ActivityRecord[] = []
+
+    // 博文活动
+    if (postsResp && postsResp.items) {
+      for (const p of postsResp.items) {
+        const post = toFrontendPost(p)
+        if (!post.draft && post.date) {
+          records.push({
+            id: `post-${post.slug}`,
+            type: '文章',
+            title: post.title,
+            date: post.date,
+            url: `/post/${post.slug}`,
+          })
+        }
+      }
+    }
+
+    // 说说活动
+    if (momentsResp && momentsResp.items) {
+      for (const m of momentsResp.items) {
+        const title = m.content.length > 20 ? m.content.slice(0, 20) + '...' : m.content
+        records.push({
+          id: `moment-${m.id}`,
+          type: '说说',
+          title,
+          date: m.date,
+          url: `/moments#moment-${m.id}`,
+        })
+      }
+    }
+
+    // 相册活动
+    if (albumsResp) {
+      for (const album of albumsResp) {
+        records.push({
+          id: `album-${album.id}`,
+          type: '相册',
+          title: album.title,
+          date: album.date ? `${album.date.replace('.', '-')}-01` : '',
+          url: '/images',
+        })
+      }
+    }
+
+    if (records.length > 0) {
+      activities.value = records.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      )
+    }
+  } catch {
+    // API 失败，保留 fallback 数据
+  }
 })
 
 // 最近的活动（时间线显示前 15 条）
@@ -114,7 +183,7 @@ const recentActivities = computed(() => activities.value.slice(0, 15))
 // 总贡献数
 const totalContributions = computed(() => activities.value.length)
 
-// 热力图数据：过去 365 天每天的发文数
+// 热力图数据：过去 365 天每天的活动数
 const activityMap = computed(() => {
   const map: Record<string, number> = {}
   activities.value.forEach((a) => {

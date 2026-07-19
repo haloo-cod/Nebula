@@ -3,9 +3,9 @@
     <div class="treasure-page">
       <!-- 页面头部 -->
       <header class="treasure-header">
-        <span class="treasure-kicker">Treasure</span>
-        <h1 class="treasure-title">藏宝阁</h1>
-        <p class="treasure-desc">收集有趣的开源项目和实用资源，未来会提供文件下载。</p>
+        <span class="treasure-kicker">{{ siteText.treasure.kicker }}</span>
+        <h1 class="treasure-title">{{ siteText.treasure.title }}</h1>
+        <p class="treasure-desc">{{ siteText.treasure.subtitle }}</p>
       </header>
 
       <!-- 分类筛选标签 -->
@@ -93,20 +93,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import TreasureCardContent from './TreasureCardContent.vue'
 import { getTreasures, getTreasureCategories } from '@/data/treasures'
+import { fetchTreasures, fetchTreasureCategories } from '@/api/treasures'
+import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
 import type { TreasureCategory } from '@/types'
 
 const ui = useUIStore()
 
-// 数据
-const treasures = getTreasures()
-const categories = getTreasureCategories()
+// 数据（初始 fallback，API 加载后替换）
+const treasures = ref(getTreasures())
+const categories = ref<TreasureCategory[]>(getTreasureCategories())
 
 // 分页配置
 const PAGE_SIZE = 12
@@ -117,8 +119,8 @@ const activeCategory = ref<TreasureCategory | null>(null)
 
 // 筛选后的宝物列表（全部）
 const filteredTreasures = computed(() => {
-  if (activeCategory.value === null) return treasures
-  return treasures.filter((t) => t.category === activeCategory.value)
+  if (activeCategory.value === null) return treasures.value
+  return treasures.value.filter((t) => t.category === activeCategory.value)
 })
 
 // 总页数
@@ -151,6 +153,24 @@ watch(activeCategory, () => {
 // 如果总页数变小（比如数据减少），保证当前页不越界
 watch(totalPages, (nextTotal) => {
   if (currentPage.value > nextTotal) currentPage.value = nextTotal
+})
+
+// 尝试从后端 API 加载藏宝数据
+onMounted(async () => {
+  try {
+    const [apiTreasures, apiCategories] = await Promise.all([
+      fetchTreasures(),
+      fetchTreasureCategories(),
+    ])
+    if (apiTreasures.length > 0) {
+      treasures.value = apiTreasures
+    }
+    if (apiCategories.length > 0) {
+      categories.value = apiCategories
+    }
+  } catch {
+    // API 失败，保留本地 fallback 数据
+  }
 })
 </script>
 

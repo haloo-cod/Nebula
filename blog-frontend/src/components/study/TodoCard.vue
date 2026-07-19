@@ -1,7 +1,10 @@
 <template>
   <div class="todo-card-wrapper">
-    <!-- 绝对定位在 LiquidGlass 外部，避免被 overflow:hidden 裁剪 -->
+    <!-- 右上角 badge：进行中 与 累计 互斥，只显示一个 -->
     <span v-if="isActive" class="todo-active-badge">进行中</span>
+    <span v-else-if="todo.completedPomodoros > 0 && todo.todayCompleted === 0" class="todo-total-badge">
+      累计 {{ todo.completedPomodoros }} 个
+    </span>
 
     <LiquidGlass
       v-if="ui.liquidGlassEnabled"
@@ -69,6 +72,21 @@ defineEmits<{
   background: rgba(140, 185, 255, 0.18);
   border: 1px solid rgba(140, 185, 255, 0.35);
   color: rgba(180, 210, 255, 0.95);
+  font-size: 0.65rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.todo-total-badge {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.85rem;
+  z-index: 2;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
   font-size: 0.65rem;
   font-weight: 600;
   pointer-events: none;

@@ -7,22 +7,27 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-
-// 导入 about.md 原始内容
-import aboutRaw from '@/assets/md/about.md?raw'
+import { api } from '@/api/client'
+import { renderMarkdown } from '@/data/posts'
 
 const html = ref('')
 const loading = ref(true)
 
-// 懒加载 marked（复用项目现有模式）
-let markedPromise: Promise<typeof import('marked').marked> | null = null
+// 默认 fallback 内容（后端不可用时显示）
+const fallbackMd = `## 你好，我是 Starlit
+
+一个喜欢折腾前端和探索新技术的开发者。`
 
 onMounted(async () => {
-  if (!markedPromise) {
-    markedPromise = import('marked').then((m) => m.marked)
+  let md = fallbackMd
+  try {
+    // 从后端 API 获取 about.md 内容
+    const res = await api.get<{ content_md: string }>('/api/v1/about/content')
+    if (res.content_md) md = res.content_md
+  } catch {
+    // 后端不可用时使用 fallback
   }
-  const marked = await markedPromise
-  html.value = await marked.parse(aboutRaw)
+  html.value = await renderMarkdown(md)
   loading.value = false
 })
 </script>

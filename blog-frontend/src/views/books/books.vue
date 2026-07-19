@@ -2,9 +2,9 @@
   <PageBackground>
     <div class="books-page">
       <div class="books-header">
-        <p class="books-kicker">Library</p>
-        <h1 class="books-title">图书</h1>
-        <p class="books-desc">一块一块的玻璃书格。点击任意图书后进入全屏 EPUB 阅读器。</p>
+        <p class="books-kicker">{{ siteText.books.kicker }}</p>
+        <h1 class="books-title">{{ siteText.books.title }}</h1>
+        <p class="books-desc">{{ siteText.books.subtitle }}</p>
       </div>
 
       <!-- 搜索栏（UI 占位，未来接后端搜索） -->
@@ -93,27 +93,50 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { getBooks } from '@/data/books'
+import { fetchBooks } from '@/api/books'
+import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
 import type { Book } from '@/types'
 
 const ui = useUIStore()
 const PAGE_SIZE = 16
-const books = ref<Book[]>(getBooks())
+const books = ref<Book[]>([])
+const totalBooks = ref(0)
 const currentPage = ref(1)
 const searchQuery = ref('')
+const loading = ref(false)
 
-const totalPages = computed(() => Math.max(1, Math.ceil(books.value.length / PAGE_SIZE)))
+// 后端分页：从 API 获取当前页数据
+async function loadBooks() {
+  loading.value = true
+  try {
+    const resp = await fetchBooks(currentPage.value, PAGE_SIZE, searchQuery.value)
+    books.value = resp.items
+    totalBooks.value = resp.total
+  } catch {
+    // API 失败时 fallback 到本地数据（前端过滤+分页）
+    const allBooks = getBooks()
+    const q = searchQuery.value.trim().toLowerCase()
+    const filtered = q
+      ? allBooks.filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))
+      : allBooks
+    totalBooks.value = filtered.length
+    const start = (currentPage.value - 1) * PAGE_SIZE
+    books.value = filtered.slice(start, start + PAGE_SIZE)
+  } finally {
+    loading.value = false
+  }
+}
 
-const visibleBooks = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return books.value.slice(start, start + PAGE_SIZE)
-})
+const totalPages = computed(() => Math.max(1, Math.ceil(totalBooks.value / PAGE_SIZE)))
+
+const visibleBooks = computed(() => books.value)
 
 const pageNumbers = computed(() =>
   Array.from({ length: totalPages.value }, (_, index) => index + 1),
@@ -138,8 +161,24 @@ function goNextPage() {
   currentPage.value += 1
 }
 
-watch(totalPages, (nextTotal) => {
-  if (currentPage.value > nextTotal) currentPage.value = nextTotal
+// 页码变化时重新加载
+watch(currentPage, () => {
+  loadBooks()
+})
+
+// 搜索关键词变化时 debounce 300ms 后加载
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchQuery, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadBooks()
+  }, 300)
+})
+
+// 首次加载
+onMounted(() => {
+  loadBooks()
 })
 </script>
 

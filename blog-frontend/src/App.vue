@@ -4,6 +4,7 @@ import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
+import RainEffect from './components/RainEffect.vue'
 import { useUIStore } from '@/stores/ui'
 
 const ui = useUIStore()
@@ -18,6 +19,9 @@ onMounted(() => {
     splash.classList.add('hide')
     setTimeout(() => splash.remove(), 400)
   }
+
+  // 从后端加载背景图列表（替换静态 fallback）
+  ui.loadBackgrounds()
 })
 </script>
 
@@ -27,6 +31,7 @@ onMounted(() => {
     <RouterView />
     <BackToTop v-if="ui.showNavbar && !hideChrome" />
     <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
+    <RainEffect />
     <div
       v-if="ui.themeTransitioning"
       class="theme-overlay"

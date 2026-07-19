@@ -15,18 +15,18 @@
               class="panel-liquid-glass"
             >
               <HomeProfilePanel
-                :avatar="avatar"
-                :name="profile.name"
-                :bio="profile.bio"
-                :links="socialLinks"
+                :avatar="profileAvatar"
+                :name="profileName"
+                :bio="profileBio"
+                :links="profileLinks"
               />
             </LiquidGlass>
             <PanelFallbackGlass v-else>
               <HomeProfilePanel
-                :avatar="avatar"
-                :name="profile.name"
-                :bio="profile.bio"
-                :links="socialLinks"
+                :avatar="profileAvatar"
+                :name="profileName"
+                :bio="profileBio"
+                :links="profileLinks"
               />
             </PanelFallbackGlass>
           </div>
@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
@@ -165,9 +165,17 @@ import MomentCarousel from '@/components/panels/MomentCarousel.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
-import { avatar, profile, socialLinks } from '@/data/profile'
+import { avatar as fallbackAvatar, profile as fallbackProfile, socialLinks as fallbackLinks } from '@/data/profile'
+import { fetchProfile } from '@/api/profile'
+import type { SocialLink } from '@/types'
 
 const ui = useUIStore()
+
+// 个人资料（初始 fallback，API 加载后替换）
+const profileAvatar = ref(fallbackAvatar)
+const profileName = ref(fallbackProfile.name)
+const profileBio = ref(fallbackProfile.bio)
+const profileLinks = ref<SocialLink[]>(fallbackLinks)
 const fullTitle = "Starlitn'blog"
 const isMobile = ref(window.innerWidth < 768)
 const showContentDirectly = history.state?.showContent === true
@@ -196,6 +204,19 @@ watch(typewriterDone, (val) => {
       showUIElements.value = true
       ui.showNavbar = true
     }, 850)
+  }
+})
+
+onMounted(async () => {
+  // 从后端 API 加载个人资料
+  try {
+    const data = await fetchProfile()
+    if (data.profile.name) profileName.value = data.profile.name
+    if (data.profile.bio) profileBio.value = data.profile.bio
+    if (data.avatarUrl) profileAvatar.value = data.avatarUrl
+    if (data.socialLinks.length > 0) profileLinks.value = data.socialLinks
+  } catch {
+    // API 失败，保留本地 fallback
   }
 })
 

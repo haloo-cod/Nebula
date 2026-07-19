@@ -191,6 +191,43 @@
                 @input="onLiquidGlassBlurInput"
               />
             </div>
+
+            <div class="settings-section settings-section--divider">
+              <div class="settings-head">
+                <div class="settings-copy">
+                  <span class="settings-title">下雨特效</span>
+                </div>
+                <button
+                  class="settings-toggle"
+                  :class="{ 'settings-toggle--on': ui.rainEnabled }"
+                  type="button"
+                  :aria-pressed="ui.rainEnabled"
+                  @click="ui.setRainEnabled(!ui.rainEnabled)"
+                >
+                  <span class="settings-toggle-thumb"></span>
+                </button>
+              </div>
+              <div v-if="ui.rainEnabled" class="rain-btns">
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 0 }"
+                  type="button"
+                  @click="ui.setRainIntensity(0)"
+                >轻</button>
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 1 }"
+                  type="button"
+                  @click="ui.setRainIntensity(1)"
+                >中</button>
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 2 }"
+                  type="button"
+                  @click="ui.setRainIntensity(2)"
+                >重</button>
+              </div>
+            </div>
           </div>
         </Transition>
       </div>
@@ -1106,6 +1143,37 @@ onUnmounted(() => {
   border-color: rgba(140, 185, 255, 0.5);
 }
 
+/* 雨量选择按钮组 */
+.rain-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.rain-btn {
+  flex: 1;
+  padding: 0.4rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rain-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.rain-btn--active {
+  background: rgba(100, 150, 255, 0.22);
+  border-color: rgba(140, 185, 255, 0.5);
+  color: rgba(210, 235, 255, 1);
+}
+
 .settings-panel {
   position: absolute;
   top: calc(100% + 10px);
@@ -1114,13 +1182,13 @@ onUnmounted(() => {
   width: 268px;
   padding: 14px;
   border-radius: 16px;
-  background: rgba(18, 24, 38, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(30, 30, 45, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 16px 38px rgba(0, 0, 0, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 38px rgba(0, 0, 0, 0.18);
 }
 
 .settings-section {
@@ -1553,5 +1621,65 @@ onUnmounted(() => {
   background: rgba(50, 100, 220, 0.1);
   border-color: rgba(50, 100, 220, 0.3);
   color: rgba(30, 70, 180, 0.95);
+}
+
+[data-theme='light'] .rain-btn {
+  border-color: rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(50, 50, 50, 0.75);
+}
+
+[data-theme='light'] .rain-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(20, 20, 20, 0.9);
+}
+
+[data-theme='light'] .rain-btn--active {
+  background: rgba(50, 100, 220, 0.15);
+  border-color: rgba(50, 100, 220, 0.45);
+  color: rgba(25, 60, 160, 1);
+}
+
+[data-theme='light'] .settings-panel {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 16px 38px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .settings-title {
+  color: rgba(20, 20, 20, 0.92);
+}
+
+[data-theme='light'] .settings-subtitle {
+  color: rgba(50, 50, 50, 0.8);
+}
+
+[data-theme='light'] .settings-value {
+  color: rgba(40, 70, 150, 0.95);
+}
+
+[data-theme='light'] .settings-section--divider {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .settings-toggle {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='light'] .settings-toggle--on {
+  background: rgba(50, 100, 220, 0.4);
+  border-color: rgba(50, 100, 220, 0.5);
+}
+
+[data-theme='light'] .settings-slider {
+  background: linear-gradient(to right, rgba(50, 100, 220, 0.4), rgba(0, 0, 0, 0.06));
+}
+
+[data-theme='light'] .settings-slider::-webkit-slider-thumb {
+  background: rgba(50, 100, 220, 0.85);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 </style>

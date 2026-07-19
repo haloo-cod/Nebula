@@ -2,9 +2,9 @@
   <PageBackground>
     <main class="blog-page">
       <div class="blog-header">
-        <p class="blog-kicker">Blog</p>
-        <h1 class="blog-title">博文</h1>
-        <p class="blog-desc">一片一片的玻璃卡片。点击任意卡片进入文章页。</p>
+        <p class="blog-kicker">{{ siteText.blog.kicker }}</p>
+        <h1 class="blog-title">{{ siteText.blog.title }}</h1>
+        <p class="blog-desc">{{ siteText.blog.subtitle }}</p>
         <div class="blog-filter">
           <button
             class="filter-btn"
@@ -54,6 +54,7 @@
                 </span>
                 <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
               </div>
+              <span class="comment-badge">💬 {{ getCommentCount(post.slug) }}</span>
             </article>
           </LiquidGlass>
 
@@ -75,6 +76,7 @@
               </span>
               <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
             </div>
+            <span class="comment-badge">💬 {{ getCommentCount(post.slug) }}</span>
           </PanelFallbackGlass>
         </RouterLink>
       </TransitionGroup>
@@ -107,14 +109,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { getPosts } from '@/data/posts'
+import { fetchPosts, toFrontendPost } from '@/api/posts'
+import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
+import { fetchBatchCommentCount } from '@/api/comments'
 import type { Post } from '@/types'
 
 const ui = useUIStore()
@@ -122,6 +127,18 @@ const PAGE_SIZE = 12
 const allPosts = ref<Post[]>(getPosts().filter((post) => !post.draft))
 const activeCategory = ref('')
 const currentPage = ref(1)
+
+// 启动时尝试从后端 API 加载文章列表（fallback 到 glob）
+onMounted(async () => {
+  try {
+    const res = await fetchPosts(1, 200)
+    if (res.items.length > 0) {
+      allPosts.value = res.items.map(toFrontendPost)
+    }
+  } catch {
+    // 后端不可用时保持 glob 数据
+  }
+})
 
 // 提取去重分类列表（排除空字符串）
 const categories = computed(() => [...new Set(allPosts.value.map((p) => p.category).filter(Boolean))])
@@ -164,6 +181,29 @@ function catColorKey(cat: string): string {
 function tagsOf(post: Post): string[] {
   return post.tags.slice(0, 4)
 }
+
+/** 每篇文章的评论数（从后端批量获取） */
+const commentCounts = ref<Record<string, number>>({})
+
+/** 获取指定文章的评论数 */
+function getCommentCount(slug: string): number {
+  return commentCounts.value[`post:${slug}`] || 0
+}
+
+/** visiblePosts 变化时批量加载评论数 */
+watch(
+  visiblePosts,
+  async (posts) => {
+    if (posts.length === 0) return
+    const keys = posts.map((p) => `post:${p.slug}`)
+    try {
+      commentCounts.value = await fetchBatchCommentCount(keys)
+    } catch {
+      // 后端不可用时静默忽略
+    }
+  },
+  { immediate: true },
+)
 
 function goPrevPage() {
   if (currentPage.value <= 1) return
@@ -399,6 +439,30 @@ watch(totalPages, (nextTotal) => {
   color: var(--text-muted);
 }
 
+.post-comments {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.28rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.comment-badge {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(140, 185, 255, 0.1);
+  border: 1px solid rgba(140, 185, 255, 0.18);
+  font-size: 0.78rem;
+  color: rgba(180, 210, 255, 0.85);
+  letter-spacing: 0.03em;
+}
+
 .cat-cyan {
   color: #67e8f9;
   border-color: rgba(103, 232, 249, 0.5);
@@ -519,5 +583,62 @@ watch(totalPages, (nextTotal) => {
 
 .grid-item-move {
   transition: transform 0.3s ease;
+}
+</style>
+
+<!-- Light 主题适配 -->
+<style>
+[data-theme='light'] .blog-kicker {
+  color: rgba(50, 80, 130, 0.6);
+}
+
+[data-theme='light'] .filter-btn {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='light'] .filter-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme='light'] .filter-btn.active {
+  background: rgba(50, 100, 220, 0.12);
+  border-color: rgba(50, 100, 220, 0.3);
+  color: rgba(30, 70, 180, 0.9);
+}
+
+[data-theme='light'] .post-tag {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='light'] .comment-badge {
+  background: rgba(50, 100, 220, 0.08);
+  border-color: rgba(50, 100, 220, 0.15);
+  color: rgba(30, 70, 180, 0.75);
+}
+
+[data-theme='light'] .pinned-badge {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='light'] .page-btn {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='light'] .page-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .page-btn-active {
+  border-color: rgba(50, 100, 220, 0.3);
+  background: rgba(50, 100, 220, 0.12);
+  color: rgba(30, 70, 180, 0.9);
 }
 </style>

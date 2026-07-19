@@ -40,3 +40,7 @@ __screenshots__/
 
 # Test epub files
 src/assets/testepub/
+
+# unplugin 自动生成的类型声明（每次 dev/build 自动重新生成）
+src/auto-imports.d.ts
+src/components.d.ts

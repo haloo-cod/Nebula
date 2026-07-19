@@ -4,7 +4,14 @@ import {
   waitForNextTextureUploadSettled,
   waitForTextureUploadQueueIdle,
 } from '@/components/liquid-glass/liquidGlassQueue'
-import { darkBackgrounds, lightBackgrounds, mobileDarkBackgrounds, mobileLightBackgrounds } from '@/data/backgrounds'
+import {
+  darkBackgrounds as defaultDarkBgs,
+  lightBackgrounds as defaultLightBgs,
+  mobileDarkBackgrounds as defaultMobileDarkBgs,
+  mobileLightBackgrounds as defaultMobileLightBgs,
+} from '@/data/backgrounds'
+import type { BackgroundItem } from '@/data/backgrounds'
+import { fetchBackgrounds } from '@/api/backgrounds'
 
 /** 站点主题:dark=暗色(默认),light=亮色 */
 export type Theme = 'dark' | 'light'
@@ -18,6 +25,8 @@ const DARK_BG_KEY = 'blog-dark-bg'
 const LIGHT_BG_KEY = 'blog-light-bg'
 const MOBILE_DARK_BG_KEY = 'blog-mobile-dark-bg'
 const MOBILE_LIGHT_BG_KEY = 'blog-mobile-light-bg'
+const RAIN_ENABLED_KEY = 'blog-rain-enabled'
+const RAIN_INTENSITY_KEY = 'blog-rain-intensity'
 const MIN_BACKGROUND_BLUR = 0
 const MAX_BACKGROUND_BLUR = 24
 const DEFAULT_BACKGROUND_BLUR = 5
@@ -96,6 +105,14 @@ function readStoredBgIndex(key: string, maxIndex: number): number {
   return 0
 }
 
+/** 读取持久化的雨量(0=轻,1=中,2=重),缺省回退到 1(中) */
+function readStoredRainIntensity(): number {
+  if (typeof localStorage === 'undefined') return 1
+  const saved = Number(localStorage.getItem(RAIN_INTENSITY_KEY))
+  if (saved >= 0 && saved <= 2) return saved
+  return 1
+}
+
 /** 全局 UI 状态 — 控制导航栏显隐、站点主题等 */
 export const useUIStore = defineStore('ui', () => {
   const showNavbar = ref(true)
@@ -104,23 +121,32 @@ export const useUIStore = defineStore('ui', () => {
   const backgroundBlur = ref(readStoredBackgroundBlur() ?? DEFAULT_BACKGROUND_BLUR)
   const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, false))
   const liquidGlassBlur = ref(readStoredLiquidGlassBlur())
-  const darkBgIndex = ref(readStoredBgIndex(DARK_BG_KEY, darkBackgrounds.length))
-  const lightBgIndex = ref(readStoredBgIndex(LIGHT_BG_KEY, lightBackgrounds.length))
-  const mobileDarkBgIndex = ref(readStoredBgIndex(MOBILE_DARK_BG_KEY, mobileDarkBackgrounds.length))
-  const mobileLightBgIndex = ref(readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBackgrounds.length))
+
+  // 背景图动态列表（初始用静态 fallback，API 加载成功后替换）
+  const darkBgs = ref<BackgroundItem[]>([...defaultDarkBgs])
+  const lightBgs = ref<BackgroundItem[]>([...defaultLightBgs])
+  const mobileDarkBgs = ref<BackgroundItem[]>([...defaultMobileDarkBgs])
+  const mobileLightBgs = ref<BackgroundItem[]>([...defaultMobileLightBgs])
+
+  const darkBgIndex = ref(readStoredBgIndex(DARK_BG_KEY, darkBgs.value.length))
+  const lightBgIndex = ref(readStoredBgIndex(LIGHT_BG_KEY, lightBgs.value.length))
+  const mobileDarkBgIndex = ref(readStoredBgIndex(MOBILE_DARK_BG_KEY, mobileDarkBgs.value.length))
+  const mobileLightBgIndex = ref(readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBgs.value.length))
+  const rainEnabled = ref(readStoredBoolean(RAIN_ENABLED_KEY, false))
+  const rainIntensity = ref(readStoredRainIntensity())
   const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
   const themeTransitioning = ref(false)
   const themeTransitionRevealStarted = ref(false)
 
   /** 当前主题下选中的背景图 URL（桌面端/移动端自动切换） */
   const currentBgUrl = computed(() => {
-    const darkGroup = isMobile.value ? mobileDarkBackgrounds : darkBackgrounds
-    const lightGroup = isMobile.value ? mobileLightBackgrounds : lightBackgrounds
+    const darkGroup = isMobile.value ? mobileDarkBgs.value : darkBgs.value
+    const lightGroup = isMobile.value ? mobileLightBgs.value : lightBgs.value
     const group = theme.value === 'dark' ? darkGroup : lightGroup
     const idx = theme.value === 'dark'
       ? (isMobile.value ? mobileDarkBgIndex.value : darkBgIndex.value)
       : (isMobile.value ? mobileLightBgIndex.value : lightBgIndex.value)
-    return group[Math.min(idx, group.length - 1)].src
+    return group[Math.min(idx, group.length - 1)]?.src ?? ''
   })
 
   // 视口变化时更新 isMobile
@@ -198,6 +224,18 @@ export const useUIStore = defineStore('ui', () => {
     }
   })
 
+  watch(rainEnabled, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(RAIN_ENABLED_KEY, String(next))
+    }
+  })
+
+  watch(rainIntensity, (next) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(RAIN_INTENSITY_KEY, String(next))
+    }
+  })
+
   /** 设置背景模糊是否启用 */
   function setBackgroundBlurEnabled(enabled: boolean) {
     backgroundBlurEnabled.value = enabled
@@ -223,29 +261,41 @@ export const useUIStore = defineStore('ui', () => {
 
   /** 设置 dark 主题背景图索引 */
   function setDarkBg(index: number) {
-    if (index >= 0 && index < darkBackgrounds.length) {
+    if (index >= 0 && index < darkBgs.value.length) {
       darkBgIndex.value = index
     }
   }
 
   /** 设置 light 主题背景图索引 */
   function setLightBg(index: number) {
-    if (index >= 0 && index < lightBackgrounds.length) {
+    if (index >= 0 && index < lightBgs.value.length) {
       lightBgIndex.value = index
     }
   }
 
   /** 设置移动端 dark 主题背景图索引 */
   function setMobileDarkBg(index: number) {
-    if (index >= 0 && index < mobileDarkBackgrounds.length) {
+    if (index >= 0 && index < mobileDarkBgs.value.length) {
       mobileDarkBgIndex.value = index
     }
   }
 
   /** 设置移动端 light 主题背景图索引 */
   function setMobileLightBg(index: number) {
-    if (index >= 0 && index < mobileLightBackgrounds.length) {
+    if (index >= 0 && index < mobileLightBgs.value.length) {
       mobileLightBgIndex.value = index
+    }
+  }
+
+  /** 设置下雨特效开关 */
+  function setRainEnabled(enabled: boolean) {
+    rainEnabled.value = enabled
+  }
+
+  /** 设置雨量(0=轻,1=中,2=重) */
+  function setRainIntensity(level: number) {
+    if (level >= 0 && level <= 2) {
+      rainIntensity.value = level
     }
   }
 
@@ -272,7 +322,7 @@ export const useUIStore = defineStore('ui', () => {
     }
 
     // 首个 LiquidGlass 面板已画入新纹理后,开始撤掉遮罩;
-    // 剩余面板继续按队列逐个淡入,保留“依次呈现”的动画感。
+    // 剩余面板继续按队列逐个淡入,保留"依次呈现"的动画感。
     await firstTextureReady
     themeTransitionRevealStarted.value = true
 
@@ -281,6 +331,35 @@ export const useUIStore = defineStore('ui', () => {
     await waitForNextFrames(2)
     themeTransitioning.value = false
     themeTransitionRevealStarted.value = false
+  }
+
+  /**
+   * 从后端 API 加载背景图列表，替换静态 fallback
+   * 应在 App.vue 的 onMounted 中调用
+   */
+  async function loadBackgrounds() {
+    try {
+      const [darkDesktop, lightDesktop, darkMobile, lightMobile] = await Promise.all([
+        fetchBackgrounds('dark', 'desktop'),
+        fetchBackgrounds('light', 'desktop'),
+        fetchBackgrounds('dark', 'mobile'),
+        fetchBackgrounds('light', 'mobile'),
+      ])
+
+      // 仅当 API 返回有效数据时替换（避免空数组导致页面无背景）
+      if (darkDesktop.length > 0) darkBgs.value = darkDesktop.map((i) => ({ src: i.url }))
+      if (lightDesktop.length > 0) lightBgs.value = lightDesktop.map((i) => ({ src: i.url }))
+      if (darkMobile.length > 0) mobileDarkBgs.value = darkMobile.map((i) => ({ src: i.url }))
+      if (lightMobile.length > 0) mobileLightBgs.value = lightMobile.map((i) => ({ src: i.url }))
+
+      // 索引越界修正（API 返回的列表可能比 localStorage 存的索引短）
+      if (darkBgIndex.value >= darkBgs.value.length) darkBgIndex.value = 0
+      if (lightBgIndex.value >= lightBgs.value.length) lightBgIndex.value = 0
+      if (mobileDarkBgIndex.value >= mobileDarkBgs.value.length) mobileDarkBgIndex.value = 0
+      if (mobileLightBgIndex.value >= mobileLightBgs.value.length) mobileLightBgIndex.value = 0
+    } catch {
+      // API 失败时静默保留 fallback 静态图片，不影响用户体验
+    }
   }
 
   return {
@@ -294,6 +373,10 @@ export const useUIStore = defineStore('ui', () => {
     lightBgIndex,
     mobileDarkBgIndex,
     mobileLightBgIndex,
+    darkBgs,
+    lightBgs,
+    mobileDarkBgs,
+    mobileLightBgs,
     isMobile,
     currentBgUrl,
     themeTransitioning,
@@ -306,6 +389,11 @@ export const useUIStore = defineStore('ui', () => {
     setLightBg,
     setMobileDarkBg,
     setMobileLightBg,
+    rainEnabled,
+    rainIntensity,
+    setRainEnabled,
+    setRainIntensity,
     toggleTheme,
+    loadBackgrounds,
   }
 })

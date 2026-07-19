@@ -58,12 +58,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useUIStore } from '@/stores/ui'
-import {
-  darkBackgrounds,
-  lightBackgrounds,
-  mobileDarkBackgrounds,
-  mobileLightBackgrounds,
-} from '@/data/backgrounds'
 
 const ui = useUIStore()
 const expanded = ref(false)
@@ -71,9 +65,9 @@ const expanded = ref(false)
 const group = computed(() => {
   const isDark = ui.theme === 'dark'
   if (ui.isMobile) {
-    return isDark ? mobileDarkBackgrounds : mobileLightBackgrounds
+    return isDark ? ui.mobileDarkBgs : ui.mobileLightBgs
   }
-  return isDark ? darkBackgrounds : lightBackgrounds
+  return isDark ? ui.darkBgs : ui.lightBgs
 })
 
 const currentIndex = computed(() => {
