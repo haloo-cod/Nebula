@@ -5,6 +5,9 @@
  * 暗色模式独立于博客前台,通过 .admin-dark class 控制
  */
 import { ref, onMounted } from 'vue'
+// Element Plus 通过 JS 调用的组件（ElMessage/ElMessageBox）需要手动引入样式
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
 

@@ -5,7 +5,19 @@
  */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  Odometer, Document, ChatDotRound, Reading, Picture,
+  Camera, Connection, Present, ColdDrink, Comment,
+  Film, Sunrise, User, Setting,
+} from '@element-plus/icons-vue'
 import { adminMenus } from './AdminMenu'
+
+/** 图标名称 → 组件映射（用于 <component :is=""> 动态渲染） */
+const iconMap: Record<string, unknown> = {
+  Odometer, Document, ChatDotRound, Reading, Picture,
+  Camera, Connection, Present, ColdDrink, Comment,
+  Film, Sunrise, User, Setting,
+}
 
 defineProps<{
   /** 是否折叠侧边栏 */
@@ -49,7 +61,7 @@ function handleMenuSelect(path: string) {
           :index="item.path"
         >
           <el-icon>
-            <component :is="item.icon" />
+            <component :is="iconMap[item.icon]" />
           </el-icon>
           <template #title>{{ item.title }}</template>
         </el-menu-item>

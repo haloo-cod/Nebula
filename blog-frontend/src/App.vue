@@ -31,7 +31,7 @@ onMounted(() => {
     <RouterView />
     <BackToTop v-if="ui.showNavbar && !hideChrome" />
     <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
-    <RainEffect />
+    <RainEffect v-if="!hideChrome" />
     <div
       v-if="ui.themeTransitioning"
       class="theme-overlay"

@@ -5,6 +5,7 @@ FastAPI 应用入口
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
@@ -62,7 +63,14 @@ app = FastAPI(
 setup_cors(app)
 
 # 静态文件服务（图床 + EPUB）
-app.mount("/uploads", StaticFiles(directory=str(settings.UPLOAD_DIR)), name="uploads")
+# 用 CORSMiddleware 包装 StaticFiles，确保 WebGL 等需要 crossOrigin 的请求能获取 CORS 头
+static_app = CORSMiddleware(
+    app=StaticFiles(directory=str(settings.UPLOAD_DIR)),
+    allow_origins=settings.CORS_ORIGINS,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+app.mount("/uploads", static_app, name="uploads")
 
 # API 路由
 app.include_router(v1_router)

@@ -3,7 +3,7 @@
  * 统一处理 baseURL、认证 token、错误响应
  */
 
-const BASE_URL = 'http://localhost:8000'
+export const BASE_URL = 'http://localhost:8000'
 const TOKEN_KEY = 'blog_admin_token'
 
 /**

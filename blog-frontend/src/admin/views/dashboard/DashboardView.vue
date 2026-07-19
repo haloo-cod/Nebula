@@ -3,6 +3,7 @@
  * 管理后台仪表盘（占位页）
  * Phase 4 再填充真实统计数据
  */
+import { Document, ChatDotRound, Reading, Connection, EditPen, Upload, Picture } from '@element-plus/icons-vue'
 </script>
 
 <template>

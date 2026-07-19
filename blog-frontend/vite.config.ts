@@ -21,6 +21,9 @@ export default defineConfig({
     }),
     Components({
       resolvers: [ElementPlusResolver()],
+      // 禁止自动扫描 src/components/ 目录,博客前台组件继续用显式 import
+      // 只让 ElementPlusResolver 处理 el-* 组件的按需加载
+      dirs: [],
       // 生成的组件类型声明文件
       dts: 'src/components.d.ts',
     }),

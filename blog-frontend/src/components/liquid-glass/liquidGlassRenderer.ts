@@ -530,7 +530,9 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
     image.crossOrigin = 'anonymous'
     image.onload = () => resolve(image)
     image.onerror = () => reject(new Error(`Failed to load image: ${url}`))
-    image.src = url
+    // 加 query 参数使 URL 与 CSS background-image 的缓存 key 不同
+    // 避免浏览器用无 CORS 头的缓存响应导致 crossOrigin 请求失败（CORS 缓存污染问题）
+    image.src = url + (url.includes('?') ? '&' : '?') + '_cors=1'
   })
 
   imageCache.set(url, loader)

@@ -114,7 +114,84 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-dashboard',
         component: () => import('../admin/views/dashboard/DashboardView.vue'),
       },
-      // Phase 2/3/4 的管理页面将在此处追加
+      // ===== Phase 2: 核心 CRUD 页面 =====
+      {
+        path: 'posts',
+        name: 'admin-posts',
+        component: () => import('../admin/views/posts/PostList.vue'),
+      },
+      {
+        path: 'posts/new',
+        name: 'admin-post-create',
+        component: () => import('../admin/views/posts/PostEditor.vue'),
+      },
+      {
+        path: 'posts/:id',
+        name: 'admin-post-edit',
+        component: () => import('../admin/views/posts/PostEditor.vue'),
+      },
+      {
+        path: 'moments',
+        name: 'admin-moments',
+        component: () => import('../admin/views/moments/MomentList.vue'),
+      },
+      {
+        path: 'books',
+        name: 'admin-books',
+        component: () => import('../admin/views/books/BookList.vue'),
+      },
+      {
+        path: 'comments',
+        name: 'admin-comments',
+        component: () => import('../admin/views/comments/CommentList.vue'),
+      },
+      // ===== Phase 3: 内容管理页面 =====
+      {
+        path: 'gallery',
+        name: 'admin-gallery',
+        component: () => import('../admin/views/gallery/GalleryList.vue'),
+      },
+      {
+        path: 'albums',
+        name: 'admin-albums',
+        component: () => import('../admin/views/albums/AlbumList.vue'),
+      },
+      {
+        path: 'friends',
+        name: 'admin-friends',
+        component: () => import('../admin/views/friends/FriendList.vue'),
+      },
+      {
+        path: 'treasures',
+        name: 'admin-treasures',
+        component: () => import('../admin/views/treasures/TreasureList.vue'),
+      },
+      {
+        path: 'tavern',
+        name: 'admin-tavern',
+        component: () => import('../admin/views/tavern/TavernList.vue'),
+      },
+      // ===== Phase 4: 配置与媒体管理 =====
+      {
+        path: 'carousel',
+        name: 'admin-carousel',
+        component: () => import('../admin/views/carousel/CarouselList.vue'),
+      },
+      {
+        path: 'backgrounds',
+        name: 'admin-backgrounds',
+        component: () => import('../admin/views/backgrounds/BackgroundList.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'admin-profile',
+        component: () => import('../admin/views/profile/ProfileEdit.vue'),
+      },
+      {
+        path: 'site',
+        name: 'admin-site',
+        component: () => import('../admin/views/site/SiteConfig.vue'),
+      },
     ],
   },
 ]

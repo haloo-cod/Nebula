@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { Fold, Expand, Moon, User, House, SwitchButton } from '@element-plus/icons-vue'
 import { adminMenus } from './AdminMenu'
 
 defineProps<{
