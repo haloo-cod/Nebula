@@ -9,10 +9,12 @@ import { RefreshRight } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 关于页内容接口响应 */
 interface AboutContent {
   content_md: string
+  cover_url: string
 }
 
 const editorRef = ref<HTMLDivElement | null>(null)
@@ -20,6 +22,8 @@ const loading = ref(true)
 const saving = ref(false)
 const editorReady = ref(false)
 const error = ref('')
+const coverUrl = ref('')
+const showImagePicker = ref(false)
 let vditor: Vditor | null = null
 
 /** 初始化支持三种编辑模式、预览和图床上传的 Markdown 编辑器。 */
@@ -107,6 +111,7 @@ async function loadContent() {
     const content = await api.get<AboutContent>('/api/v1/about/content', true)
     loading.value = false
     await nextTick()
+    coverUrl.value = content.cover_url || ''
     initVditor(content.content_md)
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : '加载关于页内容失败'
@@ -123,13 +128,22 @@ async function saveContent() {
   }
   saving.value = true
   try {
-    await api.put<AboutContent>('/api/v1/about/content', { content_md: vditor.getValue() }, true)
+    await api.put<AboutContent>(
+      '/api/v1/about/content',
+      { content_md: vditor.getValue(), cover_url: coverUrl.value },
+      true,
+    )
     ElMessage.success('关于页已保存')
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     saving.value = false
   }
+}
+
+/** 选择关于页独立封面图。 */
+function handleCoverSelected(image: PickerImage) {
+  coverUrl.value = image.url
 }
 
 /** 后台主题切换时同步编辑区和预览区。 */
@@ -168,6 +182,19 @@ onBeforeUnmount(() => {
       </el-button>
     </div>
 
+    <el-card shadow="never" class="cover-card">
+      <template #header>关于页封面图</template>
+      <div class="cover-editor">
+        <img v-if="coverUrl" :src="resolveUrl(coverUrl)" alt="关于页封面预览" class="cover-preview" />
+        <div v-else class="cover-empty">未设置封面图</div>
+        <div class="cover-actions">
+          <el-button type="primary" @click="showImagePicker = true">从媒体库选择</el-button>
+          <el-button v-if="coverUrl" @click="coverUrl = ''">清空封面</el-button>
+          <el-input v-model="coverUrl" placeholder="也可手动填写图片 URL" />
+        </div>
+      </div>
+    </el-card>
+
     <el-card shadow="never" class="editor-card" v-loading="loading">
       <el-result v-if="error" icon="error" title="内容加载失败" :sub-title="error">
         <template #extra>
@@ -176,6 +203,7 @@ onBeforeUnmount(() => {
       </el-result>
       <div v-show="!error" ref="editorRef" class="vditor-container"></div>
     </el-card>
+    <ImagePickerDialog v-model="showImagePicker" title="选择关于页封面" @select="handleCoverSelected" />
   </div>
 </template>
 
@@ -206,6 +234,37 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   overflow: visible !important;
 }
+.cover-card {
+  border-radius: 12px;
+}
+.cover-editor {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.cover-preview,
+.cover-empty {
+  width: 220px;
+  height: 120px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.cover-empty {
+  display: grid;
+  place-items: center;
+  color: var(--admin-text-secondary);
+  background: var(--admin-hover-bg);
+}
+.cover-actions {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cover-actions .el-input {
+  flex-basis: 100%;
+}
 .editor-card :deep(.el-card__body) {
   overflow: visible !important;
 }
@@ -215,6 +274,13 @@ onBeforeUnmount(() => {
 @media (max-width: 640px) {
   .page-header {
     align-items: flex-start;
+  }
+  .cover-editor {
+    flex-direction: column;
+  }
+  .cover-preview,
+  .cover-empty {
+    width: 100%;
   }
 }
 </style>

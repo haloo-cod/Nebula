@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import distinct, func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
@@ -43,21 +44,25 @@ async def record_event(
         return
     ip_address = get_client_ip(request)
     ip_hash = hash_ip(ip_address)
-    await enforce_event_limit(db, ip_hash, "analytics_ingest", 60, 30)
-    event = AnalyticsEvent(
-        event_type=data.event_type,
-        path=data.path,
-        title=data.title,
-        referrer=data.referrer,
-        user_agent=request.headers.get("user-agent", "")[:1000],
-        ip_address=ip_address,
-        ip_hash=ip_hash,
-        visitor_id=data.visitor_id,
-        user_id=None,
-        occurred_at=utc_now(),
-    )
-    db.add(event)
-    await db.commit()
+    try:
+        await enforce_event_limit(db, ip_hash, "analytics_ingest", 60, 30)
+        event = AnalyticsEvent(
+            event_type=data.event_type,
+            path=data.path,
+            title=data.title,
+            referrer=data.referrer,
+            user_agent=request.headers.get("user-agent", "")[:1000],
+            ip_address=ip_address,
+            ip_hash=ip_hash,
+            visitor_id=data.visitor_id,
+            user_id=None,
+            occurred_at=utc_now(),
+        )
+        db.add(event)
+        await db.commit()
+    except OperationalError:
+        # 统计属于非关键链路,SQLite 瞬时 I/O 故障不应让前台请求失败。
+        await db.rollback()
 
 
 def _range_filter(days: int):

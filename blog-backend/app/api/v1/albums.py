@@ -16,6 +16,7 @@ from app.schemas.album import (
     AlbumResponse,
     AlbumUpdate,
     PhotoCreate,
+    PhotoUpdate,
     PhotoResponse,
 )
 from app.services.album import (
@@ -27,6 +28,7 @@ from app.services.album import (
     remove_photo,
     reorder_photos,
     update_album,
+    update_photo,
 )
 
 router = APIRouter(prefix="/albums", tags=["相册"])
@@ -68,6 +70,7 @@ async def create(
         description=album.description,
         orientation=album.orientation,
         cover_url="",
+        cover_image_id=album.cover_image_id,
         photo_count=0,
         date=album.created_at.strftime("%Y.%m") if album.created_at else "",
         created_at=album.created_at,
@@ -141,6 +144,21 @@ async def remove_album_photo(
     success = await remove_photo(db, album_id, photo_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="照片不存在")
+
+
+@router.put("/{album_id}/photos/{photo_id}", response_model=PhotoResponse)
+async def update_album_photo(
+    album_id: int,
+    photo_id: int,
+    data: PhotoUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新相册照片说明（管理员）。"""
+    result = await update_photo(db, album_id, photo_id, data.caption)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="照片不存在")
+    return result
 
 
 @router.put("/{album_id}/photos/reorder", status_code=status.HTTP_204_NO_CONTENT)

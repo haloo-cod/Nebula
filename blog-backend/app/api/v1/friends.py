@@ -2,7 +2,10 @@
 友链路由 — 公开列表 + 管理员 CRUD
 """
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
@@ -13,7 +16,9 @@ from app.schemas.friend import (
     FriendListResponse,
     FriendResponse,
     FriendUpdate,
+    FriendExchangeInfo,
 )
+from app.models.site_config import SiteConfig
 from app.services.friend import (
     create_friend,
     delete_friend,
@@ -22,6 +27,51 @@ from app.services.friend import (
 )
 
 router = APIRouter(prefix="/friends", tags=["友链"])
+
+EXCHANGE_CONFIG_KEY = "friends_exchange_info"
+
+
+def default_exchange_info() -> FriendExchangeInfo:
+    """返回交换友链的默认展示内容。"""
+    return FriendExchangeInfo(
+        name="你的站点名称",
+        url="https://example.com",
+        avatar="https://api.dicebear.com/9.x/adventurer/svg?seed=myblog",
+        bio="这里填写你的站点简介。",
+        requirements=["原创内容优先", "站点稳定可访问", "无违法违规内容", "最好有定期更新"],
+        contact="your-email@example.com",
+    )
+
+
+@router.get("/exchange-info", response_model=FriendExchangeInfo)
+async def get_exchange_info(db: AsyncSession = Depends(get_db)):
+    """获取交换友链展示信息。"""
+    result = await db.execute(select(SiteConfig).where(SiteConfig.key == EXCHANGE_CONFIG_KEY))
+    config = result.scalar_one_or_none()
+    if not config or not config.value:
+        return default_exchange_info()
+    try:
+        return FriendExchangeInfo.model_validate(json.loads(config.value))
+    except (ValueError, TypeError):
+        return default_exchange_info()
+
+
+@router.put("/exchange-info", response_model=FriendExchangeInfo)
+async def update_exchange_info(
+    data: FriendExchangeInfo,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新交换友链展示信息。"""
+    result = await db.execute(select(SiteConfig).where(SiteConfig.key == EXCHANGE_CONFIG_KEY))
+    config = result.scalar_one_or_none()
+    value = json.dumps(data.model_dump(), ensure_ascii=False)
+    if config:
+        config.value = value
+    else:
+        db.add(SiteConfig(key=EXCHANGE_CONFIG_KEY, value=value, description="交换友链展示信息"))
+    await db.commit()
+    return data
 
 
 @router.get("", response_model=FriendListResponse)

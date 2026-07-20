@@ -24,6 +24,8 @@ const savingOrder = ref(false)
 const draggedId = ref<number | null>(null)
 const orderChanged = ref(false)
 const showImagePicker = ref(false)
+const selectedIds = ref<number[]>([])
+const deleting = ref(false)
 
 /** 加载轮播列表 */
 async function loadSlides() {
@@ -54,6 +56,45 @@ async function addImage(image: PickerImage) {
     ElMessage.error(err instanceof Error ? err.message : '上传失败')
   } finally {
     uploading.value = false
+  }
+}
+
+async function addImages(images: PickerImage[]) {
+  uploading.value = true
+  try {
+    const results = await Promise.allSettled(
+      images.map((image, index) =>
+        api.post('/api/v1/carousel', { image_id: image.id, sort_order: slides.value.length + index }, true),
+      ),
+    )
+    const failed = results.filter((result) => result.status === 'rejected').length
+    ElMessage[failed ? 'warning' : 'success'](failed ? `添加完成，${failed} 张失败` : `成功添加 ${images.length} 张`)
+    await loadSlides()
+  } finally {
+    uploading.value = false
+  }
+}
+
+function toggleSelection(id: number) {
+  selectedIds.value = selectedIds.value.includes(id)
+    ? selectedIds.value.filter((item) => item !== id)
+    : [...selectedIds.value, id]
+}
+
+async function handleBatchDelete() {
+  if (!selectedIds.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定移除选中的 ${selectedIds.value.length} 张轮播图？`, '确认', { type: 'warning' })
+    deleting.value = true
+    const results = await Promise.allSettled(selectedIds.value.map((id) => api.delete(`/api/v1/carousel/${id}`)))
+    const failed = results.filter((result) => result.status === 'rejected').length
+    ElMessage[failed ? 'warning' : 'success'](failed ? `删除完成，${failed} 张失败` : '批量删除成功')
+    selectedIds.value = []
+    await loadSlides()
+  } catch {
+    // 用户取消删除
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -116,6 +157,9 @@ onMounted(() => loadSlides())
     <div class="page-header">
       <span class="page-title">共 {{ slides.length }} 张轮播图</span>
       <div class="upload-control">
+        <el-button type="danger" plain :loading="deleting" :disabled="!selectedIds.length" @click="handleBatchDelete">
+          批量删除（{{ selectedIds.length }}）
+        </el-button>
         <el-button v-if="orderChanged" :loading="savingOrder" @click="saveOrder"
           >保存排序</el-button
         >
@@ -126,6 +170,7 @@ onMounted(() => loadSlides())
     </div>
 
     <el-card shadow="never" class="table-card">
+      <div class="batch-toolbar">已选择 {{ selectedIds.length }} 张</div>
       <div v-loading="loading" class="slide-grid">
         <div
           v-for="slide in slides"
@@ -138,6 +183,7 @@ onMounted(() => loadSlides())
           @dragend="handleDragEnd"
         >
           <img :src="resolveUrl(slide.url)" alt="" class="slide-img" />
+          <el-checkbox class="slide-check" :model-value="selectedIds.includes(slide.id)" @click.stop @change="toggleSelection(slide.id)" />
           <div class="slide-overlay">
             <el-button type="danger" size="small" @click="handleDelete(slide)">移除</el-button>
           </div>
@@ -146,7 +192,7 @@ onMounted(() => loadSlides())
         <div v-if="!loading && slides.length === 0" class="empty-state">暂无轮播图</div>
       </div>
     </el-card>
-    <ImagePickerDialog v-model="showImagePicker" title="选择轮播图" @select="addImage" />
+    <ImagePickerDialog v-model="showImagePicker" title="选择轮播图" :multiple="true" @select-many="addImages" @select="addImage" />
   </div>
 </template>
 
@@ -167,6 +213,11 @@ onMounted(() => loadSlides())
 }
 .table-card {
   border-radius: 12px;
+}
+.batch-toolbar {
+  margin-bottom: 12px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 13px;
 }
 .upload-control {
   display: flex;
@@ -190,6 +241,15 @@ onMounted(() => loadSlides())
 }
 .slide-item:active {
   cursor: grabbing;
+}
+.slide-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
 }
 .slide-img {
   width: 100%;

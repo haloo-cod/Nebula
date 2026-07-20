@@ -2,7 +2,7 @@
   <div class="about-hero">
     <!-- 封面图 -->
     <div class="hero-cover">
-      <img :src="coverImage" alt="About Cover" class="hero-cover-img" />
+      <img :src="activeCoverImage" alt="About Cover" class="hero-cover-img" />
     </div>
 
     <!-- 头像 + 个人信息 -->
@@ -35,8 +35,21 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { avatar, coverImage, profile, socialLinks } from '@/data/profile'
+import { api, resolveUrl } from '@/api/client'
+
+const activeCoverImage = ref(coverImage)
+
+onMounted(async () => {
+  try {
+    const content = await api.get<{ cover_url: string }>('/api/v1/about/content')
+    if (content.cover_url) activeCoverImage.value = resolveUrl(content.cover_url)
+  } catch {
+    // API 不可用时继续使用静态封面 fallback。
+  }
+})
 </script>
 
 <style scoped>

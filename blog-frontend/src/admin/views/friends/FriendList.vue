@@ -7,6 +7,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api } from '@/api/client'
+import type { FriendExchangeInfo } from '@/api/friends'
 
 /** 友链项（匹配后端 FriendResponse） */
 interface FriendItem {
@@ -26,6 +27,17 @@ const isEdit = ref(false)
 const saving = ref(false)
 const editingId = ref(0)
 const form = ref({ name: '', bio: '', avatar: '', url: '', sort_order: 0 })
+const exchangeInfo = ref<FriendExchangeInfo>({
+  name: '',
+  url: '',
+  avatar: '',
+  bio: '',
+  requirements: [],
+  contact: '',
+})
+const exchangeLoading = ref(false)
+const exchangeSaving = ref(false)
+const requirementsText = ref('')
 
 /** 加载友链列表 */
 async function loadFriends() {
@@ -37,6 +49,37 @@ async function loadFriends() {
     ElMessage.error('加载友链失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 加载交换友链展示信息。 */
+async function loadExchangeInfo() {
+  exchangeLoading.value = true
+  try {
+    exchangeInfo.value = await api.get<FriendExchangeInfo>('/api/v1/friends/exchange-info', true)
+    requirementsText.value = exchangeInfo.value.requirements.join('\n')
+  } catch {
+    ElMessage.error('加载交换友链信息失败')
+  } finally {
+    exchangeLoading.value = false
+  }
+}
+
+/** 保存交换友链展示信息。 */
+async function saveExchangeInfo() {
+  exchangeSaving.value = true
+  try {
+    exchangeInfo.value = await api.put<FriendExchangeInfo>(
+      '/api/v1/friends/exchange-info',
+      { ...exchangeInfo.value, requirements: requirementsText.value.split('\n').map((item) => item.trim()).filter(Boolean) },
+      true,
+    )
+    requirementsText.value = exchangeInfo.value.requirements.join('\n')
+    ElMessage.success('交换友链信息已保存')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '保存失败')
+  } finally {
+    exchangeSaving.value = false
   }
 }
 
@@ -97,7 +140,10 @@ async function handleDelete(item: FriendItem) {
   }
 }
 
-onMounted(() => loadFriends())
+onMounted(() => {
+  loadFriends()
+  loadExchangeInfo()
+})
 </script>
 
 <template>
@@ -132,6 +178,39 @@ onMounted(() => loadFriends())
           </template>
         </el-table-column>
       </el-table>
+    </el-card>
+
+    <el-card shadow="never" class="table-card" v-loading="exchangeLoading">
+      <template #header>
+        <span>交换友链</span>
+      </template>
+      <el-form label-position="top">
+        <div class="form-grid">
+          <el-form-item label="站点名称">
+            <el-input v-model="exchangeInfo.name" placeholder="展示在交换友链区域的站点名称" />
+          </el-form-item>
+          <el-form-item label="站点 URL">
+            <el-input v-model="exchangeInfo.url" placeholder="https://..." />
+          </el-form-item>
+          <el-form-item label="头像 URL">
+            <el-input v-model="exchangeInfo.avatar" placeholder="https://..." />
+          </el-form-item>
+          <el-form-item label="联系方式">
+            <el-input v-model="exchangeInfo.contact" placeholder="邮箱或其他联系方式" />
+          </el-form-item>
+        </div>
+        <el-form-item label="站点简介">
+          <el-input v-model="exchangeInfo.bio" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="申请要求（每行一条）">
+          <el-input v-model="requirementsText" type="textarea" :rows="4" placeholder="原创内容优先&#10;站点稳定可访问" />
+        </el-form-item>
+        <div class="exchange-form-actions">
+          <el-button type="primary" :loading="exchangeSaving" @click="saveExchangeInfo">
+            保存设置
+          </el-button>
+        </div>
+      </el-form>
     </el-card>
 
     <!-- 新建/编辑弹窗 -->
@@ -180,6 +259,11 @@ onMounted(() => loadFriends())
 }
 .table-card {
   border-radius: 12px;
+}
+.exchange-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 .avatar-img {
   width: 32px;

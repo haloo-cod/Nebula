@@ -3,8 +3,9 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Download, Refresh, Upload } from '@element-plus/icons-vue'
-import { api, BASE_URL, getToken } from '@/api/client'
-import { uploadFile, type UploadedFile } from '@/api/files'
+import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { uploadFiles, type UploadedFile } from '@/api/files'
+import { downloadWithProgress } from '@/utils/download'
 
 /** 图床图片记录。 */
 interface UploadedImage {
@@ -40,7 +41,11 @@ const activeTab = ref('files')
 const loading = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
+const uploadStatus = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const downloading = ref(false)
+const downloadProgress = ref(0)
+const downloadStatus = ref('')
 
 function formatSize(size: number): string {
   if (size < 1024) return `${size} B`
@@ -105,56 +110,87 @@ function openPicker() {
   if (!uploading.value) fileInput.value?.click()
 }
 
+async function copyUrl(url: string) {
+  try {
+    await navigator.clipboard.writeText(resolveUrl(url))
+    ElMessage.success('URL 已复制')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
 async function handleUpload(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+  const selectedFiles = Array.from(input.files ?? [])
+  if (!selectedFiles.length) return
   uploading.value = true
   uploadProgress.value = 0
   try {
     if (activeTab.value === 'files') {
-      await uploadFile(file, (percent) => (uploadProgress.value = percent))
-      await loadFiles()
-    } else {
-      const formData = new FormData()
-      formData.append('file', file)
-      const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-        body: formData,
-        credentials: 'include',
+      const results = await uploadFiles(selectedFiles, (completed, total, current) => {
+        uploadProgress.value = Math.round((completed / total) * 100)
+        uploadStatus.value = current ? `正在上传 ${current}` : ''
       })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({ detail: '图片上传失败' }))
-        throw new Error(body.detail || '图片上传失败')
+      await loadFiles()
+      const failed = results.filter((result) => result.error)
+      if (failed.length) {
+        ElMessage.warning(`${results.length - failed.length} 个成功，${failed.length} 个失败`)
+      }
+    } else {
+      let success = 0
+      let failed = 0
+      for (const [index, file] of selectedFiles.entries()) {
+        try {
+          uploadStatus.value = `正在上传 ${file.name}`
+          const formData = new FormData()
+          formData.append('file', file)
+          const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+            body: formData,
+            credentials: 'include',
+          })
+          if (response.ok) success++
+          else failed++
+        } catch {
+          failed++
+        }
+        uploadProgress.value = Math.round(((index + 1) / selectedFiles.length) * 100)
       }
       await loadImages()
+      if (failed) ElMessage.warning(`${success} 个成功，${failed} 个失败`)
+      else ElMessage.success(`${success} 张图片上传成功`)
+      return
     }
-    ElMessage.success(activeTab.value === 'files' ? '文件上传成功' : '图片上传成功')
+    ElMessage.success(`${selectedFiles.length} 个文件上传完成`)
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '文件上传失败')
   } finally {
     uploading.value = false
+    uploadStatus.value = ''
     input.value = ''
   }
 }
 
 async function downloadFile(file: UploadedFile) {
+  await downloadResource(file.url, file.original_name)
+}
+
+async function downloadResource(path: string, filename: string) {
+  if (downloading.value) return
+  downloading.value = true
+  downloadProgress.value = 0
+  downloadStatus.value = `正在下载 ${filename}`
   try {
-    const response = await fetch(`${BASE_URL}${file.url}`, {
+    await downloadWithProgress(resolveUrl(path), filename, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      credentials: 'include',
+      onProgress: (percent) => (downloadProgress.value = percent),
     })
-    if (!response.ok) throw new Error('文件下载失败')
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = file.original_name
-    anchor.click()
-    URL.revokeObjectURL(url)
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '文件下载失败')
+  } finally {
+    downloading.value = false
+    downloadStatus.value = ''
   }
 }
 
@@ -172,17 +208,7 @@ async function removeFile(file: UploadedFile) {
 }
 
 async function downloadImage(image: UploadedImage) {
-  const response = await fetch(`${BASE_URL}${image.url}`)
-  if (!response.ok) {
-    ElMessage.error('图片下载失败')
-    return
-  }
-  const url = URL.createObjectURL(await response.blob())
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = image.original_name
-  anchor.click()
-  URL.revokeObjectURL(url)
+  await downloadResource(image.url, image.original_name)
 }
 
 async function removeImage(image: UploadedImage) {
@@ -202,22 +228,7 @@ async function removeImage(image: UploadedImage) {
 
 async function downloadArchive(job: BookDownloadJob) {
   if (!job.download_url) return
-  try {
-    const response = await fetch(`${BASE_URL}${job.download_url}`, {
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      credentials: 'include',
-    })
-    if (!response.ok)
-      throw new Error((await response.json().catch(() => ({}))).detail || '归档下载失败')
-    const url = URL.createObjectURL(await response.blob())
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'starlit-books.zip'
-    anchor.click()
-    URL.revokeObjectURL(url)
-  } catch (err: unknown) {
-    ElMessage.error(err instanceof Error ? err.message : '归档下载失败')
-  }
+  await downloadResource(job.download_url, 'starlit-books.zip')
 }
 
 async function retryArchive(job: BookDownloadJob) {
@@ -273,7 +284,10 @@ onMounted(loadFiles)
         <p>统一管理普通文件和图床图片，数据库仍保持分表。</p>
       </div>
       <div class="upload-actions">
+            <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
         <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="6" />
+        <span v-if="downloading" class="upload-status">{{ downloadStatus }} {{ downloadProgress }}%</span>
+        <el-progress v-if="downloading" :percentage="downloadProgress" :stroke-width="6" />
         <el-button
           type="primary"
           :icon="Upload"
@@ -283,7 +297,7 @@ onMounted(loadFiles)
         >
           {{ activeTab === 'files' ? '上传文件' : '上传图片' }}
         </el-button>
-        <input ref="fileInput" type="file" class="file-input" @change="handleUpload" />
+        <input ref="fileInput" type="file" class="file-input" multiple @change="handleUpload" />
       </div>
     </div>
 
@@ -301,6 +315,14 @@ onMounted(loadFiles)
           show-overflow-tooltip
         />
         <el-table-column prop="mime_type" label="类型" min-width="180" show-overflow-tooltip />
+        <el-table-column label="URL" min-width="280" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="url-cell">
+              <span>{{ resolveUrl(row.url) }}</span>
+              <el-button link size="small" @click="copyUrl(row.url)">复制</el-button>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="大小" width="120">
           <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
         </el-table-column>
@@ -314,6 +336,7 @@ onMounted(loadFiles)
               link
               :icon="Download"
               @click="downloadFile(row as UploadedFile)"
+              :disabled="downloading"
               >下载</el-button
             >
             <el-button type="danger" link :icon="Delete" @click="removeFile(row as UploadedFile)"
@@ -325,7 +348,7 @@ onMounted(loadFiles)
       <el-table v-else-if="activeTab === 'images'" :data="images" v-loading="loading" stripe>
         <el-table-column label="预览" width="100">
           <template #default="{ row }">
-            <img :src="`${BASE_URL}${row.url}`" :alt="row.original_name" class="image-preview" />
+            <img :src="resolveUrl(row.url)" :alt="row.original_name" class="image-preview" />
           </template>
         </el-table-column>
         <el-table-column
@@ -334,6 +357,14 @@ onMounted(loadFiles)
           min-width="220"
           show-overflow-tooltip
         />
+        <el-table-column label="URL" min-width="280" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="url-cell">
+              <span>{{ resolveUrl(row.url) }}</span>
+              <el-button link size="small" @click="copyUrl(row.url)">复制</el-button>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="尺寸" width="130">
           <template #default="{ row }">{{ row.width }} × {{ row.height }}</template>
         </el-table-column>
@@ -347,6 +378,7 @@ onMounted(loadFiles)
               link
               :icon="Download"
               @click="downloadImage(row as UploadedImage)"
+              :disabled="downloading"
               >下载</el-button
             >
             <el-button type="danger" link :icon="Delete" @click="removeImage(row as UploadedImage)"
@@ -387,6 +419,7 @@ onMounted(loadFiles)
               link
               :icon="Download"
               @click="downloadArchive(row as BookDownloadJob)"
+              :disabled="downloading"
               >下载</el-button
             >
             <el-button
@@ -453,6 +486,26 @@ p {
 }
 .upload-actions .el-progress {
   width: 150px;
+}
+.upload-status,
+.url-cell span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-status {
+  max-width: 180px;
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+}
+.url-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.url-cell span {
+  min-width: 0;
 }
 .file-input {
   display: none;

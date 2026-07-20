@@ -6,7 +6,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { api } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import SvgIcon from '@/components/SvgIcon.vue'
 
 /** 个人资料（匹配后端 ProfileResponse） */
 interface ProfileData {
@@ -41,11 +42,27 @@ const showLinkDialog = ref(false)
 const savingLink = ref(false)
 const linkForm = ref({ label: '', icon: '', url: '', sort_order: 0 })
 
+/** 社交图标目录中目前可用的图标名称。 */
+const socialIconOptions = [
+  { name: 'github', label: 'GitHub' },
+  { name: 'bilibili', label: 'Bilibili' },
+  { name: 'youtube', label: 'YouTube' },
+  { name: 'telegram', label: 'Telegram' },
+  { name: 'twitter', label: 'Twitter / X' },
+  { name: 'instagram', label: 'Instagram' },
+  { name: 'facebook', label: 'Facebook' },
+]
+
 /** 加载个人资料 */
 async function loadProfile() {
   loading.value = true
   try {
-    profile.value = await api.get<ProfileData>('/api/v1/profile', true)
+    const data = await api.get<ProfileData>('/api/v1/profile', true)
+    profile.value = {
+      ...data,
+      avatar_url: data.avatar_url ? resolveUrl(data.avatar_url) : '',
+      cover_url: data.cover_url ? resolveUrl(data.cover_url) : '',
+    }
   } catch {
     ElMessage.error('加载个人资料失败')
   } finally {
@@ -159,7 +176,11 @@ onMounted(() => loadProfile())
         </div>
       </template>
       <el-table :data="profile.social_links as any" stripe style="width: 100%">
-        <el-table-column prop="icon" label="图标" width="60" />
+        <el-table-column label="图标" width="80">
+          <template #default="{ row }">
+            <SvgIcon :name="row.icon" class="social-icon-preview" />
+          </template>
+        </el-table-column>
         <el-table-column prop="label" label="平台" width="120" />
         <el-table-column prop="url" label="链接" min-width="250">
           <template #default="{ row }: { row: any }">
@@ -182,7 +203,14 @@ onMounted(() => loadProfile())
           <el-input v-model="linkForm.label" placeholder="如 GitHub、Bilibili" />
         </el-form-item>
         <el-form-item label="图标">
-          <el-input v-model="linkForm.icon" placeholder="图标标识（如 github）" />
+          <el-select v-model="linkForm.icon" placeholder="选择社交平台图标" style="width: 100%">
+            <el-option v-for="option in socialIconOptions" :key="option.name" :value="option.name">
+              <span class="icon-option">
+                <SvgIcon :name="option.name" />
+                <span>{{ option.label }}</span>
+              </span>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="链接 URL">
           <el-input v-model="linkForm.url" placeholder="https://..." />
@@ -225,5 +253,14 @@ onMounted(() => loadProfile())
 }
 .link-text:hover {
   text-decoration: underline;
+}
+.social-icon-preview {
+  width: 20px;
+  height: 20px;
+}
+.icon-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

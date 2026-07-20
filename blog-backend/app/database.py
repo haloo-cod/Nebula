@@ -10,6 +10,7 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
+    connect_args={"timeout": 30} if settings.DATABASE_URL.startswith("sqlite") else {},
 )
 
 AsyncSessionLocal = async_sessionmaker(

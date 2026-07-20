@@ -7,6 +7,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ArrowLeft } from '@element-plus/icons-vue'
 import { api, getToken, resolveUrl, BASE_URL } from '@/api/client'
+import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 相册列表项 */
 interface AlbumItem {
@@ -15,6 +16,7 @@ interface AlbumItem {
   description: string
   orientation: string
   cover_url: string
+  cover_image_id: number | null
   photo_count: number
   date: string
   created_at: string
@@ -40,14 +42,21 @@ const albums = ref<AlbumItem[]>([])
 const showAlbumDialog = ref(false)
 const isEditAlbum = ref(false)
 const savingAlbum = ref(false)
-const albumForm = ref({ title: '', description: '', orientation: 'portrait' })
+const albumForm = ref({
+  title: '',
+  description: '',
+  orientation: 'portrait',
+  cover_image_id: null as number | null,
+})
 const editingAlbumId = ref(0)
+const showCoverPicker = ref(false)
 
 // ============ 照片管理状态 ============
 const currentAlbum = ref<AlbumDetail | null>(null)
 const loadingPhotos = ref(false)
 const uploading = ref(false)
 const photoInputRef = ref<HTMLInputElement | null>(null)
+const savingPhotoId = ref<number | null>(null)
 
 /** 加载相册列表 */
 async function loadAlbums() {
@@ -65,7 +74,7 @@ async function loadAlbums() {
 /** 打开新建相册弹窗 */
 function openCreateAlbum() {
   isEditAlbum.value = false
-  albumForm.value = { title: '', description: '', orientation: 'portrait' }
+  albumForm.value = { title: '', description: '', orientation: 'portrait', cover_image_id: null }
   showAlbumDialog.value = true
 }
 
@@ -77,8 +86,13 @@ function openEditAlbum(album: AlbumItem) {
     title: album.title,
     description: album.description,
     orientation: album.orientation,
+    cover_image_id: album.cover_image_id,
   }
   showAlbumDialog.value = true
+}
+
+function handleCoverSelected(image: PickerImage) {
+  albumForm.value.cover_image_id = image.id
 }
 
 /** 保存相册 */
@@ -145,42 +159,64 @@ function openPhotoPicker() {
 /** 上传照片并关联到当前相册 */
 async function handlePhotoUpload(event: Event) {
   const input = event.target as HTMLInputElement
-  if (!input.files || !input.files[0] || !currentAlbum.value) return
-
-  const file = input.files[0]
+  const files = Array.from(input.files ?? [])
+  if (!files.length || !currentAlbum.value) return
   uploading.value = true
+  let success = 0
+  let failed = 0
   try {
-    // 第一步：上传图片到图床
-    const formData = new FormData()
-    formData.append('file', file)
-    const token = getToken()
-    const uploadResp = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    })
-    if (!uploadResp.ok) {
-      const error = await uploadResp.json().catch(() => ({ detail: '图片上传失败' }))
-      throw new Error(error.detail || '图片上传失败')
+    for (const file of files) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const token = getToken()
+        const uploadResp = await fetch(`${BASE_URL}/api/v1/images/upload`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+          credentials: 'include',
+        })
+        if (!uploadResp.ok) {
+          const error = await uploadResp.json().catch(() => ({ detail: '图片上传失败' }))
+          throw new Error(error.detail || '图片上传失败')
+        }
+        const imageData = await uploadResp.json()
+        await api.post(
+          `/api/v1/albums/${currentAlbum.value.id}/photos`,
+          { image_id: imageData.id },
+          true,
+        )
+        success++
+      } catch {
+        failed++
+      }
     }
-    const imageData = await uploadResp.json()
-
-    // 第二步：关联到相册
-    await api.post(
-      `/api/v1/albums/${currentAlbum.value.id}/photos`,
-      { image_id: imageData.id },
-      true,
-    )
-    ElMessage.success('照片添加成功')
-
-    // 刷新照片列表
     const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
     currentAlbum.value = detail
+    ElMessage[failed ? 'warning' : 'success'](failed ? `${success} 张成功，${failed} 张失败` : `成功添加 ${success} 张照片`)
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '上传失败')
   } finally {
     uploading.value = false
     input.value = '' // 重置文件选择
+  }
+}
+
+/** 保存照片说明字段。 */
+async function savePhoto(photo: PhotoItem) {
+  if (!currentAlbum.value) return
+  savingPhotoId.value = photo.id
+  try {
+    await api.put(
+      `/api/v1/albums/${currentAlbum.value.id}/photos/${photo.id}`,
+      { caption: photo.caption || '' },
+      true,
+    )
+    ElMessage.success('照片信息已保存')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '保存照片信息失败')
+  } finally {
+    savingPhotoId.value = null
   }
 }
 
@@ -260,6 +296,7 @@ onMounted(() => loadAlbums())
             ref="photoInputRef"
             type="file"
             accept="image/*"
+            multiple
             class="file-input"
             tabindex="-1"
             @change="handlePhotoUpload"
@@ -274,7 +311,10 @@ onMounted(() => loadAlbums())
             <div class="photo-actions">
               <el-button type="danger" size="small" @click="deletePhoto(photo)">删除</el-button>
             </div>
-            <span v-if="photo.caption" class="photo-caption">{{ photo.caption }}</span>
+            <div class="photo-fields">
+              <el-input v-model="photo.caption" size="small" placeholder="照片说明" clearable />
+              <el-button size="small" :loading="savingPhotoId === photo.id" @click="savePhoto(photo)">保存</el-button>
+            </div>
           </div>
           <div v-if="currentAlbum.photos.length === 0" class="empty-state">
             暂无照片，点击上方按钮添加
@@ -307,6 +347,13 @@ onMounted(() => loadAlbums())
             <el-radio value="landscape">横版 (4:3)</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="相册封面">
+          <div class="cover-picker">
+            <span>{{ albumForm.cover_image_id ? `已选择图片 #${albumForm.cover_image_id}` : '未设置封面' }}</span>
+            <el-button @click="showCoverPicker = true">从已上传图片选择</el-button>
+            <el-button v-if="albumForm.cover_image_id" @click="albumForm.cover_image_id = null">清空</el-button>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAlbumDialog = false">取消</el-button>
@@ -315,6 +362,7 @@ onMounted(() => loadAlbums())
         }}</el-button>
       </template>
     </el-dialog>
+    <ImagePickerDialog v-model="showCoverPicker" title="选择相册封面" @select="handleCoverSelected" />
   </div>
 </template>
 
@@ -341,6 +389,12 @@ onMounted(() => loadAlbums())
 }
 .file-input {
   display: none;
+}
+.cover-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .photo-grid {
@@ -376,6 +430,13 @@ onMounted(() => loadAlbums())
   padding: 4px 8px;
   font-size: 12px;
   color: var(--admin-text-secondary, #909399);
+  background: var(--admin-fill-bg, #f5f7fa);
+}
+.photo-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
   background: var(--admin-fill-bg, #f5f7fa);
 }
 .empty-state {

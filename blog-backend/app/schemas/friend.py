@@ -6,6 +6,17 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+class FriendExchangeInfo(BaseModel):
+    """交换友链展示信息。"""
+
+    name: str = ""
+    url: str = ""
+    avatar: str = ""
+    bio: str = ""
+    requirements: list[str] = []
+    contact: str = ""
+
+
 class FriendCreate(BaseModel):
     """创建友链（管理员）"""
     name: str

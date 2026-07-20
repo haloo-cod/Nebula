@@ -66,6 +66,12 @@
           {{ downloadNotice }}
         </div>
       </Transition>
+      <div v-if="downloading" class="download-progress" role="status">
+        <span>下载中 {{ downloadProgress }}%</span>
+        <div class="download-progress-track">
+          <div class="download-progress-bar" :style="{ width: `${downloadProgress}%` }"></div>
+        </div>
+      </div>
 
       <!-- 空状态 -->
       <div v-if="filteredTreasures.length === 0" class="treasure-empty">
@@ -114,6 +120,7 @@ import { useUIStore } from '@/stores/ui'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getToken } from '@/api/client'
+import { downloadWithProgress } from '@/utils/download'
 import type { Treasure, TreasureCategory } from '@/types'
 
 const ui = useUIStore()
@@ -131,6 +138,8 @@ const currentPage = ref(1)
 // 当前选中的分类，null 表示全部
 const activeCategory = ref<TreasureCategory | null>(null)
 const downloadNotice = ref('')
+const downloadProgress = ref(0)
+const downloading = ref(false)
 let noticeTimer: number | null = null
 
 // 筛选后的宝物列表（全部）
@@ -188,22 +197,19 @@ async function handleTreasureClick(event: MouseEvent, item: Treasure) {
   if (!item.downloadUrl.startsWith('/api/v1/files/')) return
 
   event.preventDefault()
+  if (downloading.value) return
+  downloading.value = true
+  downloadProgress.value = 0
   try {
-    const response = await fetch(url, {
+    await downloadWithProgress(url, 'download', {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      credentials: 'include',
+      onProgress: (percent) => (downloadProgress.value = percent),
     })
-    if (!response.ok) throw new Error()
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(await response.blob())
-    link.download = ''
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(link.href)
     showDownloadNotice('下载已开始')
   } catch {
     showDownloadNotice('文件暂时无法下载，请稍后重试')
+  } finally {
+    downloading.value = false
   }
 }
 
@@ -375,6 +381,34 @@ onMounted(async () => {
 .download-notice-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+.download-progress {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 31;
+  width: min(280px, calc(100vw - 2.5rem));
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 200, 100, 0.35);
+  border-radius: 0.8rem;
+  background: rgba(18, 20, 24, 0.92);
+  color: rgba(255, 235, 190, 0.95);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  font-size: 0.8rem;
+}
+.download-progress-track {
+  height: 5px;
+  margin-top: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.download-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: #f4b860;
+  transition: width 0.15s ease;
 }
 
 /* ===== 空状态 ===== */

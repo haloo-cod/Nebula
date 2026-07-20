@@ -8,6 +8,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowDown, Close, Download, Rank, RefreshRight, Upload } from '@element-plus/icons-vue'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import { downloadWithProgress } from '@/utils/download'
 
 /** 图书列表项（匹配后端 BookListItem） */
 interface BookItem {
@@ -249,23 +250,22 @@ function handleSelectionChange(rows: unknown[]) {
 /** 下载单本 EPUB。 */
 async function downloadBook(book: BookItem) {
   downloading.value = true
+  downloadProgress.value = 0
+  downloadStatus.value = `正在下载 ${book.title}`
   try {
-    const response = await fetch(
+    await downloadWithProgress(
       `${BASE_URL}/api/v1/books/${encodeURIComponent(book.slug)}/download`,
-      { headers: { Authorization: `Bearer ${getToken() ?? ''}` }, credentials: 'include' },
+      `${book.title}${book.author ? ` - ${book.author}` : ''}.epub`,
+      {
+        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+        onProgress: (percent) => (downloadProgress.value = percent),
+      },
     )
-    if (!response.ok) throw new Error('图书文件下载失败')
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${book.title}${book.author ? ` - ${book.author}` : ''}.epub`
-    anchor.click()
-    URL.revokeObjectURL(url)
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '下载失败')
   } finally {
     downloading.value = false
+    downloadStatus.value = ''
   }
 }
 
@@ -288,21 +288,10 @@ async function downloadSelectedZip() {
     if (!response.ok) throw new Error('创建 ZIP 打包任务失败')
     const created = (await response.json()) as { id: number }
     const job = await waitForDownloadJob(created.id)
-    const fileResponse = await fetch(`${BASE_URL}${job.download_url}`, {
+    await downloadWithProgress(`${BASE_URL}${job.download_url}`, 'starlit-books.zip', {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      credentials: 'include',
+      onProgress: (percent) => (downloadProgress.value = percent),
     })
-    if (!fileResponse.ok) {
-      const body = await fileResponse.json().catch(() => ({ detail: 'ZIP 下载失败' }))
-      throw new Error(body.detail || 'ZIP 下载失败')
-    }
-    const blob = await fileResponse.blob()
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'starlit-books.zip'
-    anchor.click()
-    URL.revokeObjectURL(url)
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : 'ZIP 下载失败')
   } finally {

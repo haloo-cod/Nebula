@@ -100,7 +100,7 @@ export interface Profile {
 /** 社交链接 */
 export interface SocialLink {
   label: string // 平台名称,如 'GitHub'
-  icon: string // 图标(当前为 emoji)
+  icon: string // 社交平台图标名称
   url: string // 跳转地址
 }
 

@@ -101,6 +101,7 @@ function applyDarkTheme() {
   color: var(--admin-text-color);
   background: var(--admin-content-bg);
   font-family:
+    'Zen Maru Gothic',
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 

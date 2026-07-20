@@ -75,3 +75,24 @@ export function uploadFile(
     xhr.send(formData)
   })
 }
+
+/** 按顺序批量上传文件，单个文件失败不会中断后续任务。 */
+export async function uploadFiles(
+  files: File[],
+  onProgress?: (completed: number, total: number, current: string) => void,
+): Promise<{ file: File; result?: UploadedFile; error?: string }[]> {
+  const results: { file: File; result?: UploadedFile; error?: string }[] = []
+  for (const [index, file] of files.entries()) {
+    onProgress?.(index, files.length, file.name)
+    try {
+      const result = await uploadFile(file, (percent) => {
+        onProgress?.(index + percent / 100, files.length, file.name)
+      })
+      results.push({ file, result })
+    } catch (error: unknown) {
+      results.push({ file, error: error instanceof Error ? error.message : '上传失败' })
+    }
+  }
+  onProgress?.(files.length, files.length, '')
+  return results
+}

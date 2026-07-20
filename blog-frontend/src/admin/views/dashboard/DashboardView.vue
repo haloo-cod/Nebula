@@ -65,6 +65,11 @@ const uvPoints = computed(() => makeChartPoints('uv'))
 const recentSevenDayPv = computed(() => trend.value.reduce((sum, item) => sum + item.pv, 0))
 const recentSevenDayUv = computed(() => trend.value.reduce((sum, item) => sum + item.uv, 0))
 
+/** 快捷操作跳转到对应的后台功能页。 */
+function goToShortcut(path: string) {
+  void router.push(path)
+}
+
 function makeChartPoints(key: 'pv' | 'uv'): string {
   if (trend.value.length === 0) return ''
   const width = 720
@@ -187,7 +192,7 @@ onMounted(async () => {
       <div v-if="trend.length" class="chart-wrap">
         <svg
           viewBox="0 0 720 260"
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
           class="trend-chart"
           role="img"
           aria-label="最近七天访问趋势"
@@ -269,16 +274,16 @@ onMounted(async () => {
         <span>快捷操作</span>
       </template>
       <div class="action-btns">
-        <el-button type="primary">
+        <el-button type="primary" @click="goToShortcut('/admin/posts/new')">
           <el-icon><EditPen /></el-icon>写文章
         </el-button>
-        <el-button>
+        <el-button @click="goToShortcut('/admin/moments')">
           <el-icon><ChatDotRound /></el-icon>发说说
         </el-button>
-        <el-button>
+        <el-button @click="goToShortcut('/admin/books')">
           <el-icon><Upload /></el-icon>上传图书
         </el-button>
-        <el-button>
+        <el-button @click="goToShortcut('/admin/files')">
           <el-icon><Picture /></el-icon>上传图片
         </el-button>
       </div>
@@ -341,7 +346,8 @@ onMounted(async () => {
 .trend-chart {
   display: block;
   width: 100%;
-  height: 240px;
+  height: auto;
+  aspect-ratio: 720 / 260;
   overflow: visible;
 }
 .chart-grid {
@@ -442,9 +448,20 @@ onMounted(async () => {
 }
 
 .action-btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-btns .el-button {
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  padding: 0 12px;
+}
+
+.action-btns :deep(.el-icon) {
+  font-size: 16px;
 }
 
 .welcome-card {
@@ -477,8 +494,8 @@ onMounted(async () => {
     align-items: flex-start;
     flex-direction: column;
   }
-  .trend-chart {
-    height: 190px;
+  .action-btns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

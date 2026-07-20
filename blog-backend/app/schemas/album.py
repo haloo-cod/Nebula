@@ -23,6 +23,12 @@ class PhotoCreate(BaseModel):
     caption: str | None = None
 
 
+class PhotoUpdate(BaseModel):
+    """更新相册照片字段（管理员）。"""
+
+    caption: str | None = None
+
+
 class AlbumCreate(BaseModel):
     """创建相册（管理员）"""
     title: str
@@ -45,6 +51,7 @@ class AlbumResponse(BaseModel):
     description: str
     orientation: str
     cover_url: str          # 封面 URL：cover_image_id 指定 or 第一张照片
+    cover_image_id: int | None = None
     photo_count: int
     date: str               # 格式化的创建时间 'YYYY.MM'
     created_at: datetime
@@ -60,6 +67,7 @@ class AlbumDetailResponse(BaseModel):
     description: str
     orientation: str
     cover_url: str
+    cover_image_id: int | None = None
     photo_count: int
     date: str
     created_at: datetime

@@ -11,6 +11,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { api, getToken, resolveUrl, BASE_URL } from '@/api/client'
+import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 后端文章详情（与 PostDetail schema 对应） */
 interface PostDetail {
@@ -36,6 +37,7 @@ const router = useRouter()
 /** 是否为编辑模式（路由参数有 slug 且不为 'new'） */
 const isEdit = ref(false)
 const saving = ref(false)
+const showCoverPicker = ref(false)
 
 /** 表单数据 */
 const form = ref({
@@ -197,6 +199,11 @@ function removeTag(tag: string) {
   form.value.tags = form.value.tags.filter((t) => t !== tag)
 }
 
+/** 从已上传图片中选择文章封面。 */
+function handleCoverSelected(image: PickerImage) {
+  form.value.cover_url = image.url
+}
+
 /** 返回列表 */
 function goBack() {
   router.push('/admin/posts')
@@ -277,7 +284,24 @@ onBeforeUnmount(() => {
           <el-input v-model="form.description" type="textarea" :rows="2" placeholder="文章摘要" />
         </el-form-item>
         <el-form-item label="封面图">
-          <el-input v-model="form.cover_url" placeholder="封面图 URL（可从图床上传后粘贴）" />
+          <div class="cover-field">
+            <img
+              v-if="form.cover_url"
+              :src="resolveUrl(form.cover_url)"
+              alt="文章封面预览"
+              class="cover-preview"
+            />
+            <div v-else class="cover-empty">未设置封面</div>
+            <div class="cover-actions">
+              <div>
+                <el-button type="primary" plain @click="showCoverPicker = true">
+                  从已上传图片选择
+                </el-button>
+                <el-button v-if="form.cover_url" @click="form.cover_url = ''">清空</el-button>
+              </div>
+              <el-input v-model="form.cover_url" placeholder="也可手动填写封面图 URL" />
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="标签">
           <div class="tags-input">
@@ -306,6 +330,11 @@ onBeforeUnmount(() => {
     <el-card shadow="never" class="editor-card">
       <div ref="editorRef" class="vditor-container"></div>
     </el-card>
+    <ImagePickerDialog
+      v-model="showCoverPicker"
+      title="选择文章封面"
+      @select="handleCoverSelected"
+    />
   </div>
 </template>
 
@@ -351,6 +380,36 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
+.cover-field {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.cover-preview,
+.cover-empty {
+  width: 180px;
+  height: 100px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.cover-empty {
+  display: grid;
+  place-items: center;
+  color: var(--admin-text-secondary);
+  background: var(--admin-fill-bg, #f5f7fa);
+  font-size: 12px;
+}
+
+.cover-actions {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .tag-item {
   margin: 0;
 }
@@ -366,5 +425,16 @@ onBeforeUnmount(() => {
 
 .vditor-container {
   min-height: 500px;
+}
+
+@media (max-width: 640px) {
+  .cover-field {
+    flex-direction: column;
+  }
+
+  .cover-preview,
+  .cover-empty {
+    width: 100%;
+  }
 }
 </style>

@@ -86,6 +86,7 @@ async def list_albums(db: AsyncSession) -> list[dict]:
             "description": album.description,
             "orientation": album.orientation,
             "cover_url": cover_url,
+            "cover_image_id": album.cover_image_id,
             "photo_count": photo_count,
             "date": _format_date(album.created_at),
             "created_at": album.created_at,
@@ -127,6 +128,7 @@ async def get_album_detail(db: AsyncSession, album_id: int) -> dict | None:
         "description": album.description,
         "orientation": album.orientation,
         "cover_url": cover_url,
+        "cover_image_id": album.cover_image_id,
         "photo_count": len(photos_data),
         "date": _format_date(album.created_at),
         "created_at": album.created_at,
@@ -253,6 +255,32 @@ async def remove_photo(db: AsyncSession, album_id: int, photo_id: int) -> bool:
     await db.delete(photo)
     await db.commit()
     return True
+
+
+async def update_photo(
+    db: AsyncSession, album_id: int, photo_id: int, caption: str | None
+) -> dict | None:
+    """更新相册照片说明。"""
+    result = await db.execute(
+        select(AlbumPhoto).where(
+            AlbumPhoto.id == photo_id,
+            AlbumPhoto.album_id == album_id,
+        )
+    )
+    photo = result.scalar_one_or_none()
+    if not photo:
+        return None
+    image_url = await db.scalar(select(UploadedImage.url).where(UploadedImage.id == photo.image_id))
+    photo.caption = caption.strip() if caption and caption.strip() else None
+    await db.commit()
+    await db.refresh(photo)
+    return {
+        "id": photo.id,
+        "url": image_url or "",
+        "caption": photo.caption,
+        "sort_order": photo.sort_order,
+        "created_at": photo.created_at,
+    }
 
 
 async def reorder_photos(db: AsyncSession, album_id: int, ids: list[int]) -> None:

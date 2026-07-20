@@ -20,11 +20,13 @@ export interface PickerImage {
 const props = defineProps<{
   modelValue: boolean
   title?: string
+  multiple?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   select: [image: PickerImage]
+  'select-many': [images: PickerImage[]]
 }>()
 
 const images = ref<PickerImage[]>([])
@@ -33,6 +35,7 @@ const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
 const keyword = ref('')
 const selectedId = ref<number | null>(null)
+const selectedIds = ref<number[]>([])
 
 const filteredImages = computed(() => {
   const query = keyword.value.trim().toLowerCase()
@@ -66,10 +69,26 @@ async function loadImages() {
 }
 
 function choose(image: PickerImage) {
+  if (props.multiple) {
+    selectedIds.value = selectedIds.value.includes(image.id)
+      ? selectedIds.value.filter((id) => id !== image.id)
+      : [...selectedIds.value, image.id]
+    return
+  }
   selectedId.value = image.id
 }
 
 function confirm() {
+  if (props.multiple) {
+    const selected = images.value.filter((item) => selectedIds.value.includes(item.id))
+    if (!selected.length) {
+      ElMessage.warning('请至少选择一张图片')
+      return
+    }
+    emit('select-many', selected)
+    close()
+    return
+  }
   const image = images.value.find((item) => item.id === selectedId.value)
   if (!image) {
     ElMessage.warning('请选择一张图片')
@@ -118,6 +137,7 @@ watch(
   (visible) => {
     if (visible) {
       selectedId.value = null
+      selectedIds.value = []
       keyword.value = ''
       void loadImages()
     }
@@ -153,7 +173,7 @@ watch(
         :key="image.id"
         type="button"
         class="image-option"
-        :class="{ selected: selectedId === image.id }"
+        :class="{ selected: multiple ? selectedIds.includes(image.id) : selectedId === image.id }"
         @click="choose(image)"
       >
         <img :src="resolveUrl(image.url)" :alt="image.original_name" />
@@ -167,7 +187,7 @@ watch(
 
     <template #footer>
       <el-button @click="close">取消</el-button>
-      <el-button type="primary" @click="confirm">确认选择</el-button>
+      <el-button type="primary" @click="confirm">确认选择{{ multiple ? `（${selectedIds.length}）` : '' }}</el-button>
     </template>
   </el-dialog>
 </template>

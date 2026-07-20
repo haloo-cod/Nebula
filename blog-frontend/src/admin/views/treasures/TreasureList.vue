@@ -432,6 +432,25 @@ onMounted(() => {
 .table-card {
   border-radius: 12px;
 }
+
+/* 弹窗内容过长时只滚动表单，底部操作区始终留在视口内。 */
+:deep(.el-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  margin: 24px auto;
+}
+
+:deep(.el-dialog__header),
+:deep(.el-dialog__footer) {
+  flex-shrink: 0;
+}
+
+:deep(.el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .icon-cell {
   font-size: 20px;
 }
