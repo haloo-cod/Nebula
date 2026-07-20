@@ -373,8 +373,9 @@ const containerClass = computed(() => {
    ============================================ */
 .home-panels {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   top: 90px;
   z-index: 15;
   width: 85%;
@@ -459,8 +460,9 @@ const containerClass = computed(() => {
    ============================================ */
 .home-bottom {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   top: calc(50vh + 40px);
   z-index: 15;
   width: 85%;

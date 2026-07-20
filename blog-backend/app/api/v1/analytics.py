@@ -21,6 +21,7 @@ from app.schemas.analytics import (
     AnalyticsVisitorResponse,
 )
 from app.services.analytics import get_client_ip, hash_ip, utc_now
+from app.services.rate_limit import enforce_event_limit
 
 router = APIRouter(prefix="/analytics", tags=["访问统计"])
 TRACKABLE_EVENTS = {"page_view", "book_open", "book_download", "file_download", "zip_download"}
@@ -41,6 +42,8 @@ async def record_event(
     if not settings.ANALYTICS_ENABLED or data.event_type not in TRACKABLE_EVENTS:
         return
     ip_address = get_client_ip(request)
+    ip_hash = hash_ip(ip_address)
+    await enforce_event_limit(db, ip_hash, "analytics_ingest", 60, 30)
     event = AnalyticsEvent(
         event_type=data.event_type,
         path=data.path,
@@ -48,7 +51,7 @@ async def record_event(
         referrer=data.referrer,
         user_agent=request.headers.get("user-agent", "")[:1000],
         ip_address=ip_address,
-        ip_hash=hash_ip(ip_address),
+        ip_hash=ip_hash,
         visitor_id=data.visitor_id,
         user_id=None,
         occurred_at=utc_now(),

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,8 @@ from app.utils.security import (
     hash_token,
     verify_password,
 )
+from app.services.analytics import get_client_ip, hash_ip
+from app.services.rate_limit import enforce_event_limit
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 REFRESH_COOKIE = "blog_refresh_token"
@@ -84,10 +86,14 @@ async def _create_session(user: User, db: AsyncSession, response: Response) -> T
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """创建普通用户并立即登录。"""
+    await enforce_event_limit(
+        db, hash_ip(get_client_ip(request)), "auth_register", 3600, 10
+    )
 
     result = await db.execute(
         select(User).where(or_(User.username == body.username, User.email == body.email))
@@ -140,10 +146,12 @@ async def confirm_email_verification(token: str, db: AsyncSession = Depends(get_
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """使用用户名或邮箱登录。"""
+    await enforce_event_limit(db, hash_ip(get_client_ip(request)), "auth_login", 900, 10)
 
     identity = body.username.strip()
     result = await db.execute(

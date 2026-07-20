@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     BOOK_ARCHIVE_DIR: Path = UPLOAD_DIR / "book-archives"
     BOOK_ARCHIVE_EXPIRE_HOURS: int = 24 * 7
 
+    # ===== 生产配置保护 =====
+    ENVIRONMENT: str = "development"
+
     # 图片上传限制
     MAX_IMAGE_SIZE: int = 10 * 1024 * 1024  # 10 MB
     ALLOWED_IMAGE_TYPES: list[str] = [
@@ -70,3 +73,24 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def validate_production_settings() -> None:
+    """阻止生产环境使用开发密钥和默认管理员密码。"""
+    if settings.ENVIRONMENT.lower() not in {"production", "prod"}:
+        return
+    invalid = []
+    if settings.DEBUG:
+        invalid.append("DEBUG 必须为 false")
+    if len(settings.SECRET_KEY) < 32 or settings.SECRET_KEY in {"change-me-in-production", "dev-secret-key-change-in-prod"}:
+        invalid.append("SECRET_KEY 必须是至少 32 个字符的随机值")
+    if settings.ADMIN_PASSWORD in {"admin123", "change-me-in-production"} or len(settings.ADMIN_PASSWORD) < 12:
+        invalid.append("ADMIN_PASSWORD 必须是至少 12 个字符的非默认密码")
+    if len(settings.ANALYTICS_HASH_SALT) < 32 or settings.ANALYTICS_HASH_SALT == "change-analytics-salt":
+        invalid.append("ANALYTICS_HASH_SALT 必须是至少 32 个字符的随机值")
+    if not settings.COOKIE_SECURE:
+        invalid.append("HTTPS 生产环境必须启用 COOKIE_SECURE")
+    if not settings.FRONTEND_URL.startswith("https://"):
+        invalid.append("FRONTEND_URL 必须使用 HTTPS")
+    if invalid:
+        raise RuntimeError("生产配置不安全: " + "; ".join(invalid))

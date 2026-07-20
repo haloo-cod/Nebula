@@ -96,13 +96,15 @@ MAX_IMAGE_SIZE=10485760  # 10MB
 # API 开关：设为 false 时禁用所有 API 调用，使用本地静态数据
 VITE_USE_API=true
 
-# API 地址（上线时改为实际域名）
-# VITE_API_BASE_URL=https://your-domain.com
+# 同域生产部署留空；本地开发可填写 http://localhost:8000
+VITE_API_BASE_URL=
 ```
 
 ---
 
 ## 生产部署
+
+以下方案适用于 `starlitn.top` 在一台 Ubuntu 服务器上的同域部署：Nginx 对外提供 HTTPS 和前端静态文件，`/api/` 反向代理到仅监听本机的 FastAPI，SQLite 和上传目录保留在后端目录。
 
 ### 方案一：Nginx 反向代理（推荐）
 
@@ -130,10 +132,10 @@ pnpm build
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name starlitn.top www.starlitn.top;
 
     # 前端静态文件
-    root /path/to/blog-frontend/dist;
+    root /srv/starlit/blog-frontend/dist;
     index index.html;
 
     # SPA fallback（Hash 模式其实不需要，但保险起见）
@@ -149,11 +151,14 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    # 静态文件（上传的图片/EPUB）
-    location /uploads/ {
+    # 只允许公开图片通过应用路由访问；EPUB、普通文件和 ZIP 必须经过 API 鉴权。
+    location /uploads/images/ {
         proxy_pass http://127.0.0.1:8000;
-        # 或者直接映射目录（更高效）：
-        # alias /path/to/blog-backend/uploads/;
+    }
+
+    # 禁止访问隐藏文件
+    location ~ /\. {
+        deny all;
     }
 }
 ```
@@ -165,7 +170,7 @@ cd blog-backend
 source .venv/bin/activate
 
 # 使用 gunicorn + uvicorn worker
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+    gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
 
 # 或使用 systemd 管理（推荐）
 ```
@@ -181,9 +186,9 @@ After=network.target
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/path/to/blog-backend
-Environment="PATH=/path/to/blog-backend/.venv/bin"
-ExecStart=/path/to/blog-backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+WorkingDirectory=/srv/starlit/blog-backend
+Environment="PATH=/srv/starlit/blog-backend/.venv/bin"
+ExecStart=/srv/starlit/blog-backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=always
 RestartSec=5
 
@@ -194,6 +199,49 @@ WantedBy=multi-user.target
 ### 方案二：Docker Compose
 
 > 待补充（TODO）
+
+### `starlitn.top` 上线前配置
+
+前端同域部署时，在构建前创建 `blog-frontend/.env.production`：
+
+```env
+VITE_USE_API=true
+VITE_API_BASE_URL=
+```
+
+后端 `/srv/starlit/blog-backend/.env` 至少设置：
+
+```env
+ENVIRONMENT=production
+DEBUG=false
+FRONTEND_URL=https://starlitn.top
+CORS_ORIGINS=["https://starlitn.top","https://www.starlitn.top"]
+COOKIE_SECURE=true
+TRUST_PROXY_HEADERS=true
+REQUIRE_EMAIL_VERIFICATION=false
+```
+
+`SECRET_KEY`、`ADMIN_PASSWORD` 和 `ANALYTICS_HASH_SALT` 必须替换成随机值，生产配置校验会拒绝默认值。不要把 `.env` 提交到 Git。
+
+启动并启用服务：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now blog-backend
+curl http://127.0.0.1:8000/health
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+HTTPS 使用 Certbot：
+
+```bash
+sudo certbot --nginx -d starlitn.top -d www.starlitn.top
+```
+
+限流记录写入 SQLite 的 `rate_limit_hits` 表，两个 Uvicorn worker 可以共享限流数据。高并发或多服务器部署时再迁移到 Redis。启动时会清理两天以前的限流记录。
+
+防火墙只开放 SSH、HTTP 和 HTTPS；8000 端口不对公网开放。
 
 ---
 
@@ -250,6 +298,16 @@ pnpm dev
 ```bash
 sudo certbot --nginx -d your-domain.com
 ```
+
+生产上线检查：
+
+```bash
+curl https://starlitn.top/health
+sudo systemctl status blog-backend
+sudo nginx -t
+```
+
+`/health` 会同时检查 FastAPI 进程和 SQLite 连接。访问统计会在应用启动时清理超过 `ANALYTICS_IP_RETENTION_DAYS` 的明细；图书归档会按 `BOOK_ARCHIVE_EXPIRE_HOURS` 清理。
 
 ---
 

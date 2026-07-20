@@ -35,6 +35,8 @@ export default defineConfig({
     },
   },
   build: {
+    // 暂停 CSS 压缩，保留标准 backdrop-filter 声明，避免生产产物只留下前缀版本。
+    cssMinify: false,
     rollupOptions: {
       output: {
         // 手动分包:把体积较大的依赖拆出独立 chunk,优化首屏加载

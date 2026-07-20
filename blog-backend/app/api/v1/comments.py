@@ -1,6 +1,6 @@
 """数据库账户化评论路由。"""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -14,6 +14,8 @@ from app.models.comment import Comment
 from app.models.user import User
 from app.schemas.comment import CommentCreate, CommentItem, CommentListResponse
 from app.utils.security import decode_access_token
+from app.services.analytics import hash_ip, get_client_ip
+from app.services.rate_limit import enforce_event_limit
 
 router = APIRouter(prefix="/comments", tags=["评论"])
 
@@ -122,13 +124,15 @@ async def batch_comment_count(body: BatchCountRequest, db: AsyncSession = Depend
 @router.post("", response_model=CommentItem, status_code=status.HTTP_201_CREATED)
 async def create_comment(
     body: CommentCreate,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """以当前登录账户发表评论。"""
 
     if not user.email_verified and user.email and settings.REQUIRE_EMAIL_VERIFICATION:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="验证邮箱后才能发表评论")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="验证邮箱后才能发表评论")
+    await enforce_event_limit(db, hash_ip(get_client_ip(request)), "comment_create", 3600, 20)
     if body.parent_id:
         parent = await db.get(Comment, body.parent_id)
         if not parent or parent.page_key != body.page_key:

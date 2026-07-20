@@ -17,6 +17,7 @@ from app.models.profile import Profile, SocialLink
 from app.models.study import StudyTodo, ScheduleItem, StudyHistory
 from app.models.site_config import SiteConfig
 from app.models.analytics import AnalyticsEvent
+from app.models.rate_limit import RateLimitHit
 
 __all__ = [
     "Base",
@@ -43,4 +44,5 @@ __all__ = [
     "StudyHistory",
     "SiteConfig",
     "AnalyticsEvent",
+    "RateLimitHit",
 ]

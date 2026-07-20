@@ -27,7 +27,11 @@
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
               <img
@@ -40,7 +44,7 @@
               />
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
 
       <!-- 中层照片(半灰度,悬停向左飞出) -->
@@ -68,7 +72,11 @@
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
               <img
@@ -81,7 +89,7 @@
               />
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
 
       <!-- 封面(最上层,悬停上浮放大 + 遮罩淡入) -->
@@ -113,7 +121,11 @@
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
               <img
@@ -130,7 +142,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
     </div>
 
@@ -148,6 +160,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'
 import type { Album } from '@/types'
 
@@ -237,9 +250,30 @@ function onImageLoad(url: string) {
   border-radius: 8px;
 }
 
-/* 玻璃关闭时的兜底:透明边框 + 白色相纸,即参考站原版观感 */
+/* 关闭液态玻璃时,用背景图副本和 filter 模拟毛玻璃,不受堆叠旋转影响 */
 .unit-glass--fallback {
+  position: relative;
   display: block;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+}
+
+.unit-glass--fallback::before {
+  position: absolute;
+  inset: -18px;
+  z-index: 0;
+  content: '';
+  background-image: inherit;
+  background-size: cover;
+  background-position: center;
+  filter: blur(12px);
+  opacity: 0.72;
+}
+
+.unit-glass--fallback > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* 玻璃包边:内缩出玻璃折射可见的边框区 */

@@ -3,7 +3,15 @@
  * 统一处理 baseURL、认证 token、错误响应
  */
 
-export const BASE_URL = 'http://localhost:8000'
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL
+
+/** API 根地址；同域生产部署使用空字符串，让请求交给当前域名。 */
+export const BASE_URL =
+  configuredBaseUrl !== undefined
+    ? configuredBaseUrl.replace(/\/+$/, '')
+    : import.meta.env.DEV
+      ? 'http://localhost:8000'
+      : ''
 const TOKEN_KEY = 'blog_admin_token'
 
 /**
