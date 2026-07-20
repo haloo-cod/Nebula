@@ -165,7 +165,11 @@ import MomentCarousel from '@/components/panels/MomentCarousel.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
-import { avatar as fallbackAvatar, profile as fallbackProfile, socialLinks as fallbackLinks } from '@/data/profile'
+import {
+  avatar as fallbackAvatar,
+  profile as fallbackProfile,
+  socialLinks as fallbackLinks,
+} from '@/data/profile'
 import { fetchProfile } from '@/api/profile'
 import type { SocialLink } from '@/types'
 
@@ -511,7 +515,6 @@ const containerClass = computed(() => {
   height: 100%;
   box-sizing: border-box;
 }
-
 
 @media (max-width: 768px) {
   .home-bottom {

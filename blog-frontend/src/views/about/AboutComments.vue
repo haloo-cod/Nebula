@@ -3,7 +3,7 @@
     <h3 class="comments-title">评论 ({{ totalCount }})</h3>
 
     <!-- 输入区 -->
-    <div class="comments-input-wrap">
+    <div v-if="auth.isLoggedIn" class="comments-input-wrap">
       <div class="comments-input-row">
         <input
           ref="inputRef"
@@ -35,6 +35,11 @@
         回复 <strong>@{{ replyTo.author }}</strong>
       </div>
     </div>
+    <div v-else class="comments-login-prompt">
+      <RouterLink :to="{ path: '/login', query: { redirect: $route.fullPath } }"
+        >登录后参与评论</RouterLink
+      >
+    </div>
 
     <!-- 评论列表 -->
     <div v-if="comments.length === 0" class="comments-empty">暂无评论，来抢沙发吧~</div>
@@ -42,7 +47,17 @@
       <template v-for="comment in comments" :key="comment.id">
         <!-- 父评论 -->
         <div class="comment-item">
-          <div class="comment-avatar" :style="{ background: comment.avatarColor }">
+          <img
+            v-if="comment.avatarUrl"
+            class="comment-avatar"
+            :src="resolveUrl(comment.avatarUrl)"
+            alt=""
+          />
+          <div
+            v-else
+            class="comment-avatar"
+            :style="{ background: comment.avatarColor || '#6366f1' }"
+          >
             {{ comment.author.charAt(0) }}
           </div>
           <div class="comment-body">
@@ -52,7 +67,16 @@
               <span class="comment-date">{{ comment.date }}</span>
             </div>
             <p class="comment-content">{{ comment.content }}</p>
-            <button class="comment-reply-btn" @click="startReply(comment)">回复</button>
+            <button v-if="auth.isLoggedIn" class="comment-reply-btn" @click="startReply(comment)">
+              回复
+            </button>
+            <button
+              v-if="comment.canDelete"
+              class="comment-delete-btn"
+              @click="removeComment(comment)"
+            >
+              删除
+            </button>
           </div>
         </div>
 
@@ -63,7 +87,17 @@
             :key="reply.id"
             class="comment-item comment-item--child"
           >
-            <div class="comment-avatar" :style="{ background: reply.avatarColor }">
+            <img
+              v-if="reply.avatarUrl"
+              class="comment-avatar"
+              :src="resolveUrl(reply.avatarUrl)"
+              alt=""
+            />
+            <div
+              v-else
+              class="comment-avatar"
+              :style="{ background: reply.avatarColor || '#6366f1' }"
+            >
               {{ reply.author.charAt(0) }}
             </div>
             <div class="comment-body">
@@ -73,7 +107,16 @@
                 <span class="comment-date">{{ reply.date }}</span>
               </div>
               <p class="comment-content">{{ reply.content }}</p>
-              <button class="comment-reply-btn" @click="startReply(comment)">回复</button>
+              <button v-if="auth.isLoggedIn" class="comment-reply-btn" @click="startReply(comment)">
+                回复
+              </button>
+              <button
+                v-if="reply.canDelete"
+                class="comment-delete-btn"
+                @click="removeComment(reply)"
+              >
+                删除
+              </button>
             </div>
           </div>
         </div>
@@ -84,11 +127,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { RouterLink } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
   fetchComments,
   postComment,
+  deleteComment,
   type CommentItem as ApiCommentItem,
 } from '@/api/comments'
+import { resolveUrl } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 
 /** 评论数据结构（兼容 API 返回的 snake_case 和前端的 camelCase） */
 interface CommentItem {
@@ -97,6 +145,8 @@ interface CommentItem {
   date: string
   content: string
   avatarColor: string
+  avatarUrl?: string
+  canDelete?: boolean
   children?: CommentItem[]
 }
 
@@ -104,6 +154,7 @@ interface CommentItem {
 const props = withDefaults(defineProps<{ pageKey?: string }>(), {
   pageKey: 'about',
 })
+const auth = useAuthStore()
 
 const seedComments: CommentItem[] = [
   {
@@ -159,6 +210,8 @@ function mapApiComment(item: ApiCommentItem): CommentItem {
     date: item.date,
     content: item.content,
     avatarColor: item.avatar_color || '#6366f1',
+    avatarUrl: item.avatar_url,
+    canDelete: item.can_delete,
     children: item.children?.map(mapApiComment) || [],
   }
 }
@@ -197,15 +250,14 @@ function cancelReply() {
 }
 
 async function submitComment() {
+  if (!auth.isLoggedIn) return
   const text = inputText.value.trim()
   if (!text) return
 
   const parentId = replyTo.value?.id || null
-  const author = '访客' + Math.floor(Math.random() * 900 + 100)
-
   try {
     // 调用后端 API 发表评论
-    const newItem = await postComment(props.pageKey, author, text, parentId)
+    const newItem = await postComment(props.pageKey, text, parentId)
     const mapped = mapApiComment(newItem)
 
     if (parentId) {
@@ -219,26 +271,9 @@ async function submitComment() {
     } else {
       comments.value.push(mapped)
     }
-  } catch {
-    // API 失败时本地追加（降级体验）
-    const fallbackComment: CommentItem = {
-      id: Date.now(),
-      author,
-      date: formatDate(),
-      content: text,
-      avatarColor: '#6366f1',
-    }
-    if (parentId) {
-      const parent = findCommentById(comments.value, parentId)
-      if (parent) {
-        if (!parent.children) parent.children = []
-        parent.children.push(fallbackComment)
-      } else {
-        comments.value.push(fallbackComment)
-      }
-    } else {
-      comments.value.push(fallbackComment)
-    }
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '评论发送失败')
+    return
   }
 
   inputText.value = ''
@@ -248,10 +283,15 @@ async function submitComment() {
   })
 }
 
-function formatDate(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+/** 删除本人评论并重新加载评论树。 */
+async function removeComment(comment: CommentItem) {
+  try {
+    await deleteComment(comment.id)
+    await loadComments()
+    ElMessage.success('评论已删除')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '删除失败')
+  }
 }
 
 function findCommentById(list: CommentItem[], id: number): CommentItem | null {
@@ -286,6 +326,19 @@ onMounted(() => {
 /* ===== 输入区 ===== */
 .comments-input-wrap {
   margin-bottom: 0.25rem;
+}
+
+.comments-login-prompt {
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px dashed rgba(140, 185, 255, 0.28);
+  border-radius: 0.75rem;
+  text-align: center;
+}
+
+.comments-login-prompt a {
+  color: rgba(180, 210, 255, 0.9);
+  font-size: 0.82rem;
 }
 
 .comments-input-row {
@@ -482,6 +535,16 @@ onMounted(() => {
   font-size: 0.72rem;
   cursor: pointer;
   transition: color 0.2s ease;
+}
+
+.comment-delete-btn {
+  margin: 0.4rem 0 0 0.7rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255, 120, 120, 0.75);
+  font-size: 0.72rem;
+  cursor: pointer;
 }
 
 .comment-reply-btn:hover {

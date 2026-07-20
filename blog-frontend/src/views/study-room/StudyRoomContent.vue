@@ -111,7 +111,8 @@ defineEmits<{
 }
 
 .timer-time {
-  font-family: 'DS-DIGIT', 'SFMono-Regular', 'Cascadia Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-family:
+    'DS-DIGIT', 'SFMono-Regular', 'Cascadia Mono', 'Cascadia Code', 'Consolas', monospace;
   font-size: 5rem;
   font-weight: 400;
   color: var(--text-primary);

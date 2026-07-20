@@ -60,11 +60,7 @@
 
     <!-- 时间线 -->
     <div class="timeline-section">
-      <div
-        v-for="act in recentActivities"
-        :key="act.id"
-        class="timeline-item"
-      >
+      <div v-for="act in recentActivities" :key="act.id" class="timeline-item">
         <div class="timeline-dot"></div>
         <RouterLink :to="act.url" class="timeline-card">
           <div class="timeline-card-head">
@@ -79,9 +75,7 @@
         </RouterLink>
       </div>
 
-      <div v-if="recentActivities.length === 0" class="timeline-empty">
-        暂无活动记录
-      </div>
+      <div v-if="recentActivities.length === 0" class="timeline-empty">暂无活动记录</div>
     </div>
   </div>
 </template>
@@ -222,7 +216,20 @@ const heatmapDays = computed(() => {
 // 月份标签
 const monthLabels = computed(() => {
   const labels: { name: string; col: number }[] = []
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ]
   let lastMonth = -1
 
   for (let i = 0; i < heatmapDays.value.length; i++) {
@@ -344,11 +351,21 @@ function getCellClass(count: number): string {
   outline-offset: 1px;
 }
 
-.cell-0 { background: rgba(255, 255, 255, 0.06); }
-.cell-1 { background: rgba(74, 222, 128, 0.3); }
-.cell-2 { background: rgba(74, 222, 128, 0.5); }
-.cell-3 { background: rgba(34, 197, 94, 0.7); }
-.cell-4 { background: rgba(22, 163, 74, 0.9); }
+.cell-0 {
+  background: rgba(255, 255, 255, 0.06);
+}
+.cell-1 {
+  background: rgba(74, 222, 128, 0.3);
+}
+.cell-2 {
+  background: rgba(74, 222, 128, 0.5);
+}
+.cell-3 {
+  background: rgba(34, 197, 94, 0.7);
+}
+.cell-4 {
+  background: rgba(22, 163, 74, 0.9);
+}
 
 .heatmap-legend {
   display: flex;
@@ -366,11 +383,21 @@ function getCellClass(count: number): string {
   border-radius: 3px;
 }
 
-.legend-0 { background: rgba(255, 255, 255, 0.06); }
-.legend-1 { background: rgba(74, 222, 128, 0.3); }
-.legend-2 { background: rgba(74, 222, 128, 0.5); }
-.legend-3 { background: rgba(34, 197, 94, 0.7); }
-.legend-4 { background: rgba(22, 163, 74, 0.9); }
+.legend-0 {
+  background: rgba(255, 255, 255, 0.06);
+}
+.legend-1 {
+  background: rgba(74, 222, 128, 0.3);
+}
+.legend-2 {
+  background: rgba(74, 222, 128, 0.5);
+}
+.legend-3 {
+  background: rgba(34, 197, 94, 0.7);
+}
+.legend-4 {
+  background: rgba(22, 163, 74, 0.9);
+}
 
 /* ===== 时间线 ===== */
 .timeline-section {

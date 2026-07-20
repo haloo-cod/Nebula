@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * 图书管理 — 列表页
- * 展示所有图书，支持搜索、上传新书、删除
+ * 图书管理 — 列表与 EPUB 批量上传队列
+ * 批量上传按顺序执行，单本失败不会中断后续文件。
  */
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Upload } from '@element-plus/icons-vue'
-import { api, getToken, resolveUrl } from '@/api/client'
+import { ArrowDown, Close, Download, Rank, RefreshRight, Upload } from '@element-plus/icons-vue'
+import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 
 /** 图书列表项（匹配后端 BookListItem） */
@@ -18,92 +18,496 @@ interface BookItem {
   description: string
   cover_url: string
   file_path: string
+  sort_order: number
   created_at: string
+}
+
+/** 上传队列状态 */
+type UploadStatus = 'pending' | 'uploading' | 'success' | 'skipped' | 'failed'
+
+/** 单本 EPUB 上传任务 */
+interface BookUploadTask {
+  id: string
+  file: File
+  status: UploadStatus
+  progress: number
+  error: string
+}
+
+/** 当前 EPUB 内可选择的封面图片 */
+interface CoverCandidate {
+  item_name: string
+  filename: string
+  media_type: string
+  width: number
+  height: number
+  size: number
+  score: number
+  recommended: boolean
+  preview_data_url: string
 }
 
 const showUploadDialog = ref(false)
 const uploading = ref(false)
-const uploadForm = ref({
-  title: '',
-  author: '',
-  description: '',
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploadQueue = ref<BookUploadTask[]>([])
+const uploadForm = ref({ title: '', author: '', description: '' })
+const showEditDialog = ref(false)
+const savingEdit = ref(false)
+const extractingCover = ref(false)
+const coverInputRef = ref<HTMLInputElement | null>(null)
+const editingBook = ref<BookItem | null>(null)
+const editForm = ref({ title: '', author: '', description: '', cover_url: '', sort_order: 0 })
+const showCoverCandidatesDialog = ref(false)
+const loadingCoverCandidates = ref(false)
+const selectingCover = ref(false)
+const coverCandidates = ref<CoverCandidate[]>([])
+const selectedCandidateName = ref('')
+const showSortDialog = ref(false)
+const loadingSort = ref(false)
+const savingSort = ref(false)
+const sortBooks = ref<BookItem[]>([])
+const draggedSlug = ref('')
+const selectedBooks = ref<BookItem[]>([])
+const downloading = ref(false)
+const downloadProgress = ref(0)
+const downloadStatus = ref('')
+
+const completedCount = computed(
+  () =>
+    uploadQueue.value.filter((task) => task.status === 'success' || task.status === 'skipped')
+      .length,
+)
+const failedCount = computed(
+  () => uploadQueue.value.filter((task) => task.status === 'failed').length,
+)
+const isSingleUpload = computed(() => uploadQueue.value.length === 1)
+
+const {
+  loading,
+  data,
+  keyword,
+  pagination,
+  loadData,
+  handleSearch,
+  handlePageChange,
+  handleSizeChange,
+  handleDelete,
+} = useAdminTable<BookItem>({
+  fetchData: async ({ page, pageSize, keyword: kw }) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (kw) params.set('keyword', kw)
+    return api.get<{ items: BookItem[]; total: number }>(`/api/v1/books?${params}`, true)
+  },
+  deleteItem: async (item) => api.delete(`/api/v1/books/${item.slug}`),
+  defaultPageSize: 15,
 })
-const selectedFile = ref<File | null>(null)
 
-const { loading, data, keyword, pagination, loadData, handleSearch, handlePageChange, handleSizeChange, handleDelete } =
-  useAdminTable<BookItem>({
-    fetchData: async ({ page, pageSize, keyword: kw }) => {
-      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-      if (kw) params.set('keyword', kw)
-      const res = await api.get<{ items: BookItem[]; total: number }>(`/api/v1/books?${params}`, true)
-      return res
-    },
-    deleteItem: async (item) => {
-      await api.delete(`/api/v1/books/${item.slug}`)
-    },
-    defaultPageSize: 15,
-  })
-
-/** 打开上传弹窗 */
+/** 打开上传弹窗并重置队列 */
 function openUpload() {
   uploadForm.value = { title: '', author: '', description: '' }
-  selectedFile.value = null
+  uploadQueue.value = []
   showUploadDialog.value = true
 }
 
-/** 选择文件 */
-function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (input.files && input.files[0]) {
-    const file = input.files[0]
-    if (!file.name.endsWith('.epub')) {
-      ElMessage.warning('只支持 EPUB 格式')
-      return
-    }
-    selectedFile.value = file
-    // 用文件名自动填充标题
-    if (!uploadForm.value.title) {
-      uploadForm.value.title = file.name.replace('.epub', '')
-    }
-  }
+/** 显式打开 EPUB 多选文件选择器 */
+function openFilePicker() {
+  if (!uploading.value) fileInputRef.value?.click()
 }
 
-/** 提交上传 */
+/** 将选择的 EPUB 合并到上传队列，并按文件名去重 */
+function handleFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const selected = Array.from(input.files ?? [])
+  const existingKeys = new Set(
+    uploadQueue.value.map((task) => `${task.file.name}:${task.file.size}`),
+  )
+
+  for (const file of selected) {
+    if (!file.name.toLowerCase().endsWith('.epub')) continue
+    const key = `${file.name}:${file.size}`
+    if (existingKeys.has(key)) continue
+    existingKeys.add(key)
+    uploadQueue.value.push({
+      id: `${file.name}-${file.size}-${file.lastModified}`,
+      file,
+      status: 'pending',
+      progress: 0,
+      error: '',
+    })
+  }
+
+  if (uploadQueue.value.length === 1 && !uploadForm.value.title) {
+    uploadForm.value.title = uploadQueue.value[0].file.name.replace(/\.epub$/i, '')
+  }
+  input.value = ''
+}
+
+/** 从等待队列移除单个文件 */
+function removeTask(taskId: string) {
+  if (uploading.value) return
+  uploadQueue.value = uploadQueue.value.filter((task) => task.id !== taskId)
+}
+
+/** 格式化文件大小 */
+function formatFileSize(size: number): string {
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** 上传单本 EPUB，并报告浏览器侧进度 */
+function uploadBook(task: BookUploadTask): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const formData = new FormData()
+    formData.append('file', task.file)
+    formData.append('title', isSingleUpload.value ? uploadForm.value.title : '')
+    formData.append('author', isSingleUpload.value ? uploadForm.value.author : '')
+    formData.append('description', isSingleUpload.value ? uploadForm.value.description : '')
+
+    xhr.open('POST', `${BASE_URL}/api/v1/books`)
+    const token = getToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) task.progress = Math.round((event.loaded / event.total) * 100)
+    })
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+        return
+      }
+      try {
+        const body = JSON.parse(xhr.responseText) as { detail?: string }
+        const error = new Error(body.detail || `上传失败 (${xhr.status})`)
+        Object.assign(error, { status: xhr.status })
+        reject(error)
+      } catch {
+        reject(new Error(`上传失败 (${xhr.status})`))
+      }
+    })
+    xhr.addEventListener('error', () => reject(new Error('网络错误，上传失败')))
+    xhr.send(formData)
+  })
+}
+
+/** 顺序执行指定任务，重复 slug 标记为跳过，其余失败继续下一本 */
+async function runTasks(tasks: BookUploadTask[]) {
+  uploading.value = true
+  for (const task of tasks) {
+    task.status = 'uploading'
+    task.progress = 0
+    task.error = ''
+    try {
+      await uploadBook(task)
+      task.status = 'success'
+      task.progress = 100
+    } catch (err: unknown) {
+      const error = err as Error & { status?: number }
+      task.status = error.status === 409 ? 'skipped' : 'failed'
+      task.error = error.status === 409 ? '同名图书已存在，已跳过' : error.message
+    }
+  }
+  uploading.value = false
+  await loadData()
+}
+
+/** 上传所有等待项 */
 async function submitUpload() {
-  if (!selectedFile.value) {
+  const pending = uploadQueue.value.filter((task) => task.status === 'pending')
+  if (pending.length === 0) {
     ElMessage.warning('请选择 EPUB 文件')
     return
   }
+  await runTasks(pending)
+  ElMessage.success(`处理完成：成功/跳过 ${completedCount.value} 本，失败 ${failedCount.value} 本`)
+}
 
-  uploading.value = true
+/** 重试全部失败项 */
+async function retryFailed() {
+  const failed = uploadQueue.value.filter((task) => task.status === 'failed')
+  if (failed.length > 0) await runTasks(failed)
+}
+
+/** 上传状态文案 */
+function statusText(task: BookUploadTask): string {
+  const labels: Record<UploadStatus, string> = {
+    pending: '等待中',
+    uploading: `上传中 ${task.progress}%`,
+    success: '成功',
+    skipped: '已跳过',
+    failed: '失败',
+  }
+  return labels[task.status]
+}
+
+/** 更新当前页的批量下载选择。 */
+function handleSelectionChange(rows: unknown[]) {
+  // Element Plus 的表格泛型未从模板推断，这里将选择结果收窄为当前表格行类型。
+  selectedBooks.value = rows as BookItem[]
+}
+
+/** 下载单本 EPUB。 */
+async function downloadBook(book: BookItem) {
+  downloading.value = true
+  try {
+    const response = await fetch(
+      `${BASE_URL}/api/v1/books/${encodeURIComponent(book.slug)}/download`,
+      { headers: { Authorization: `Bearer ${getToken() ?? ''}` }, credentials: 'include' },
+    )
+    if (!response.ok) throw new Error('图书文件下载失败')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${book.title}${book.author ? ` - ${book.author}` : ''}.epub`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '下载失败')
+  } finally {
+    downloading.value = false
+  }
+}
+
+/** 将当前选中的图书打包为 ZIP。 */
+async function downloadSelectedZip() {
+  if (selectedBooks.value.length === 0) return
+  downloading.value = true
+  downloadProgress.value = 0
+  downloadStatus.value = '正在创建打包任务'
+  try {
+    const response = await fetch(`${BASE_URL}/api/v1/books/download-jobs`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getToken() ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ slugs: selectedBooks.value.map((book) => book.slug) }),
+    })
+    if (!response.ok) throw new Error('创建 ZIP 打包任务失败')
+    const created = (await response.json()) as { id: number }
+    const job = await waitForDownloadJob(created.id)
+    const fileResponse = await fetch(`${BASE_URL}${job.download_url}`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      credentials: 'include',
+    })
+    if (!fileResponse.ok) {
+      const body = await fileResponse.json().catch(() => ({ detail: 'ZIP 下载失败' }))
+      throw new Error(body.detail || 'ZIP 下载失败')
+    }
+    const blob = await fileResponse.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'starlit-books.zip'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : 'ZIP 下载失败')
+  } finally {
+    downloading.value = false
+    downloadStatus.value = ''
+  }
+}
+
+/** 轮询后台打包任务状态。 */
+async function waitForDownloadJob(jobId: number): Promise<{ download_url: string }> {
+  for (;;) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    const response = await fetch(`${BASE_URL}/api/v1/books/download-jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: '读取 ZIP 任务状态失败' }))
+      throw new Error(body.detail || '读取 ZIP 任务状态失败')
+    }
+    const job = (await response.json()) as {
+      status: string
+      progress: number
+      completed_books: number
+      total_books: number
+      error_message: string
+      download_url: string | null
+    }
+    downloadProgress.value = job.progress
+    downloadStatus.value = `${job.completed_books}/${job.total_books} 本已打包`
+    if (job.status === 'completed' && job.download_url) return { download_url: job.download_url }
+    if (job.status === 'failed') throw new Error(job.error_message || 'ZIP 打包失败')
+  }
+}
+
+/** 打开图书编辑弹窗 */
+function openEdit(book: BookItem) {
+  editingBook.value = book
+  editForm.value = {
+    title: book.title,
+    author: book.author,
+    description: book.description,
+    cover_url: book.cover_url,
+    sort_order: book.sort_order,
+  }
+  showEditDialog.value = true
+}
+
+/** 保存手动编辑的元数据、封面和排序值 */
+async function saveEdit() {
+  if (!editingBook.value || !editForm.value.title.trim()) {
+    ElMessage.warning('书名不能为空')
+    return
+  }
+  savingEdit.value = true
+  try {
+    await api.put(
+      `/api/v1/books/${encodeURIComponent(editingBook.value.slug)}`,
+      editForm.value,
+      true,
+    )
+    ElMessage.success('图书信息已更新')
+    showEditDialog.value = false
+    await loadData()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '更新失败')
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+/** 打开手动封面文件选择器 */
+function openCoverPicker() {
+  if (!savingEdit.value) coverInputRef.value?.click()
+}
+
+/** 上传自定义封面到图床并自动回填 URL */
+async function handleCoverUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  savingEdit.value = true
   try {
     const formData = new FormData()
-    formData.append('file', selectedFile.value)
-    formData.append('title', uploadForm.value.title)
-    formData.append('author', uploadForm.value.author)
-    formData.append('description', uploadForm.value.description)
-
-    // 使用原生 fetch 因为 api.post 会 JSON.stringify body
+    formData.append('file', file)
     const token = getToken()
-    const resp = await fetch('http://localhost:8000/api/v1/books', {
+    const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     })
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: '上传失败' }))
-      throw new Error(err.detail || '上传失败')
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: '封面上传失败' }))
+      throw new Error(body.detail || '封面上传失败')
     }
-
-    ElMessage.success('图书上传成功')
-    showUploadDialog.value = false
-    loadData()
+    const image = (await response.json()) as { url: string }
+    editForm.value.cover_url = image.url
+    ElMessage.success('封面已上传，保存后生效')
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '上传失败'
-    ElMessage.error(msg)
+    ElMessage.error(err instanceof Error ? err.message : '封面上传失败')
   } finally {
-    uploading.value = false
+    savingEdit.value = false
+    input.value = ''
+  }
+}
+
+/** 使用改进后的规则重新从 EPUB 提取封面 */
+async function extractCover(book: BookItem) {
+  extractingCover.value = true
+  try {
+    await api.post(`/api/v1/books/${encodeURIComponent(book.slug)}/extract-cover`, undefined, true)
+    ElMessage.success('封面已重新提取')
+    await loadData()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '未能识别封面')
+  } finally {
+    extractingCover.value = false
+  }
+}
+
+/** 读取当前图书 EPUB 内的图片并打开封面选择器 */
+async function openCoverCandidates() {
+  if (!editingBook.value) return
+  showCoverCandidatesDialog.value = true
+  loadingCoverCandidates.value = true
+  selectedCandidateName.value = ''
+  coverCandidates.value = []
+  try {
+    coverCandidates.value = await api.get<CoverCandidate[]>(
+      `/api/v1/books/${encodeURIComponent(editingBook.value.slug)}/cover-candidates`,
+      true,
+    )
+    const recommended = coverCandidates.value.find((candidate) => candidate.recommended)
+    selectedCandidateName.value = recommended?.item_name || ''
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '读取 EPUB 图片失败')
+  } finally {
+    loadingCoverCandidates.value = false
+  }
+}
+
+/** 将选中的 EPUB 内图片保存为当前图书封面 */
+async function selectCoverCandidate() {
+  if (!editingBook.value || !selectedCandidateName.value) {
+    ElMessage.warning('请选择一张图片')
+    return
+  }
+  selectingCover.value = true
+  try {
+    const book = await api.post<BookItem>(
+      `/api/v1/books/${encodeURIComponent(editingBook.value.slug)}/select-cover`,
+      { item_name: selectedCandidateName.value },
+      true,
+    )
+    editForm.value.cover_url = book.cover_url
+    editingBook.value.cover_url = book.cover_url
+    showCoverCandidatesDialog.value = false
+    ElMessage.success('已从 EPUB 更新封面')
+    await loadData()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '设置封面失败')
+  } finally {
+    selectingCover.value = false
+  }
+}
+
+/** 加载全部图书并打开全局排序弹窗 */
+async function openSort() {
+  showSortDialog.value = true
+  loadingSort.value = true
+  try {
+    sortBooks.value = await api.get<BookItem[]>('/api/v1/books/admin/all', true)
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '加载排序列表失败')
+  } finally {
+    loadingSort.value = false
+  }
+}
+
+/** 原生拖拽排序：把拖拽项插入目标项当前位置 */
+function moveBook(targetSlug: string) {
+  if (!draggedSlug.value || draggedSlug.value === targetSlug) return
+  const fromIndex = sortBooks.value.findIndex((book) => book.slug === draggedSlug.value)
+  const toIndex = sortBooks.value.findIndex((book) => book.slug === targetSlug)
+  if (fromIndex < 0 || toIndex < 0) return
+  const [book] = sortBooks.value.splice(fromIndex, 1)
+  sortBooks.value.splice(toIndex, 0, book)
+}
+
+/** 保存全局图书顺序 */
+async function saveSort() {
+  savingSort.value = true
+  try {
+    await api.put(
+      '/api/v1/books/reorder',
+      { slugs: sortBooks.value.map((book) => book.slug) },
+      true,
+    )
+    ElMessage.success('排序已保存')
+    showSortDialog.value = false
+    await loadData()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '保存排序失败')
+  } finally {
+    savingSort.value = false
   }
 }
 
@@ -112,7 +516,6 @@ onMounted(() => loadData())
 
 <template>
   <div class="book-list-page">
-    <!-- 顶部操作栏 -->
     <div class="page-header">
       <el-input
         v-model="keyword"
@@ -121,45 +524,88 @@ onMounted(() => loadData())
         style="width: 240px"
         @keyup.enter="handleSearch"
       />
-      <el-button type="primary" @click="openUpload">
-        <el-icon><Upload /></el-icon>上传图书
-      </el-button>
+      <div class="header-actions">
+        <el-dropdown
+          :disabled="selectedBooks.length === 0 || downloading"
+          @command="downloadSelectedZip"
+        >
+          <el-button :icon="Download" :disabled="selectedBooks.length === 0 || downloading">
+            下载选中（{{ selectedBooks.length }}）<el-icon class="el-icon--right"
+              ><ArrowDown
+            /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="zip">打包为 ZIP 下载</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span v-if="downloading" class="download-status">
+          {{ downloadStatus }} {{ downloadProgress }}%
+        </span>
+        <el-button :icon="Rank" @click="openSort">排序管理</el-button>
+        <el-button type="primary" @click="openUpload"
+          ><el-icon><Upload /></el-icon>上传图书</el-button
+        >
+      </div>
     </div>
 
-    <!-- 图书表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="(data as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table
+        :data="data as any"
+        v-loading="loading"
+        stripe
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="48" />
         <el-table-column label="封面" width="80">
           <template #default="{ row }">
-            <img
-              v-if="row.cover_url"
-              :src="resolveUrl(row.cover_url)"
-              class="book-cover"
-              alt=""
-            />
+            <img v-if="row.cover_url" :src="resolveUrl(row.cover_url)" class="book-cover" alt="" />
             <div v-else class="book-cover-placeholder">无</div>
           </template>
         </el-table-column>
         <el-table-column prop="title" label="书名" min-width="200" />
         <el-table-column prop="author" label="作者" width="150" />
+        <el-table-column prop="sort_order" label="排序" width="70" />
         <el-table-column prop="description" label="简介" min-width="200">
-          <template #default="{ row }">
-            {{ row.description.slice(0, 50) }}{{ row.description.length > 50 ? '...' : '' }}
-          </template>
+          <template #default="{ row }"
+            >{{ row.description.slice(0, 50)
+            }}{{ row.description.length > 50 ? '...' : '' }}</template
+          >
         </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="170">
-          <template #default="{ row }">
-            {{ row.created_at?.slice(0, 10) }}
-          </template>
+          <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="270" fixed="right">
           <template #default="{ row }: { row: any }">
-            <el-button type="danger" link size="small" @click="handleDelete(row, `「${row.title}」`)">删除</el-button>
+            <el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button
+              type="success"
+              link
+              size="small"
+              :loading="downloading"
+              @click="downloadBook(row)"
+              >下载</el-button
+            >
+            <el-button
+              type="warning"
+              link
+              size="small"
+              :loading="extractingCover"
+              @click="extractCover(row)"
+              >重提封面</el-button
+            >
+            <el-button
+              type="danger"
+              link
+              size="small"
+              @click="handleDelete(row, `「${row.title}」`)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
-
-      <!-- 分页 -->
       <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
@@ -173,26 +619,235 @@ onMounted(() => loadData())
       </div>
     </el-card>
 
-    <!-- 上传图书弹窗 -->
-    <el-dialog v-model="showUploadDialog" title="上传图书" width="480px">
+    <el-dialog
+      v-model="showUploadDialog"
+      title="上传图书"
+      width="680px"
+      :close-on-click-modal="!uploading"
+    >
+      <div class="file-picker-row">
+        <el-button plain :icon="Upload" :disabled="uploading" @click="openFilePicker"
+          >选择 EPUB（可多选）</el-button
+        >
+        <span>已选择 {{ uploadQueue.length }} 本</span>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".epub,application/epub+zip"
+          multiple
+          class="file-input"
+          tabindex="-1"
+          @change="handleFileChange"
+        />
+      </div>
+
+      <el-alert
+        v-if="uploadQueue.length > 1"
+        title="批量模式将自动读取 EPUB 元数据，并按顺序逐本上传。重复图书会跳过。"
+        type="info"
+        :closable="false"
+      />
+
+      <el-form v-if="isSingleUpload" label-position="top" class="single-book-form">
+        <el-form-item label="书名"
+          ><el-input v-model="uploadForm.title" placeholder="留空则读取 EPUB 元数据"
+        /></el-form-item>
+        <el-form-item label="作者"
+          ><el-input v-model="uploadForm.author" placeholder="留空则读取 EPUB 元数据"
+        /></el-form-item>
+        <el-form-item label="简介"
+          ><el-input
+            v-model="uploadForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="留空则读取 EPUB 元数据"
+        /></el-form-item>
+      </el-form>
+
+      <div class="upload-queue">
+        <el-empty
+          v-if="uploadQueue.length === 0"
+          description="尚未选择 EPUB 文件"
+          :image-size="72"
+        />
+        <div v-for="task in uploadQueue" :key="task.id" class="upload-task">
+          <div class="task-main">
+            <span class="task-name">{{ task.file.name }}</span>
+            <span class="task-size">{{ formatFileSize(task.file.size) }}</span>
+            <el-tag
+              :type="
+                task.status === 'success'
+                  ? 'success'
+                  : task.status === 'failed'
+                    ? 'danger'
+                    : task.status === 'skipped'
+                      ? 'warning'
+                      : 'info'
+              "
+              size="small"
+              >{{ statusText(task) }}</el-tag
+            >
+            <el-button
+              v-if="task.status === 'pending' && !uploading"
+              link
+              :icon="Close"
+              @click="removeTask(task.id)"
+            />
+          </div>
+          <el-progress
+            v-if="task.status === 'uploading'"
+            :percentage="task.progress"
+            :show-text="false"
+            :stroke-width="6"
+          />
+          <p v-if="task.error" class="task-error">{{ task.error }}</p>
+        </div>
+      </div>
+
+      <template #footer>
+        <span class="batch-summary"
+          >完成 {{ completedCount }}/{{ uploadQueue.length }}，失败 {{ failedCount }}</span
+        >
+        <el-button v-if="failedCount > 0 && !uploading" :icon="RefreshRight" @click="retryFailed"
+          >重试失败项</el-button
+        >
+        <el-button :disabled="uploading" @click="showUploadDialog = false">关闭</el-button>
+        <el-button
+          type="primary"
+          :loading="uploading"
+          :disabled="uploadQueue.length === 0"
+          @click="submitUpload"
+          >开始上传</el-button
+        >
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showEditDialog" title="编辑图书" width="560px">
       <el-form label-position="top">
-        <el-form-item label="EPUB 文件">
-          <input type="file" accept=".epub" @change="handleFileChange" />
-          <span v-if="selectedFile" class="file-name">{{ selectedFile.name }}</span>
+        <div class="edit-grid">
+          <el-form-item label="书名"><el-input v-model="editForm.title" /></el-form-item>
+          <el-form-item label="作者"><el-input v-model="editForm.author" /></el-form-item>
+        </div>
+        <el-form-item label="简介"
+          ><el-input v-model="editForm.description" type="textarea" :rows="3"
+        /></el-form-item>
+        <el-form-item label="封面">
+          <div class="cover-editor">
+            <img
+              v-if="editForm.cover_url"
+              :src="resolveUrl(editForm.cover_url)"
+              class="cover-preview"
+              alt="封面预览"
+            />
+            <div v-else class="cover-preview cover-preview--empty">无封面</div>
+            <div class="cover-actions">
+              <el-button plain :icon="Upload" @click="openCoverPicker">上传封面</el-button>
+              <el-button plain @click="openCoverCandidates">从 EPUB 选择</el-button>
+              <el-button v-if="editForm.cover_url" @click="editForm.cover_url = ''"
+                >清空封面</el-button
+              >
+              <input
+                ref="coverInputRef"
+                type="file"
+                accept="image/*"
+                class="file-input"
+                tabindex="-1"
+                @change="handleCoverUpload"
+              />
+            </div>
+          </div>
+          <el-input v-model="editForm.cover_url" placeholder="也可手动填写封面 URL" />
         </el-form-item>
-        <el-form-item label="书名">
-          <el-input v-model="uploadForm.title" placeholder="留空则从文件名推断" />
-        </el-form-item>
-        <el-form-item label="作者">
-          <el-input v-model="uploadForm.author" placeholder="作者名" />
-        </el-form-item>
-        <el-form-item label="简介">
-          <el-input v-model="uploadForm.description" type="textarea" :rows="3" placeholder="图书简介" />
-        </el-form-item>
+        <el-form-item label="排序值（越小越靠前）"
+          ><el-input-number v-model="editForm.sort_order" :min="0"
+        /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="submitUpload">上传</el-button>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" :loading="savingEdit" @click="saveEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="showCoverCandidatesDialog"
+      title="从当前 EPUB 选择封面"
+      width="820px"
+      append-to-body
+    >
+      <el-alert
+        title="选择只会更新这本图书的封面，不会修改 EPUB 文件。推荐项是系统自动识别的结果。"
+        type="info"
+        :closable="false"
+      />
+      <div v-loading="loadingCoverCandidates" class="candidate-grid">
+        <el-empty
+          v-if="!loadingCoverCandidates && coverCandidates.length === 0"
+          description="EPUB 内没有可用图片"
+        />
+        <button
+          v-for="candidate in coverCandidates"
+          :key="candidate.item_name"
+          type="button"
+          class="candidate-card"
+          :class="{ 'candidate-card--selected': selectedCandidateName === candidate.item_name }"
+          @click="selectedCandidateName = candidate.item_name"
+        >
+          <div class="candidate-image-wrap">
+            <img
+              :src="candidate.preview_data_url"
+              class="candidate-image"
+              :alt="candidate.filename"
+            />
+            <el-tag v-if="candidate.recommended" class="candidate-tag" type="success" size="small"
+              >推荐</el-tag
+            >
+          </div>
+          <span class="candidate-name" :title="candidate.item_name">{{ candidate.filename }}</span>
+          <span class="candidate-meta"
+            >{{ candidate.width }} × {{ candidate.height }} ·
+            {{ formatFileSize(candidate.size) }}</span
+          >
+        </button>
+      </div>
+      <template #footer>
+        <el-button @click="showCoverCandidatesDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="selectingCover"
+          :disabled="!selectedCandidateName"
+          @click="selectCoverCandidate"
+          >设为封面</el-button
+        >
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showSortDialog" title="图书全局排序" width="620px">
+      <el-alert
+        title="拖动图书调整顺序，保存后用户端和搜索结果都会使用该顺序。"
+        type="info"
+        :closable="false"
+      />
+      <div v-loading="loadingSort" class="sort-list">
+        <div
+          v-for="(book, index) in sortBooks"
+          :key="book.slug"
+          class="sort-item"
+          draggable="true"
+          @dragstart="draggedSlug = book.slug"
+          @dragover.prevent
+          @drop.prevent="moveBook(book.slug)"
+          @dragend="draggedSlug = ''"
+        >
+          <el-icon class="drag-handle"><Rank /></el-icon>
+          <span class="sort-index">{{ index + 1 }}</span>
+          <img v-if="book.cover_url" :src="resolveUrl(book.cover_url)" class="sort-cover" alt="" />
+          <span class="sort-title">{{ book.title }}</span>
+          <span class="sort-author">{{ book.author }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showSortDialog = false">取消</el-button>
+        <el-button type="primary" :loading="savingSort" @click="saveSort">保存顺序</el-button>
       </template>
     </el-dialog>
   </div>
@@ -204,45 +859,238 @@ onMounted(() => loadData())
   flex-direction: column;
   gap: 16px;
 }
-
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-
+.header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.download-status {
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .table-card {
   border-radius: 12px;
 }
-
 .book-cover {
   width: 40px;
   height: 56px;
   object-fit: cover;
   border-radius: 4px;
 }
-
 .book-cover-placeholder {
-  width: 40px;
-  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f0f0;
+  width: 40px;
+  height: 56px;
   border-radius: 4px;
+  background: var(--admin-fill-bg, var(--el-fill-color-light));
+  color: var(--admin-text-secondary, var(--el-text-color-secondary));
   font-size: 12px;
-  color: #999;
 }
-
-.file-name {
-  margin-left: 8px;
-  font-size: 13px;
-  color: #666;
-}
-
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+.file-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 13px;
+}
+.file-input {
+  display: none;
+}
+.single-book-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+  margin-top: 14px;
+}
+.single-book-form :deep(.el-form-item:last-child) {
+  grid-column: 1 / -1;
+}
+.upload-queue {
+  max-height: 310px;
+  margin-top: 14px;
+  overflow-y: auto;
+}
+.upload-task {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--admin-border-color, #e4e7ed);
+}
+.task-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.task-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-size,
+.batch-summary {
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+.task-error {
+  margin: 5px 0 0;
+  color: #f56c6c;
+  font-size: 12px;
+}
+.batch-summary {
+  margin-right: auto;
+}
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+.cover-editor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.cover-preview {
+  width: 72px;
+  height: 100px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+.cover-preview--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--admin-fill-bg, var(--el-fill-color-light));
+  color: var(--admin-text-secondary, var(--el-text-color-secondary));
+  font-size: 12px;
+}
+.cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 14px;
+  min-height: 180px;
+  max-height: 560px;
+  margin-top: 14px;
+  overflow-y: auto;
+}
+.candidate-card {
+  min-width: 0;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--admin-fill-bg, var(--el-fill-color-light));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.candidate-card:hover {
+  transform: translateY(-2px);
+}
+.candidate-card--selected {
+  border-color: var(--el-color-primary);
+}
+.candidate-image-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 190px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--admin-panel-bg, var(--el-bg-color));
+}
+.candidate-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.candidate-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.candidate-name,
+.candidate-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.candidate-name {
+  margin-top: 7px;
+  font-size: 13px;
+}
+.candidate-meta {
+  margin-top: 3px;
+  color: var(--admin-text-secondary, var(--el-text-color-secondary));
+  font-size: 11px;
+}
+.sort-list {
+  max-height: 480px;
+  margin-top: 14px;
+  overflow-y: auto;
+}
+.sort-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--admin-border-color, #e4e7ed);
+  cursor: grab;
+}
+.sort-item:active {
+  cursor: grabbing;
+}
+.drag-handle,
+.sort-index,
+.sort-author {
+  color: var(--admin-text-secondary, #909399);
+}
+.sort-index {
+  width: 28px;
+  font-size: 12px;
+}
+.sort-cover {
+  width: 32px;
+  height: 44px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+.sort-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sort-author {
+  max-width: 130px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

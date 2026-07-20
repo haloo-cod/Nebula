@@ -64,4 +64,7 @@ async def reorder(
     _: User = Depends(require_admin),
 ):
     """批量调整轮播图排序（管理员）"""
-    await reorder_slides(db, data.ids)
+    try:
+        await reorder_slides(db, data.ids)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

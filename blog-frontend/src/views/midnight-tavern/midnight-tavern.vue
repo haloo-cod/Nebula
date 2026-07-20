@@ -5,8 +5,14 @@
 
     <RouterLink class="tavern-exit" to="/">离开酒馆</RouterLink>
     <div class="tavern-auth" aria-label="账号入口">
-      <button class="auth-btn" type="button">登录</button>
-      <button class="auth-btn auth-btn--primary" type="button">注册</button>
+      <template v-if="auth.initialized && !auth.isLoggedIn">
+        <button class="auth-btn" type="button" @click="goToLogin">登录</button>
+        <button class="auth-btn auth-btn--primary" type="button" @click="goToRegister">注册</button>
+      </template>
+      <template v-else-if="auth.initialized">
+        <span class="auth-user">{{ auth.user?.display_name || auth.user?.username }}</span>
+        <button class="auth-btn" type="button" @click="logoutUser">退出</button>
+      </template>
     </div>
 
     <p class="tavern-top-title">今晚的门,只为晚归的人开</p>
@@ -79,7 +85,7 @@
       </div>
     </Transition>
 
-    <button class="write-trigger" type="button" @click="composerOpen = true">投下一只瓶子</button>
+    <button class="write-trigger" type="button" @click="openComposer">投下一只瓶子</button>
 
     <Transition name="composer-fade">
       <div
@@ -114,7 +120,11 @@
         </label>
         <label class="composer-field">
           <span>想封进瓶子里的话</span>
-          <textarea v-model="composeBody" rows="5" placeholder="烦心事或开心事,都可以封进这里。"></textarea>
+          <textarea
+            v-model="composeBody"
+            rows="5"
+            placeholder="烦心事或开心事,都可以封进这里。"
+          ></textarea>
         </label>
         <button class="composer-submit" type="button" :disabled="submitting" @click="handleSubmit">
           {{ submitting ? '封瓶中...' : '封好瓶塞' }}
@@ -126,10 +136,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import tavernBg from '@/assets/img/test7.jfif'
 import { fetchTavernPosts, submitTavernPost } from '@/api/tavern'
 import type { TavernPost as ApiTavernPost } from '@/api/tavern'
+import { useAuthStore } from '@/stores/auth'
 
 /** 前端留言条目（兼容原有模板 id 为 string） */
 interface TavernPost {
@@ -145,15 +156,67 @@ const submitting = ref(false)
 const composeAuthor = ref('')
 const composeTopic = ref('')
 const composeBody = ref('')
+const auth = useAuthStore()
+const router = useRouter()
+
+function goToLogin() {
+  void router.push({ path: '/login', query: { redirect: '/midnight-tavern' } })
+}
+
+function goToRegister() {
+  void router.push({ path: '/register', query: { redirect: '/midnight-tavern' } })
+}
+
+async function logoutUser() {
+  await auth.logout()
+}
+
+function openComposer() {
+  if (!auth.isLoggedIn) {
+    goToLogin()
+    return
+  }
+  composerOpen.value = true
+}
 
 /** 静态 fallback 数据 */
 const fallbackPosts: TavernPost[] = [
-  { id: 'late-bus', author: '赶末班车的人', topic: '今天差点哭出来', body: '忙了一整天,回家的时候才发现自己还没好好吃饭。可是走到楼下,看见便利店还亮着灯,忽然觉得也没有那么糟。' },
-  { id: 'rain-cat', author: '躲雨的猫', topic: '捡到一点好运气', body: '下午下雨的时候有人把伞往我这边偏了一点。只是很小的事,但我记了很久。' },
-  { id: 'old-ticket', author: '旧车票', topic: '没说出口的话', body: '有些话错过那一站就不知道怎么再开口了。今晚先寄存在这里,等我勇敢一点再取走。' },
-  { id: 'warm-window', author: '亮着灯的窗', topic: '终于做完了', body: '拖了很久的事情今天终于收尾。不是很完美,但我第一次觉得自己没有逃走。' },
-  { id: 'quiet-star', author: '安静的星星', topic: '想睡个好觉', body: '希望今晚不要再反复想白天的失误。明天醒来,我想重新开始一次。' },
-  { id: 'soda-memory', author: '冰镇汽水', topic: '小小开心', body: '喜欢的歌随机播放到了,路边的风也刚刚好。虽然只是普通一天,但我想把它记下来。' },
+  {
+    id: 'late-bus',
+    author: '赶末班车的人',
+    topic: '今天差点哭出来',
+    body: '忙了一整天,回家的时候才发现自己还没好好吃饭。可是走到楼下,看见便利店还亮着灯,忽然觉得也没有那么糟。',
+  },
+  {
+    id: 'rain-cat',
+    author: '躲雨的猫',
+    topic: '捡到一点好运气',
+    body: '下午下雨的时候有人把伞往我这边偏了一点。只是很小的事,但我记了很久。',
+  },
+  {
+    id: 'old-ticket',
+    author: '旧车票',
+    topic: '没说出口的话',
+    body: '有些话错过那一站就不知道怎么再开口了。今晚先寄存在这里,等我勇敢一点再取走。',
+  },
+  {
+    id: 'warm-window',
+    author: '亮着灯的窗',
+    topic: '终于做完了',
+    body: '拖了很久的事情今天终于收尾。不是很完美,但我第一次觉得自己没有逃走。',
+  },
+  {
+    id: 'quiet-star',
+    author: '安静的星星',
+    topic: '想睡个好觉',
+    body: '希望今晚不要再反复想白天的失误。明天醒来,我想重新开始一次。',
+  },
+  {
+    id: 'soda-memory',
+    author: '冰镇汽水',
+    topic: '小小开心',
+    body: '喜欢的歌随机播放到了,路边的风也刚刚好。虽然只是普通一天,但我想把它记下来。',
+  },
 ]
 
 const tavernPosts = ref<TavernPost[]>(fallbackPosts)
@@ -310,6 +373,16 @@ onMounted(async () => {
   border-radius: 999px;
   padding: 0.56rem 0.88rem;
   background: rgba(8, 7, 6, 0.42);
+}
+
+.auth-user {
+  align-self: center;
+  max-width: 9rem;
+  overflow: hidden;
+  color: rgba(255, 240, 218, 0.82);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .auth-btn--primary {

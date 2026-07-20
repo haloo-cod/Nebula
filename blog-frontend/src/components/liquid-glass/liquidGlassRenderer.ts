@@ -160,9 +160,13 @@ let frameCount = 0
 // 滚动感知：滚动期间保持 60fps，停止后 200ms 缓冲再退回 30fps
 let lastScrollTime = 0
 if (typeof window !== 'undefined') {
-  window.addEventListener('scroll', () => {
-    lastScrollTime = performance.now()
-  }, { passive: true })
+  window.addEventListener(
+    'scroll',
+    () => {
+      lastScrollTime = performance.now()
+    },
+    { passive: true },
+  )
 }
 
 // ============================================================================
@@ -363,7 +367,11 @@ const fsSource = `
 // WebGL 初始化
 // ============================================================================
 
-function createShader(glCtx: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
+function createShader(
+  glCtx: WebGLRenderingContext,
+  type: number,
+  source: string,
+): WebGLShader | null {
   const shader = glCtx.createShader(type)
   if (!shader) return null
   glCtx.shaderSource(shader, source)

@@ -167,7 +167,11 @@ function onPointerMove(e: PointerEvent) {
 function onPointerUp(e: PointerEvent) {
   if (!viewportRef.value) return
   isDragging.value = false
-  try { viewportRef.value.releasePointerCapture(e.pointerId) } catch { /* 可能未 capture */ }
+  try {
+    viewportRef.value.releasePointerCapture(e.pointerId)
+  } catch {
+    /* 可能未 capture */
+  }
 }
 
 function onCaptureClick(e: MouseEvent) {

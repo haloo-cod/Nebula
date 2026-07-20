@@ -52,7 +52,9 @@ async function handleDelete(post: TavernPost) {
     await api.delete(`/api/v1/tavern/${post.id}`)
     ElMessage.success('删除成功')
     loadPosts()
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
 }
 
 onMounted(() => loadPosts())
@@ -65,7 +67,7 @@ onMounted(() => loadPosts())
     </div>
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="(posts as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="posts as any" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="author" label="作者" width="100" />
         <el-table-column prop="topic" label="话题" width="120" />
         <el-table-column prop="body" label="内容" min-width="250">
@@ -104,9 +106,26 @@ onMounted(() => loadPosts())
 </template>
 
 <style scoped>
-.tavern-list-page { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.page-title { font-size: 14px; color: var(--admin-text-secondary, #909399); }
-.table-card { border-radius: 12px; }
-.ip-hash { font-family: monospace; font-size: 12px; color: #999; }
+.tavern-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-title {
+  font-size: 14px;
+  color: var(--admin-text-secondary, #909399);
+}
+.table-card {
+  border-radius: 12px;
+}
+.ip-hash {
+  font-family: monospace;
+  font-size: 12px;
+  color: #999;
+}
 </style>

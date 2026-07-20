@@ -2,7 +2,7 @@
 轮播图 service — CRUD + 排序
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.carousel import CarouselSlide
@@ -40,7 +40,8 @@ async def create_slide(db: AsyncSession, image_id: int, sort_order: int = 0) -> 
     if not image:
         raise ValueError(f"图片 ID {image_id} 不存在")
 
-    slide = CarouselSlide(image_id=image_id, sort_order=sort_order)
+    max_order = (await db.execute(select(func.max(CarouselSlide.sort_order)))).scalar()
+    slide = CarouselSlide(image_id=image_id, sort_order=(max_order + 1) if max_order is not None else 0)
     db.add(slide)
     await db.commit()
     await db.refresh(slide)
@@ -64,17 +65,26 @@ async def delete_slide(db: AsyncSession, slide_id: int) -> bool:
 
     await db.delete(slide)
     await db.commit()
+    # 删除后压缩排序值，避免后台出现断档。
+    remaining = await db.execute(select(CarouselSlide).order_by(CarouselSlide.sort_order.asc(), CarouselSlide.id.asc()))
+    for order, remaining_slide in enumerate(remaining.scalars().all()):
+        remaining_slide.sort_order = order
+    await db.commit()
     return True
 
 
 async def reorder_slides(db: AsyncSession, ids: list[int]) -> None:
     """批量更新排序"""
+    if len(ids) != len(set(ids)):
+        raise ValueError("排序列表包含重复轮播图")
+    existing = (await db.execute(select(CarouselSlide.id))).scalars().all()
+    if set(ids) != set(existing):
+        raise ValueError("排序列表与现有轮播图不一致")
     for order, slide_id in enumerate(ids):
-        result = await db.execute(
-            select(CarouselSlide).where(CarouselSlide.id == slide_id)
+        await db.execute(
+            CarouselSlide.__table__.update()
+            .where(CarouselSlide.id == slide_id)
+            .values(sort_order=order)
         )
-        slide = result.scalar_one_or_none()
-        if slide:
-            slide.sort_order = order
 
     await db.commit()

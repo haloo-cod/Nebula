@@ -15,6 +15,7 @@ export interface BookApiItem {
   description: string
   cover_url: string
   file_path: string
+  sort_order: number
   created_at: string
 }
 
@@ -27,6 +28,7 @@ export interface BookApiDetail {
   description: string
   cover_url: string
   file_path: string
+  sort_order: number
   created_at: string
   updated_at: string
 }

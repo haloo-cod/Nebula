@@ -37,6 +37,11 @@ async function handleLogin() {
       username: form.username,
       password: form.password,
     })
+    if (!authStore.isAdmin) {
+      await authStore.logout()
+      errorMsg.value = '该账户没有管理员权限'
+      return
+    }
     // 登录成功,跳转到管理后台首页
     router.push('/admin/dashboard')
   } catch (err: unknown) {
@@ -58,11 +63,7 @@ async function handleLogin() {
       </div>
 
       <!-- 表单 -->
-      <el-form
-        :model="form"
-        class="login-form"
-        @submit.prevent="handleLogin"
-      >
+      <el-form :model="form" class="login-form" @submit.prevent="handleLogin">
         <el-form-item>
           <el-input
             v-model="form.username"

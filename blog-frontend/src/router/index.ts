@@ -1,5 +1,12 @@
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
+import {
+  createRouter,
+  createWebHashHistory,
+  type RouteLocationNormalized,
+  type RouteRecordRaw,
+} from 'vue-router'
 import { getToken } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import { recordAnalyticsEvent } from '@/api/analytics'
 
 // 路由表(未做懒加载拆分按需可加)
 const routes: RouteRecordRaw[] = [
@@ -21,6 +28,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/books/read/:slug',
     name: 'book-reader',
+    meta: { hideRain: true },
     component: () => import('../views/books/reader.vue'),
   },
   {
@@ -67,7 +75,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/midnight-tavern',
     name: 'midnight-tavern',
-    meta: { hideChrome: true },
+    meta: { hideChrome: true, requiresAuth: true },
     component: () => import('../views/midnight-tavern/midnight-tavern.vue'),
   },
   {
@@ -90,6 +98,30 @@ const routes: RouteRecordRaw[] = [
     name: 'study-room',
     component: () => import('../views/study-room/study-room.vue'),
   },
+  {
+    path: '/login',
+    name: 'user-login',
+    meta: { hideChrome: true },
+    component: () => import('../views/auth/UserLogin.vue'),
+  },
+  {
+    path: '/register',
+    name: 'user-register',
+    meta: { hideChrome: true },
+    component: () => import('../views/auth/UserRegister.vue'),
+  },
+  {
+    path: '/auth/callback',
+    name: 'auth-callback',
+    meta: { hideChrome: true },
+    component: () => import('../views/auth/AuthCallback.vue'),
+  },
+  {
+    path: '/verify-email',
+    name: 'verify-email',
+    meta: { hideChrome: true },
+    component: () => import('../views/auth/VerifyEmail.vue'),
+  },
 
   // =========================================================================
   // 管理后台路由
@@ -106,13 +138,18 @@ const routes: RouteRecordRaw[] = [
     // 管理后台主路由（带 AdminLayout 侧边栏+顶栏）
     path: '/admin',
     component: () => import('../admin/layout/AdminLayout.vue'),
-    meta: { hideChrome: true, requiresAuth: true },
+    meta: { hideChrome: true, requiresAuth: true, requiresAdmin: true },
     redirect: '/admin/dashboard',
     children: [
       {
         path: 'dashboard',
         name: 'admin-dashboard',
         component: () => import('../admin/views/dashboard/DashboardView.vue'),
+      },
+      {
+        path: 'analytics/visitors',
+        name: 'admin-analytics-visitors',
+        component: () => import('../admin/views/analytics/VisitorList.vue'),
       },
       // ===== Phase 2: 核心 CRUD 页面 =====
       {
@@ -139,6 +176,11 @@ const routes: RouteRecordRaw[] = [
         path: 'books',
         name: 'admin-books',
         component: () => import('../admin/views/books/BookList.vue'),
+      },
+      {
+        path: 'files',
+        name: 'admin-files',
+        component: () => import('../admin/views/files/FileList.vue'),
       },
       {
         path: 'comments',
@@ -183,6 +225,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../admin/views/backgrounds/BackgroundList.vue'),
       },
       {
+        path: 'about',
+        name: 'admin-about',
+        component: () => import('../admin/views/about/AboutEditor.vue'),
+      },
+      {
+        path: 'users',
+        name: 'admin-users',
+        component: () => import('../admin/views/users/UserList.vue'),
+      },
+      {
         path: 'profile',
         name: 'admin-profile',
         component: () => import('../admin/views/profile/ProfileEdit.vue'),
@@ -201,6 +253,29 @@ const router = createRouter({
   routes,
 })
 
+/** 记录前台成功导航，后台和认证页面不纳入公开访问统计。 */
+router.afterEach((to) => {
+  if (
+    to.path.startsWith('/admin') ||
+    ['/login', '/register', '/auth/callback', '/verify-email'].includes(to.path)
+  ) {
+    return
+  }
+  const key = 'starlit_visitor_id'
+  let visitorId = localStorage.getItem(key)
+  if (!visitorId) {
+    visitorId = crypto.randomUUID()
+    localStorage.setItem(key, visitorId)
+  }
+  void recordAnalyticsEvent({
+    event_type: 'page_view',
+    path: to.fullPath,
+    title: typeof to.meta.title === 'string' ? to.meta.title : to.name?.toString() || to.path,
+    referrer: document.referrer,
+    visitor_id: visitorId,
+  }).catch(() => undefined)
+})
+
 // ---------------------------------------------------------------------------
 // 导航守卫：管理后台需要登录
 // ---------------------------------------------------------------------------
@@ -209,13 +284,29 @@ router.beforeEach((to) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   if (!requiresAuth) return true
 
-  const token = getToken()
-  if (!token) {
-    // 未登录,重定向到登录页
-    return { path: '/admin/login', query: { redirect: to.fullPath } }
+  const auth = useAuthStore()
+  if (!auth.initialized) {
+    return auth.init().then(() => checkAuthentication(to, auth))
   }
 
-  return true
+  return checkAuthentication(to, auth)
 })
+
+/** 检查受保护路由的登录状态和管理员权限。 */
+function checkAuthentication(to: RouteLocationNormalized, auth: ReturnType<typeof useAuthStore>) {
+  const token = getToken()
+  if (!token || !auth.user) {
+    const loginPath = to.path.startsWith('/admin') ? '/admin/login' : '/login'
+    return { path: loginPath, query: { redirect: to.fullPath } }
+  }
+
+  if (to.matched.some((record) => record.meta.requiresAdmin) && !auth.isAdmin) {
+    return { path: '/', query: { error: 'admin_required' } }
+  }
+
+  // 普通用户即使已登录，也必须由后端管理员权限保护最终接口访问。
+
+  return true
+}
 
 export default router

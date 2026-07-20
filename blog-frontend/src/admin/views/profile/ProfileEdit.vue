@@ -28,7 +28,13 @@ interface SocialLink {
 
 const loading = ref(false)
 const saving = ref(false)
-const profile = ref<ProfileData>({ name: '', bio: '', avatar_url: '', cover_url: '', social_links: [] })
+const profile = ref<ProfileData>({
+  name: '',
+  bio: '',
+  avatar_url: '',
+  cover_url: '',
+  social_links: [],
+})
 
 // 社交链接弹窗
 const showLinkDialog = ref(false)
@@ -51,12 +57,16 @@ async function loadProfile() {
 async function saveProfile() {
   saving.value = true
   try {
-    await api.put('/api/v1/profile', {
-      name: profile.value.name,
-      bio: profile.value.bio,
-      avatar_url: profile.value.avatar_url,
-      cover_url: profile.value.cover_url,
-    }, true)
+    await api.put(
+      '/api/v1/profile',
+      {
+        name: profile.value.name,
+        bio: profile.value.bio,
+        avatar_url: profile.value.avatar_url,
+        cover_url: profile.value.cover_url,
+      },
+      true,
+    )
     ElMessage.success('保存成功')
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '保存失败')
@@ -97,7 +107,9 @@ async function deleteLink(link: SocialLink) {
     await api.delete(`/api/v1/profile/social-links/${link.id}`)
     ElMessage.success('删除成功')
     loadProfile()
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
 }
 
 onMounted(() => loadProfile())
@@ -120,7 +132,12 @@ onMounted(() => loadProfile())
           </el-form-item>
         </div>
         <el-form-item label="简介">
-          <el-input v-model="profile.bio" type="textarea" :rows="3" placeholder="个人简介 / 站点描述" />
+          <el-input
+            v-model="profile.bio"
+            type="textarea"
+            :rows="3"
+            placeholder="个人简介 / 站点描述"
+          />
         </el-form-item>
         <el-form-item label="封面图 URL">
           <el-input v-model="profile.cover_url" placeholder="个人资料页封面图" />
@@ -141,7 +158,7 @@ onMounted(() => loadProfile())
           </el-button>
         </div>
       </template>
-      <el-table :data="(profile.social_links as any)" stripe style="width: 100%">
+      <el-table :data="profile.social_links as any" stripe style="width: 100%">
         <el-table-column prop="icon" label="图标" width="60" />
         <el-table-column prop="label" label="平台" width="120" />
         <el-table-column prop="url" label="链接" min-width="250">
@@ -183,10 +200,30 @@ onMounted(() => loadProfile())
 </template>
 
 <style scoped>
-.profile-edit-page { display: flex; flex-direction: column; gap: 20px; }
-.section-card { border-radius: 12px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
-.card-header-row { display: flex; justify-content: space-between; align-items: center; }
-.link-text { color: #409eff; text-decoration: none; font-size: 13px; }
-.link-text:hover { text-decoration: underline; }
+.profile-edit-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.section-card {
+  border-radius: 12px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.link-text {
+  color: #409eff;
+  text-decoration: none;
+  font-size: 13px;
+}
+.link-text:hover {
+  text-decoration: underline;
+}
 </style>

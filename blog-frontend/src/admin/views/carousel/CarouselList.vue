@@ -6,7 +6,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { api, getToken, resolveUrl, BASE_URL } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 轮播项（匹配后端 CarouselSlideResponse） */
 interface CarouselSlide {
@@ -19,6 +20,10 @@ interface CarouselSlide {
 const loading = ref(false)
 const slides = ref<CarouselSlide[]>([])
 const uploading = ref(false)
+const savingOrder = ref(false)
+const draggedId = ref<number | null>(null)
+const orderChanged = ref(false)
+const showImagePicker = ref(false)
 
 /** 加载轮播列表 */
 async function loadSlides() {
@@ -26,6 +31,7 @@ async function loadSlides() {
   try {
     const res = await api.get<{ items: CarouselSlide[]; total: number }>('/api/v1/carousel', true)
     slides.value = res.items
+    orderChanged.value = false
   } catch {
     ElMessage.error('加载轮播失败')
   } finally {
@@ -33,34 +39,21 @@ async function loadSlides() {
   }
 }
 
-/** 上传图片并添加到轮播 */
-async function handleUpload(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (!input.files || !input.files[0]) return
-
+/** 从媒体库选择图片并关联到轮播。 */
+async function addImage(image: PickerImage) {
   uploading.value = true
   try {
-    // 第一步：上传图片到图床
-    const formData = new FormData()
-    formData.append('file', input.files[0])
-    const token = getToken()
-    const uploadResp = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    })
-    if (!uploadResp.ok) throw new Error('图片上传失败')
-    const imageData = await uploadResp.json()
-
-    // 第二步：关联到轮播
-    await api.post('/api/v1/carousel', { image_id: imageData.id, sort_order: slides.value.length }, true)
+    await api.post(
+      '/api/v1/carousel',
+      { image_id: image.id, sort_order: slides.value.length },
+      true,
+    )
     ElMessage.success('添加成功')
-    loadSlides()
+    await loadSlides()
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '上传失败')
   } finally {
     uploading.value = false
-    input.value = ''
   }
 }
 
@@ -71,7 +64,48 @@ async function handleDelete(slide: CarouselSlide) {
     await api.delete(`/api/v1/carousel/${slide.id}`)
     ElMessage.success('删除成功')
     loadSlides()
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
+}
+
+/** 拖拽开始，记录当前卡片。 */
+function handleDragStart(slide: CarouselSlide) {
+  draggedId.value = slide.id
+}
+
+/** 将拖拽卡片移动到目标卡片之前。 */
+function handleDrop(target: CarouselSlide) {
+  if (draggedId.value === null || draggedId.value === target.id) return
+  const fromIndex = slides.value.findIndex((slide) => slide.id === draggedId.value)
+  const targetIndex = slides.value.findIndex((slide) => slide.id === target.id)
+  if (fromIndex < 0 || targetIndex < 0) return
+  const [dragged] = slides.value.splice(fromIndex, 1)
+  slides.value.splice(targetIndex, 0, dragged)
+  slides.value.forEach((slide, index) => {
+    slide.sort_order = index
+  })
+  orderChanged.value = true
+}
+
+/** 清理拖拽状态。 */
+function handleDragEnd() {
+  draggedId.value = null
+}
+
+/** 将当前卡片顺序保存到后端。 */
+async function saveOrder() {
+  savingOrder.value = true
+  try {
+    await api.put('/api/v1/carousel/reorder', { ids: slides.value.map((slide) => slide.id) }, true)
+    ElMessage.success('轮播顺序已保存')
+    orderChanged.value = false
+    await loadSlides()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '保存排序失败')
+  } finally {
+    savingOrder.value = false
+  }
 }
 
 onMounted(() => loadSlides())
@@ -81,17 +115,28 @@ onMounted(() => loadSlides())
   <div class="carousel-list-page">
     <div class="page-header">
       <span class="page-title">共 {{ slides.length }} 张轮播图</span>
-      <label class="upload-btn">
-        <el-button type="primary" :loading="uploading">
+      <div class="upload-control">
+        <el-button v-if="orderChanged" :loading="savingOrder" @click="saveOrder"
+          >保存排序</el-button
+        >
+        <el-button type="primary" :loading="uploading" @click="showImagePicker = true">
           <el-icon><Plus /></el-icon>添加轮播图
         </el-button>
-        <input type="file" accept="image/*" hidden @change="handleUpload" />
-      </label>
+      </div>
     </div>
 
     <el-card shadow="never" class="table-card">
       <div v-loading="loading" class="slide-grid">
-        <div v-for="slide in slides" :key="slide.id" class="slide-item">
+        <div
+          v-for="slide in slides"
+          :key="slide.id"
+          class="slide-item"
+          draggable="true"
+          @dragstart="handleDragStart(slide)"
+          @dragover.prevent
+          @drop.prevent="handleDrop(slide)"
+          @dragend="handleDragEnd"
+        >
           <img :src="resolveUrl(slide.url)" alt="" class="slide-img" />
           <div class="slide-overlay">
             <el-button type="danger" size="small" @click="handleDelete(slide)">移除</el-button>
@@ -101,15 +146,34 @@ onMounted(() => loadSlides())
         <div v-if="!loading && slides.length === 0" class="empty-state">暂无轮播图</div>
       </div>
     </el-card>
+    <ImagePickerDialog v-model="showImagePicker" title="选择轮播图" @select="addImage" />
   </div>
 </template>
 
 <style scoped>
-.carousel-list-page { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.page-title { font-size: 14px; color: var(--admin-text-secondary, #909399); }
-.table-card { border-radius: 12px; }
-.upload-btn { cursor: pointer; }
+.carousel-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-title {
+  font-size: 14px;
+  color: var(--admin-text-secondary, #909399);
+}
+.table-card {
+  border-radius: 12px;
+}
+.upload-control {
+  display: flex;
+}
+.file-input {
+  display: none;
+}
 
 .slide-grid {
   display: grid;
@@ -121,7 +185,11 @@ onMounted(() => loadSlides())
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #eee;
+  border: 1px solid var(--admin-border-color, #e4e7ed);
+  cursor: grab;
+}
+.slide-item:active {
+  cursor: grabbing;
 }
 .slide-img {
   width: 100%;
@@ -139,16 +207,23 @@ onMounted(() => loadSlides())
   opacity: 0;
   transition: opacity 0.2s;
 }
-.slide-item:hover .slide-overlay { opacity: 1; }
+.slide-item:hover .slide-overlay {
+  opacity: 1;
+}
 .slide-order {
   position: absolute;
   top: 6px;
   left: 6px;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
 }
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #999; }
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 0;
+  color: var(--admin-text-secondary, #909399);
+}
 </style>

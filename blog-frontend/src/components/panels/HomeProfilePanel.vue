@@ -17,12 +17,12 @@
           <span class="stat-label">文章</span>
         </div>
         <div class="stat-box">
-          <span class="stat-value">{{ totalTags }}</span>
-          <span class="stat-label">标签</span>
+          <span class="stat-value">{{ totalMoments }}</span>
+          <span class="stat-label">说说</span>
         </div>
         <div class="stat-box">
-          <span class="stat-value">{{ totalCategories }}</span>
-          <span class="stat-label">分类</span>
+          <span class="stat-value">{{ totalProjects }}</span>
+          <span class="stat-label">展览</span>
         </div>
         <div class="stat-box">
           <span class="stat-value">{{ daysActive }}</span>
@@ -50,29 +50,17 @@
 import { computed } from 'vue'
 import type { SocialLink } from '@/types'
 import { getPosts } from '@/data/posts'
+import { getAllMoments } from '@/data/moments'
+import { getGalleryProjects } from '@/data/gallery'
 import SvgIcon from '@/components/SvgIcon.vue'
 
 const posts = getPosts()
+const moments = getAllMoments()
+const projects = getGalleryProjects()
 
 const totalPosts = computed(() => posts.length)
-
-const totalTags = computed(() => {
-  const tagSet = new Set<string>()
-  for (const p of posts) {
-    for (const tag of p.tags) {
-      tagSet.add(tag)
-    }
-  }
-  return tagSet.size
-})
-
-const totalCategories = computed(() => {
-  const catSet = new Set<string>()
-  for (const p of posts) {
-    if (p.category) catSet.add(p.category)
-  }
-  return catSet.size
-})
+const totalMoments = computed(() => moments.length)
+const totalProjects = computed(() => projects.length)
 
 const daysActive = computed(() => {
   const dates = new Set<string>()

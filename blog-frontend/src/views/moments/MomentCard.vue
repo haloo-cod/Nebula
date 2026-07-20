@@ -3,7 +3,9 @@
     <!-- 头部:相对时间 + 心情标签 -->
     <div class="moment-card__head">
       <span class="moment-card__time">{{ relativeTime(moment.date) }}</span>
-      <span v-if="moment.mood" class="moment-card__mood">{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span>
+      <span v-if="moment.mood" class="moment-card__mood"
+        >{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span
+      >
     </div>
 
     <!-- 正文:最多 2 行,超出省略 -->
@@ -85,7 +87,9 @@ function toggleLike() {
     localLikeDelta.value++
     isLiked.value = true
     justLiked.value = true
-    setTimeout(() => { justLiked.value = false }, 400)
+    setTimeout(() => {
+      justLiked.value = false
+    }, 400)
     // 调用后端 API 点赞（静默，不阻塞 UI）
     likeMoment(props.moment.id).catch(() => {})
   }
@@ -238,8 +242,14 @@ function moodEmoji(mood: string): string {
 }
 
 @keyframes heartPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

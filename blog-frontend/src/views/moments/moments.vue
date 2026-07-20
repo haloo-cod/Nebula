@@ -280,12 +280,7 @@ onUnmounted(() => {
 .moments-day-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(140, 200, 255, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(140, 200, 255, 0.2), transparent);
 }
 
 .moments-day-label {
@@ -310,11 +305,15 @@ onUnmounted(() => {
 @keyframes momentHighlight {
   0%,
   20% {
-    box-shadow: 0 0 0 2px rgba(140, 200, 255, 0.6), 0 0 24px rgba(140, 200, 255, 0.3);
+    box-shadow:
+      0 0 0 2px rgba(140, 200, 255, 0.6),
+      0 0 24px rgba(140, 200, 255, 0.3);
     border-radius: 1.1rem;
   }
   100% {
-    box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 transparent;
   }
 }
 

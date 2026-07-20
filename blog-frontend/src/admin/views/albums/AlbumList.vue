@@ -47,6 +47,7 @@ const editingAlbumId = ref(0)
 const currentAlbum = ref<AlbumDetail | null>(null)
 const loadingPhotos = ref(false)
 const uploading = ref(false)
+const photoInputRef = ref<HTMLInputElement | null>(null)
 
 /** 加载相册列表 */
 async function loadAlbums() {
@@ -72,7 +73,11 @@ function openCreateAlbum() {
 function openEditAlbum(album: AlbumItem) {
   isEditAlbum.value = true
   editingAlbumId.value = album.id
-  albumForm.value = { title: album.title, description: album.description, orientation: album.orientation }
+  albumForm.value = {
+    title: album.title,
+    description: album.description,
+    orientation: album.orientation,
+  }
   showAlbumDialog.value = true
 }
 
@@ -103,11 +108,15 @@ async function saveAlbum() {
 /** 删除相册 */
 async function deleteAlbum(album: AlbumItem) {
   try {
-    await ElMessageBox.confirm(`确定删除相册「${album.title}」？所有照片将同时删除。`, '确认删除', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除相册「${album.title}」？所有照片将同时删除。`, '确认删除', {
+      type: 'warning',
+    })
     await api.delete(`/api/v1/albums/${album.id}`)
     ElMessage.success('删除成功')
     loadAlbums()
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
 }
 
 /** 进入照片管理 */
@@ -128,6 +137,11 @@ function backToList() {
   currentAlbum.value = null
 }
 
+/** 显式打开照片选择器，避免 el-button 嵌套 label 时点击失效 */
+function openPhotoPicker() {
+  if (!uploading.value) photoInputRef.value?.click()
+}
+
 /** 上传照片并关联到当前相册 */
 async function handlePhotoUpload(event: Event) {
   const input = event.target as HTMLInputElement
@@ -145,11 +159,18 @@ async function handlePhotoUpload(event: Event) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     })
-    if (!uploadResp.ok) throw new Error('图片上传失败')
+    if (!uploadResp.ok) {
+      const error = await uploadResp.json().catch(() => ({ detail: '图片上传失败' }))
+      throw new Error(error.detail || '图片上传失败')
+    }
     const imageData = await uploadResp.json()
 
     // 第二步：关联到相册
-    await api.post(`/api/v1/albums/${currentAlbum.value.id}/photos`, { image_id: imageData.id }, true)
+    await api.post(
+      `/api/v1/albums/${currentAlbum.value.id}/photos`,
+      { image_id: imageData.id },
+      true,
+    )
     ElMessage.success('照片添加成功')
 
     // 刷新照片列表
@@ -173,7 +194,9 @@ async function deletePhoto(photo: PhotoItem) {
     // 刷新
     const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
     currentAlbum.value = detail
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
 }
 
 onMounted(() => loadAlbums())
@@ -191,7 +214,7 @@ onMounted(() => loadAlbums())
       </div>
 
       <el-card shadow="never" class="table-card">
-        <el-table :data="(albums as any)" v-loading="loading" stripe style="width: 100%">
+        <el-table :data="albums as any" v-loading="loading" stripe style="width: 100%">
           <el-table-column prop="title" label="标题" min-width="150" />
           <el-table-column prop="description" label="描述" min-width="200">
             <template #default="{ row }: { row: any }">
@@ -207,8 +230,12 @@ onMounted(() => loadAlbums())
           <el-table-column prop="date" label="日期" width="100" />
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }: { row: any }">
-              <el-button type="primary" link size="small" @click="enterPhotoManage(row)">照片</el-button>
-              <el-button type="primary" link size="small" @click="openEditAlbum(row)">编辑</el-button>
+              <el-button type="primary" link size="small" @click="enterPhotoManage(row)"
+                >照片</el-button
+              >
+              <el-button type="primary" link size="small" @click="openEditAlbum(row)"
+                >编辑</el-button
+              >
               <el-button type="danger" link size="small" @click="deleteAlbum(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -222,13 +249,22 @@ onMounted(() => loadAlbums())
         <el-button @click="backToList">
           <el-icon><ArrowLeft /></el-icon>返回相册列表
         </el-button>
-        <span class="page-title">{{ currentAlbum.title }} — {{ currentAlbum.photos.length }} 张照片</span>
-        <label class="upload-btn">
-          <el-button type="primary" :loading="uploading">
+        <span class="page-title"
+          >{{ currentAlbum.title }} — {{ currentAlbum.photos.length }} 张照片</span
+        >
+        <div class="upload-control">
+          <el-button type="primary" :loading="uploading" @click="openPhotoPicker">
             <el-icon><Plus /></el-icon>添加照片
           </el-button>
-          <input type="file" accept="image/*" hidden @change="handlePhotoUpload" />
-        </label>
+          <input
+            ref="photoInputRef"
+            type="file"
+            accept="image/*"
+            class="file-input"
+            tabindex="-1"
+            @change="handlePhotoUpload"
+          />
+        </div>
       </div>
 
       <el-card shadow="never" class="table-card">
@@ -240,19 +276,30 @@ onMounted(() => loadAlbums())
             </div>
             <span v-if="photo.caption" class="photo-caption">{{ photo.caption }}</span>
           </div>
-          <div v-if="currentAlbum.photos.length === 0" class="empty-state">暂无照片，点击上方按钮添加</div>
+          <div v-if="currentAlbum.photos.length === 0" class="empty-state">
+            暂无照片，点击上方按钮添加
+          </div>
         </div>
       </el-card>
     </template>
 
     <!-- 新建/编辑相册弹窗 -->
-    <el-dialog v-model="showAlbumDialog" :title="isEditAlbum ? '编辑相册' : '新建相册'" width="440px">
+    <el-dialog
+      v-model="showAlbumDialog"
+      :title="isEditAlbum ? '编辑相册' : '新建相册'"
+      width="440px"
+    >
       <el-form label-position="top">
         <el-form-item label="标题">
           <el-input v-model="albumForm.title" placeholder="相册标题" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="albumForm.description" type="textarea" :rows="2" placeholder="相册描述" />
+          <el-input
+            v-model="albumForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="相册描述"
+          />
         </el-form-item>
         <el-form-item label="照片方向">
           <el-radio-group v-model="albumForm.orientation">
@@ -263,18 +310,38 @@ onMounted(() => loadAlbums())
       </el-form>
       <template #footer>
         <el-button @click="showAlbumDialog = false">取消</el-button>
-        <el-button type="primary" :loading="savingAlbum" @click="saveAlbum">{{ isEditAlbum ? '更新' : '创建' }}</el-button>
+        <el-button type="primary" :loading="savingAlbum" @click="saveAlbum">{{
+          isEditAlbum ? '更新' : '创建'
+        }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.album-list-page { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.page-title { font-size: 14px; color: var(--admin-text-secondary, #909399); }
-.table-card { border-radius: 12px; }
-.upload-btn { cursor: pointer; }
+.album-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-title {
+  font-size: 14px;
+  color: var(--admin-text-secondary, #909399);
+}
+.table-card {
+  border-radius: 12px;
+}
+.upload-control {
+  display: flex;
+}
+.file-input {
+  display: none;
+}
 
 .photo-grid {
   display: grid;
@@ -286,7 +353,7 @@ onMounted(() => loadAlbums())
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #eee;
+  border: 1px solid var(--admin-border-color, #e4e7ed);
 }
 .photo-thumb {
   width: 100%;
@@ -301,13 +368,20 @@ onMounted(() => loadAlbums())
   opacity: 0;
   transition: opacity 0.2s;
 }
-.photo-item:hover .photo-actions { opacity: 1; }
+.photo-item:hover .photo-actions {
+  opacity: 1;
+}
 .photo-caption {
   display: block;
   padding: 4px 8px;
   font-size: 12px;
-  color: #666;
-  background: #f9f9f9;
+  color: var(--admin-text-secondary, #909399);
+  background: var(--admin-fill-bg, #f5f7fa);
 }
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #999; }
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 0;
+  color: #999;
+}
 </style>

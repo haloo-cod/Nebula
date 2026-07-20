@@ -10,14 +10,18 @@
             class="filter-btn"
             :class="{ active: !activeCategory }"
             @click="activeCategory = ''"
-          >全部</button>
+          >
+            全部
+          </button>
           <button
             v-for="cat in categories"
             :key="cat"
             class="filter-btn"
             :class="{ active: activeCategory === cat }"
             @click="activeCategory = activeCategory === cat ? '' : cat"
-          >{{ cat }}</button>
+          >
+            {{ cat }}
+          </button>
         </div>
       </div>
 
@@ -141,11 +145,15 @@ onMounted(async () => {
 })
 
 // 提取去重分类列表（排除空字符串）
-const categories = computed(() => [...new Set(allPosts.value.map((p) => p.category).filter(Boolean))])
+const categories = computed(() => [
+  ...new Set(allPosts.value.map((p) => p.category).filter(Boolean)),
+])
 
 // 根据分类筛选后的文章列表
 const posts = computed(() =>
-  activeCategory.value ? allPosts.value.filter((p) => p.category === activeCategory.value) : allPosts.value,
+  activeCategory.value
+    ? allPosts.value.filter((p) => p.category === activeCategory.value)
+    : allPosts.value,
 )
 
 const categoryColors: Record<string, string> = {

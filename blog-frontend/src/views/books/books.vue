@@ -10,7 +10,16 @@
       <!-- 搜索栏（UI 占位，未来接后端搜索） -->
       <div class="books-search">
         <span class="books-search-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
           </svg>
@@ -124,7 +133,9 @@ async function loadBooks() {
     const allBooks = getBooks()
     const q = searchQuery.value.trim().toLowerCase()
     const filtered = q
-      ? allBooks.filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))
+      ? allBooks.filter(
+          (b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q),
+        )
       : allBooks
     totalBooks.value = filtered.length
     const start = (currentPage.value - 1) * PAGE_SIZE

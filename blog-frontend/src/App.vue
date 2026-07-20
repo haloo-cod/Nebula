@@ -6,10 +6,13 @@ import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 
 const ui = useUIStore()
+const auth = useAuthStore()
 const route = useRoute()
 const hideChrome = computed(() => route.meta.hideChrome === true)
+const hideRain = computed(() => route.meta.hideRain === true)
 
 onMounted(() => {
   const splash = document.getElementById('splash')
@@ -22,6 +25,11 @@ onMounted(() => {
 
   // 从后端加载背景图列表（替换静态 fallback）
   ui.loadBackgrounds()
+  if (auth.token || route.meta.requiresAuth || route.path === '/auth/callback') {
+    void auth.init()
+  } else {
+    auth.initialized = true
+  }
 })
 </script>
 
@@ -31,7 +39,7 @@ onMounted(() => {
     <RouterView />
     <BackToTop v-if="ui.showNavbar && !hideChrome" />
     <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
-    <RainEffect v-if="!hideChrome" />
+    <RainEffect v-if="!hideChrome && !hideRain" />
     <div
       v-if="ui.themeTransitioning"
       class="theme-overlay"

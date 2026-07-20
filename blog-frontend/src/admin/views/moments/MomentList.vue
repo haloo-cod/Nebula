@@ -63,8 +63,18 @@ async function submitCreate() {
     const payload = {
       content: createForm.value.content,
       mood: createForm.value.mood || '',
-      tags: createForm.value.tags ? createForm.value.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-      images: createForm.value.images ? createForm.value.images.split('\n').map((u) => u.trim()).filter(Boolean) : [],
+      tags: createForm.value.tags
+        ? createForm.value.tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [],
+      images: createForm.value.images
+        ? createForm.value.images
+            .split('\n')
+            .map((u) => u.trim())
+            .filter(Boolean)
+        : [],
     }
     await api.post('/api/v1/moments', payload, true)
     ElMessage.success('发布成功')
@@ -81,8 +91,14 @@ async function submitCreate() {
 /** 心情 emoji 映射 */
 function moodEmoji(mood: string): string {
   const map: Record<string, string> = {
-    开心: '😊', 平静: '😌', 灵感: '💡', 感动: '🥹',
-    疲惫: '😴', 思考: '🤔', 满足: '😋', 期待: '✨',
+    开心: '😊',
+    平静: '😌',
+    灵感: '💡',
+    感动: '🥹',
+    疲惫: '😴',
+    思考: '🤔',
+    满足: '😋',
+    期待: '✨',
   }
   return mood ? (map[mood] || '📝') + ' ' + mood : ''
 }
@@ -102,10 +118,12 @@ onMounted(() => loadData())
 
     <!-- 说说表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="(data as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="content" label="内容" min-width="300">
           <template #default="{ row }">
-            <div class="content-cell">{{ row.content.slice(0, 80) }}{{ row.content.length > 80 ? '...' : '' }}</div>
+            <div class="content-cell">
+              {{ row.content.slice(0, 80) }}{{ row.content.length > 80 ? '...' : '' }}
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="mood" label="心情" width="100">
@@ -126,7 +144,9 @@ onMounted(() => loadData())
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }: { row: any }">
-            <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')">删除</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -149,7 +169,12 @@ onMounted(() => loadData())
     <el-dialog v-model="showCreateDialog" title="发说说" width="500px">
       <el-form label-position="top">
         <el-form-item label="内容">
-          <el-input v-model="createForm.content" type="textarea" :rows="4" placeholder="说点什么..." />
+          <el-input
+            v-model="createForm.content"
+            type="textarea"
+            :rows="4"
+            placeholder="说点什么..."
+          />
         </el-form-item>
         <el-form-item label="心情">
           <el-input v-model="createForm.mood" placeholder="如：开心、思考、灵感" />
@@ -158,7 +183,12 @@ onMounted(() => loadData())
           <el-input v-model="createForm.tags" placeholder="标签1, 标签2" />
         </el-form-item>
         <el-form-item label="图片 URL（每行一个）">
-          <el-input v-model="createForm.images" type="textarea" :rows="3" placeholder="http://..." />
+          <el-input
+            v-model="createForm.images"
+            type="textarea"
+            :rows="3"
+            placeholder="http://..."
+          />
         </el-form-item>
       </el-form>
       <template #footer>

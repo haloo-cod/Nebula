@@ -32,10 +32,10 @@ const currentTitle = computed(() => {
 })
 
 /** 处理用户下拉命令 */
-function handleCommand(command: string) {
+async function handleCommand(command: string) {
   if (command === 'logout') {
-    authStore.logout()
-    router.push('/admin/login')
+    await authStore.logout()
+    await router.push('/admin/login')
   } else if (command === 'home') {
     // 返回博客前台
     router.push('/')
@@ -47,11 +47,7 @@ function handleCommand(command: string) {
   <div class="admin-topbar">
     <!-- 左侧：折叠按钮 + 面包屑 -->
     <div class="topbar-left">
-      <el-icon
-        class="collapse-btn"
-        :size="20"
-        @click="emit('toggleCollapse')"
-      >
+      <el-icon class="collapse-btn" :size="20" @click="emit('toggleCollapse')">
         <Fold v-if="!collapsed" />
         <Expand v-else />
       </el-icon>

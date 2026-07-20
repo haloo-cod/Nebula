@@ -10,7 +10,11 @@
     :highlight-width="2.5"
     ripple-trail
   >
-    <ScheduleCardContent :item="item" @delete="$emit('delete', item.id)" @toggle="$emit('toggle', item.id)" />
+    <ScheduleCardContent
+      :item="item"
+      @delete="$emit('delete', item.id)"
+      @toggle="$emit('toggle', item.id)"
+    />
   </LiquidGlass>
 
   <PanelFallbackGlass
@@ -19,7 +23,11 @@
     class="schedule-card schedule-card--fallback"
     :class="{ 'schedule-card--completed': item.isCompleted }"
   >
-    <ScheduleCardContent :item="item" @delete="$emit('delete', item.id)" @toggle="$emit('toggle', item.id)" />
+    <ScheduleCardContent
+      :item="item"
+      @delete="$emit('delete', item.id)"
+      @toggle="$emit('toggle', item.id)"
+    />
   </PanelFallbackGlass>
 </template>
 

@@ -2,10 +2,20 @@
   <PageBackground>
     <div class="study-page">
       <!-- 左右抽屉开关 -->
-      <button class="drawer-trigger drawer-trigger--left" type="button" aria-label="打开待办清单" @click="leftOpen = true">
+      <button
+        class="drawer-trigger drawer-trigger--left"
+        type="button"
+        aria-label="打开待办清单"
+        @click="leftOpen = true"
+      >
         <SvgIcon name="arrow_forward_ios" class="trigger-icon" />
       </button>
-      <button class="drawer-trigger drawer-trigger--right" type="button" aria-label="打开今日日程" @click="rightOpen = true">
+      <button
+        class="drawer-trigger drawer-trigger--right"
+        type="button"
+        aria-label="打开今日日程"
+        @click="rightOpen = true"
+      >
         <SvgIcon name="arrow_back_ios" class="trigger-icon" />
       </button>
 
@@ -131,10 +141,7 @@ const formattedTime = computed(() => {
   const hours = Math.floor(total / 3600)
   const mins = Math.floor((total % 3600) / 60)
   const secs = total % 60
-  const parts = [
-    String(mins).padStart(2, '0'),
-    String(secs).padStart(2, '0'),
-  ]
+  const parts = [String(mins).padStart(2, '0'), String(secs).padStart(2, '0')]
   if (hours > 0) parts.unshift(String(hours).padStart(2, '0'))
   return parts.join(':')
 })
@@ -177,7 +184,10 @@ function loadFromStorage() {
         // 结算：把昨日的 todayCompleted 写入历史（补偿未被 recordFocus 覆盖的情况）
         if (lastDate) {
           const totalPomodoros = todos.value.reduce((sum, t) => sum + t.todayCompleted, 0)
-          const totalMinutes = todos.value.reduce((sum, t) => sum + t.todayCompleted * t.durationMinutes, 0)
+          const totalMinutes = todos.value.reduce(
+            (sum, t) => sum + t.todayCompleted * t.durationMinutes,
+            0,
+          )
           if (totalPomodoros > 0) {
             const existing = history.value.find((h) => h.date === lastDate)
             if (!existing) {
@@ -314,7 +324,12 @@ function recordFocus(minutes: number) {
 }
 
 // Todo CRUD
-function addTodo(payload: Omit<StudyTodo, 'id' | 'createdAt' | 'completedPomodoros' | 'todayCompleted' | 'isRunning' | 'isCompleted'>) {
+function addTodo(
+  payload: Omit<
+    StudyTodo,
+    'id' | 'createdAt' | 'completedPomodoros' | 'todayCompleted' | 'isRunning' | 'isCompleted'
+  >,
+) {
   const todo: StudyTodo = {
     ...payload,
     id: generateId(),
@@ -493,7 +508,9 @@ onUnmounted(() => {
 }
 
 .study-glass--fallback {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .history-wrapper {

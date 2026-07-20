@@ -30,8 +30,14 @@ import { Setting } from '@element-plus/icons-vue'
 </template>
 
 <style scoped>
-.site-config-page { display: flex; flex-direction: column; gap: 20px; }
-.section-card { border-radius: 12px; }
+.site-config-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.section-card {
+  border-radius: 12px;
+}
 .placeholder-content {
   display: flex;
   flex-direction: column;

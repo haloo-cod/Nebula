@@ -35,10 +35,12 @@
         <a
           v-for="item in pagedTreasures"
           :key="item.slug"
-          :href="item.url"
-          target="_blank"
-          rel="noopener noreferrer"
+          :href="item.downloadUrl ? resolveUrl(item.downloadUrl) : item.url"
+          :target="item.downloadUrl ? undefined : '_blank'"
+          :rel="item.downloadUrl ? undefined : 'noopener noreferrer'"
+          :download="item.downloadUrl ? '' : undefined"
           class="treasure-link"
+          @click="handleTreasureClick($event, item)"
         >
           <LiquidGlass
             v-if="ui.liquidGlassEnabled"
@@ -58,6 +60,12 @@
           </PanelFallbackGlass>
         </a>
       </TransitionGroup>
+
+      <Transition name="download-notice">
+        <div v-if="downloadNotice" class="download-notice" role="status">
+          {{ downloadNotice }}
+        </div>
+      </Transition>
 
       <!-- 空状态 -->
       <div v-if="filteredTreasures.length === 0" class="treasure-empty">
@@ -101,10 +109,16 @@ import TreasureCardContent from './TreasureCardContent.vue'
 import { getTreasures, getTreasureCategories } from '@/data/treasures'
 import { fetchTreasures, fetchTreasureCategories } from '@/api/treasures'
 import { siteText } from '@/data/site-text'
+import { resolveUrl } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
-import type { TreasureCategory } from '@/types'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { getToken } from '@/api/client'
+import type { Treasure, TreasureCategory } from '@/types'
 
 const ui = useUIStore()
+const router = useRouter()
+const auth = useAuthStore()
 
 // 数据（初始 fallback，API 加载后替换）
 const treasures = ref(getTreasures())
@@ -116,6 +130,8 @@ const currentPage = ref(1)
 
 // 当前选中的分类，null 表示全部
 const activeCategory = ref<TreasureCategory | null>(null)
+const downloadNotice = ref('')
+let noticeTimer: number | null = null
 
 // 筛选后的宝物列表（全部）
 const filteredTreasures = computed(() => {
@@ -124,7 +140,9 @@ const filteredTreasures = computed(() => {
 })
 
 // 总页数
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredTreasures.value.length / PAGE_SIZE)))
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredTreasures.value.length / PAGE_SIZE)),
+)
 
 // 页码列表
 const pageNumbers = computed(() =>
@@ -143,6 +161,50 @@ function goPrevPage() {
 
 function goNextPage() {
   if (currentPage.value < totalPages.value) currentPage.value += 1
+}
+
+/** 显示短暂的下载状态提示 */
+function showDownloadNotice(message: string) {
+  downloadNotice.value = message
+  if (noticeTimer) window.clearTimeout(noticeTimer)
+  noticeTimer = window.setTimeout(() => {
+    downloadNotice.value = ''
+    noticeTimer = null
+  }, 3000)
+}
+
+/** 下载卡片不跳外链；本站文件先检查可用性再触发浏览器下载 */
+async function handleTreasureClick(event: MouseEvent, item: Treasure) {
+  if (!item.downloadUrl) return
+
+  if (!auth.initialized) await auth.init()
+  if (!auth.isLoggedIn) {
+    event.preventDefault()
+    await router.push({ path: '/login', query: { redirect: '/treasure' } })
+    return
+  }
+
+  const url = resolveUrl(item.downloadUrl)
+  if (!item.downloadUrl.startsWith('/api/v1/files/')) return
+
+  event.preventDefault()
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error()
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(await response.blob())
+    link.download = ''
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(link.href)
+    showDownloadNotice('下载已开始')
+  } catch {
+    showDownloadNotice('文件暂时无法下载，请稍后重试')
+  }
 }
 
 // 切换分类时重置页码
@@ -286,6 +348,33 @@ onMounted(async () => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 14px 32px rgba(255, 200, 100, 0.1);
+}
+
+.download-notice {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 30;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(255, 200, 100, 0.35);
+  border-radius: 999px;
+  background: rgba(18, 20, 24, 0.88);
+  color: rgba(255, 235, 190, 0.95);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.download-notice-enter-active,
+.download-notice-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.download-notice-enter-from,
+.download-notice-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 /* ===== 空状态 ===== */

@@ -19,10 +19,18 @@
           <div class="about-divider"></div>
           <!-- 高度过渡容器：用 inline style 绑定动态高度 -->
           <div class="tab-panel" :style="{ height: panelHeight }">
-            <div ref="introRef" class="tab-pane" :class="{ 'tab-pane--active': activeTab === 'intro' }">
+            <div
+              ref="introRef"
+              class="tab-pane"
+              :class="{ 'tab-pane--active': activeTab === 'intro' }"
+            >
               <AboutIntro />
             </div>
-            <div ref="activityRef" class="tab-pane" :class="{ 'tab-pane--active': activeTab === 'activity' }">
+            <div
+              ref="activityRef"
+              class="tab-pane"
+              :class="{ 'tab-pane--active': activeTab === 'activity' }"
+            >
               <AboutActivity />
             </div>
           </div>
@@ -38,10 +46,18 @@
           </div>
           <div class="about-divider"></div>
           <div class="tab-panel" :style="{ height: panelHeight }">
-            <div ref="introRefFallback" class="tab-pane" :class="{ 'tab-pane--active': activeTab === 'intro' }">
+            <div
+              ref="introRefFallback"
+              class="tab-pane"
+              :class="{ 'tab-pane--active': activeTab === 'intro' }"
+            >
               <AboutIntro />
             </div>
-            <div ref="activityRefFallback" class="tab-pane" :class="{ 'tab-pane--active': activeTab === 'activity' }">
+            <div
+              ref="activityRefFallback"
+              class="tab-pane"
+              :class="{ 'tab-pane--active': activeTab === 'activity' }"
+            >
               <AboutActivity />
             </div>
           </div>
@@ -143,7 +159,9 @@ onMounted(() => {
 }
 
 .about-glass--fallback {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .about-inner {

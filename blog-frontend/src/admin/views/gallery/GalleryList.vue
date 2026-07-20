@@ -43,22 +43,30 @@ const form = ref({
   content_md: '',
 })
 
-const { loading, data, pagination, loadData, handleDelete } =
-  useAdminTable<GalleryItem>({
-    fetchData: async () => {
-      // 展览 API 没有分页，返回全部列表
-      const items = await api.get<GalleryItem[]>('/api/v1/gallery', true)
-      return { items, total: items.length }
-    },
-    deleteItem: async (item) => {
-      await api.delete(`/api/v1/gallery/${item.slug}`)
-    },
-  })
+const { loading, data, pagination, loadData, handleDelete } = useAdminTable<GalleryItem>({
+  fetchData: async () => {
+    // 展览 API 没有分页，返回全部列表
+    const items = await api.get<GalleryItem[]>('/api/v1/gallery', true)
+    return { items, total: items.length }
+  },
+  deleteItem: async (item) => {
+    await api.delete(`/api/v1/gallery/${item.slug}`)
+  },
+})
 
 /** 打开新建弹窗 */
 function openCreate() {
   isEdit.value = false
-  form.value = { slug: '', title: '', description: '', tags: '', status: '', year: '', is_featured: false, content_md: '' }
+  form.value = {
+    slug: '',
+    title: '',
+    description: '',
+    tags: '',
+    status: '',
+    year: '',
+    is_featured: false,
+    content_md: '',
+  }
   showDialog.value = true
 }
 
@@ -100,7 +108,12 @@ async function handleSave() {
       slug: form.value.slug,
       title: form.value.title,
       description: form.value.description,
-      tags: form.value.tags ? form.value.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      tags: form.value.tags
+        ? form.value.tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [],
       status: form.value.status,
       year: form.value.year,
       is_featured: form.value.is_featured,
@@ -136,13 +149,15 @@ onMounted(() => loadData())
     </div>
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="(data as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="title" label="标题" min-width="180" />
         <el-table-column prop="status" label="状态" width="100" />
         <el-table-column prop="year" label="年份" width="80" />
         <el-table-column prop="tags" label="标签" min-width="150">
           <template #default="{ row }: { row: any }">
-            <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin-right: 4px">{{ tag }}</el-tag>
+            <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin-right: 4px">{{
+              tag
+            }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="is_featured" label="精选" width="70">
@@ -153,7 +168,13 @@ onMounted(() => loadData())
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }: { row: any }">
             <el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row, `「${row.title}」`)">删除</el-button>
+            <el-button
+              type="danger"
+              link
+              size="small"
+              @click="handleDelete(row, `「${row.title}」`)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -186,21 +207,45 @@ onMounted(() => loadData())
           <el-checkbox v-model="form.is_featured">精选项目</el-checkbox>
         </el-form-item>
         <el-form-item label="Markdown 正文">
-          <el-input v-model="form.content_md" type="textarea" :rows="8" placeholder="项目详细介绍（Markdown）" />
+          <el-input
+            v-model="form.content_md"
+            type="textarea"
+            :rows="8"
+            placeholder="项目详细介绍（Markdown）"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">{{ isEdit ? '更新' : '创建' }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{
+          isEdit ? '更新' : '创建'
+        }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.gallery-list-page { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.page-title { font-size: 14px; color: var(--admin-text-secondary, #909399); }
-.table-card { border-radius: 12px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.gallery-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-title {
+  font-size: 14px;
+  color: var(--admin-text-secondary, #909399);
+}
+.table-card {
+  border-radius: 12px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
 </style>

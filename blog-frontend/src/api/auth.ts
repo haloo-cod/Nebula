@@ -11,6 +11,13 @@ export interface LoginRequest {
   password: string
 }
 
+/** 普通用户注册请求 */
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+}
+
 /** 登录响应（JWT） */
 export interface TokenResponse {
   access_token: string
@@ -22,11 +29,30 @@ export interface UserInfo {
   id: number
   username: string
   is_admin: boolean
+  email: string | null
+  display_name: string
+  avatar_url: string
+  email_verified: boolean
 }
 
 /** 管理员登录 */
 export function login(data: LoginRequest): Promise<TokenResponse> {
   return api.post<TokenResponse>('/api/v1/auth/login', data)
+}
+
+/** 用户名、邮箱和密码注册 */
+export function register(data: RegisterRequest): Promise<TokenResponse> {
+  return api.post<TokenResponse>('/api/v1/auth/register', data)
+}
+
+/** 使用 Refresh Cookie 恢复访问令牌 */
+export function refreshSession(): Promise<TokenResponse> {
+  return api.post<TokenResponse>('/api/v1/auth/refresh')
+}
+
+/** 撤销当前登录会话 */
+export function logoutSession(): Promise<void> {
+  return api.post<void>('/api/v1/auth/logout')
 }
 
 /** 获取当前登录用户信息（需要 token） */

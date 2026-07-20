@@ -118,8 +118,7 @@ async function deleteComment(comment: CommentItem) {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    const key = currentPageKey.value
-    await api.delete(`/api/v1/comments/${comment.id}?page_key=${encodeURIComponent(key)}`)
+    await api.delete(`/api/v1/comments/${comment.id}`)
     ElMessage.success('删除成功')
     loadComments()
   } catch {
@@ -186,7 +185,11 @@ onMounted(() => loadComments())
           v-if="sourceType === 'post'"
           v-model="selectedPostSlug"
           filterable
-          :filter-method="(val: string) => { postSearchKeyword = val }"
+          :filter-method="
+            (val: string) => {
+              postSearchKeyword = val
+            }
+          "
           placeholder="选择文章"
           @change="handleSelectionChange"
           :loading="loadingPosts"
@@ -209,7 +212,9 @@ onMounted(() => loadComments())
       <el-table :data="flattenComments(comments)" v-loading="loading" stripe style="width: 100%">
         <el-table-column label="层级" width="60">
           <template #default="{ row }">
-            <span v-if="row._depth > 0" class="indent-mark">{{ '└'.padStart(row._depth + 1, '  ') }}</span>
+            <span v-if="row._depth > 0" class="indent-mark">{{
+              '└'.padStart(row._depth + 1, '  ')
+            }}</span>
             <span v-else>—</span>
           </template>
         </el-table-column>
@@ -239,9 +244,7 @@ onMounted(() => loadComments())
       </el-table>
 
       <!-- 空状态 -->
-      <div v-if="!loading && comments.length === 0" class="empty-state">
-        暂无评论
-      </div>
+      <div v-if="!loading && comments.length === 0" class="empty-state">暂无评论</div>
     </el-card>
   </div>
 </template>

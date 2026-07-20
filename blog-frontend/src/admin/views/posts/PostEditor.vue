@@ -61,17 +61,39 @@ const editorRef = ref<HTMLDivElement | null>(null)
 /** 初始化 Vditor 编辑器 */
 function initVditor(content = '') {
   if (!editorRef.value) return
+  const isDark = document.documentElement.classList.contains('dark')
 
   vditor = new Vditor(editorRef.value, {
     height: 500,
     mode: 'ir',
+    theme: isDark ? 'dark' : 'classic',
     // 三种模式都可用
     toolbar: [
-      'emoji', 'headings', 'bold', 'italic', 'strike', '|',
-      'line', 'quote', 'list', 'ordered-list', 'check', '|',
-      'code', 'inline-code', 'link', 'upload', 'table', '|',
-      'undo', 'redo', '|',
-      'edit-mode', 'fullscreen', 'outline', 'preview',
+      'emoji',
+      'headings',
+      'bold',
+      'italic',
+      'strike',
+      '|',
+      'line',
+      'quote',
+      'list',
+      'ordered-list',
+      'check',
+      '|',
+      'code',
+      'inline-code',
+      'link',
+      'upload',
+      'table',
+      '|',
+      'undo',
+      'redo',
+      '|',
+      'edit-mode',
+      'fullscreen',
+      'outline',
+      'preview',
     ],
     placeholder: '开始写作...',
     cache: { enable: false },
@@ -101,6 +123,9 @@ function initVditor(content = '') {
     preview: {
       // 移除预览区的 Desktop/Tablet/Mobile/公众号/知乎 按钮
       actions: [],
+      theme: {
+        current: isDark ? 'dark' : 'ant-design',
+      },
     },
     after: () => {
       // 编辑器就绪后设置内容
@@ -109,6 +134,13 @@ function initVditor(content = '') {
       }
     },
   })
+}
+
+/** 后台主题切换时同步 Vditor 编辑区和预览区。 */
+function handleAdminThemeChange(event: Event) {
+  const customEvent = event as CustomEvent<{ isDark: boolean }>
+  const isDark = customEvent.detail.isDark
+  vditor?.setTheme(isDark ? 'dark' : 'classic', isDark ? 'dark' : 'ant-design')
 }
 
 /** 获取编辑器当前内容 */
@@ -171,28 +203,32 @@ function goBack() {
 }
 
 onMounted(() => {
+  window.addEventListener('admin-theme-change', handleAdminThemeChange)
   const slug = route.params.id as string
   if (slug && slug !== 'new') {
     isEdit.value = true
     // 先加载文章内容，再初始化编辑器
-    api.get<PostDetail>(`/api/v1/posts/${slug}`, true).then((detail) => {
-      form.value = {
-        slug: detail.slug,
-        title: detail.title,
-        description: detail.description,
-        date: detail.date,
-        cover_url: detail.cover_url,
-        category: detail.category,
-        tags: detail.tags,
-        is_draft: detail.is_draft,
-        is_pinned: detail.is_pinned,
-        content_md: detail.content_md,
-      }
-      initVditor(detail.content_md)
-    }).catch(() => {
-      ElMessage.error('加载文章失败')
-      initVditor('')
-    })
+    api
+      .get<PostDetail>(`/api/v1/posts/${slug}`, true)
+      .then((detail) => {
+        form.value = {
+          slug: detail.slug,
+          title: detail.title,
+          description: detail.description,
+          date: detail.date,
+          cover_url: detail.cover_url,
+          category: detail.category,
+          tags: detail.tags,
+          is_draft: detail.is_draft,
+          is_pinned: detail.is_pinned,
+          content_md: detail.content_md,
+        }
+        initVditor(detail.content_md)
+      })
+      .catch(() => {
+        ElMessage.error('加载文章失败')
+        initVditor('')
+      })
   } else {
     isEdit.value = false
     initVditor('')
@@ -200,6 +236,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('admin-theme-change', handleAdminThemeChange)
   vditor?.destroy()
   vditor = null
 })
@@ -320,6 +357,11 @@ onBeforeUnmount(() => {
 
 .editor-card {
   border-radius: 12px;
+  overflow: visible !important;
+}
+
+.editor-card :deep(.el-card__body) {
+  overflow: visible !important;
 }
 
 .vditor-container {

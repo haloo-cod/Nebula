@@ -36,8 +36,5 @@ export function waitForFirstTextureUploadSettled(): Promise<void> {
   if (hasTexture(darkBgUrl) || hasTexture(lightBgUrl)) {
     return Promise.resolve()
   }
-  return Promise.race([
-    waitForTexture(darkBgUrl, 1200),
-    waitForTexture(lightBgUrl, 1200),
-  ])
+  return Promise.race([waitForTexture(darkBgUrl, 1200), waitForTexture(lightBgUrl, 1200)])
 }

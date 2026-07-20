@@ -1,5 +1,9 @@
 <template>
-  <div class="liquid-glass" ref="containerRef" :class="{ 'liquid-glass--css-fallback': rendererFailed }">
+  <div
+    class="liquid-glass"
+    ref="containerRef"
+    :class="{ 'liquid-glass--css-fallback': rendererFailed }"
+  >
     <canvas
       ref="canvasRef"
       class="liquid-glass-canvas"
@@ -178,7 +182,10 @@ const uniforms: GlassUniforms = {
   blurRadius: 0,
   overlayColor: [0, 0, 0, 1],
   highlightWidth: 0,
-  trailPoints: Array.from({ length: MAX_TRAIL_POINTS }, () => [0, 0, 1, 0] as [number, number, number, number]),
+  trailPoints: Array.from(
+    { length: MAX_TRAIL_POINTS },
+    () => [0, 0, 1, 0] as [number, number, number, number],
+  ),
   trailRadius: 0,
   trailStrength: 0,
 }

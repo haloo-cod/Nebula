@@ -42,7 +42,9 @@ const router = useRouter()
 
 // 取最新 5 篇非草稿文章（先用 glob fallback）
 const slides = ref<Post[]>(
-  getPosts().filter((p) => !p.draft).slice(0, 5),
+  getPosts()
+    .filter((p) => !p.draft)
+    .slice(0, 5),
 )
 
 const current = ref(0)

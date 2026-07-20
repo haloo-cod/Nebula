@@ -6,8 +6,8 @@
 
 /** 单个页面的文案结构 */
 export interface PageText {
-  kicker: string   // 英文小标题（如 "Images"）
-  title: string    // 中文主标题（如 "图片"）
+  kicker: string // 英文小标题（如 "Images"）
+  title: string // 中文主标题（如 "图片"）
   subtitle: string // 副标题/描述（如 "定格时间，封存每一次心跳。"）
 }
 

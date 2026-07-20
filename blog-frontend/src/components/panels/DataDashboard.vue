@@ -7,19 +7,19 @@
 
     <div class="metrics-grid">
       <div class="metric-card">
-        <span class="metric-value">{{ formatNum(totalVisitors) }}</span>
+        <span class="metric-value">{{ formatNum(totalUv) }}</span>
         <span class="metric-label">总访客</span>
       </div>
       <div class="metric-card">
-        <span class="metric-value">{{ formatNum(todayVisitors) }}</span>
+        <span class="metric-value">{{ formatNum(todayUv) }}</span>
         <span class="metric-label">今日访客</span>
       </div>
       <div class="metric-card">
-        <span class="metric-value">{{ formatNum(totalViews) }}</span>
+        <span class="metric-value">{{ formatNum(totalPv) }}</span>
         <span class="metric-label">总浏览</span>
       </div>
       <div class="metric-card">
-        <span class="metric-value">{{ formatNum(todayViews) }}</span>
+        <span class="metric-value">{{ formatNum(todayPv) }}</span>
         <span class="metric-label">今日浏览</span>
       </div>
     </div>
@@ -58,28 +58,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { fetchPublicAnalyticsSummary } from '@/api/analytics'
 
-// 模拟访客数据（后端接入后替换为 API 请求）
-const mockVisitors = [
-  { label: '周一', value: 128 },
-  { label: '周二', value: 156 },
-  { label: '周三', value: 142 },
-  { label: '周四', value: 189 },
-  { label: '周五', value: 213 },
-  { label: '周六', value: 267 },
-  { label: '周日', value: 245 },
-]
+const totalUv = ref(0)
+const todayUv = ref(0)
+const totalPv = ref(0)
+const todayPv = ref(0)
+const visitors = ref<{ label: string; value: number }[]>([])
 
-const totalVisitors = 12847
-const todayVisitors = 245
-const totalViews = 38621
-const todayViews = 812
+onMounted(async () => {
+  try {
+    const summary = await fetchPublicAnalyticsSummary()
+    totalUv.value = summary.total_uv
+    todayUv.value = summary.today_uv
+    totalPv.value = summary.total_pv
+    todayPv.value = summary.today_pv
+    visitors.value = summary.trend.map((item) => ({
+      label: formatDate(item.date),
+      value: item.uv,
+    }))
+  } catch {
+    // 首页统计失败时保持空数据，不影响其他内容渲染。
+    visitors.value = []
+  }
+})
+
+function formatDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? '--' : `周${'日一二三四五六'[date.getDay()]}`
+}
 
 function formatNum(n: number): string {
-  if (n >= 10000) return (n / 10000).toFixed(1) + 'w'
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
-  return String(n)
+  return n.toLocaleString('zh-CN')
 }
 
 // SVG 坐标系
@@ -90,7 +101,7 @@ const padR = 10
 const padT = 12
 const padB = 22
 
-const maxVal = computed(() => Math.max(1, ...mockVisitors.map((d) => d.value)))
+const maxVal = computed(() => Math.max(1, ...visitors.value.map((d) => d.value)))
 
 interface YTick {
   value: number
@@ -116,7 +127,7 @@ const yTicks = computed<YTick[]>(() => {
 })
 
 const points = computed<ChartPoint[]>(() => {
-  const list = mockVisitors
+  const list = visitors.value
   if (list.length === 0) return []
   const innerW = W - padL - padR
   const innerH = H - padT - padB

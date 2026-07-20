@@ -16,14 +16,28 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--back" :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }" :src="album.photos[2].url" alt="" loading="lazy" @load="onImageLoad(album.photos[2].url)" />
+              <img
+                class="unit-img unit-img--back"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }"
+                :src="album.photos[2].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[2].url)"
+              />
             </div>
           </div>
         </LiquidGlass>
         <div v-else class="unit-glass unit-glass--fallback">
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--back" :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }" :src="album.photos[2].url" alt="" loading="lazy" @load="onImageLoad(album.photos[2].url)" />
+              <img
+                class="unit-img unit-img--back"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }"
+                :src="album.photos[2].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[2].url)"
+              />
             </div>
           </div>
         </div>
@@ -43,14 +57,28 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--mid" :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }" :src="album.photos[1].url" alt="" loading="lazy" @load="onImageLoad(album.photos[1].url)" />
+              <img
+                class="unit-img unit-img--mid"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }"
+                :src="album.photos[1].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[1].url)"
+              />
             </div>
           </div>
         </LiquidGlass>
         <div v-else class="unit-glass unit-glass--fallback">
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--mid" :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }" :src="album.photos[1].url" alt="" loading="lazy" @load="onImageLoad(album.photos[1].url)" />
+              <img
+                class="unit-img unit-img--mid"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }"
+                :src="album.photos[1].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[1].url)"
+              />
             </div>
           </div>
         </div>
@@ -70,7 +98,14 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img" :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }" :src="album.cover" :alt="album.title" loading="lazy" @load="onImageLoad(album.cover)" />
+              <img
+                class="unit-img"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }"
+                :src="album.cover"
+                :alt="album.title"
+                loading="lazy"
+                @load="onImageLoad(album.cover)"
+              />
               <div class="unit-overlay">
                 <span class="unit-overlay__count">{{ album.photos.length }} 张照片</span>
                 <span class="unit-overlay__hint">Click to Open</span>
@@ -81,7 +116,14 @@
         <div v-else class="unit-glass unit-glass--fallback">
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img" :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }" :src="album.cover" :alt="album.title" loading="lazy" @load="onImageLoad(album.cover)" />
+              <img
+                class="unit-img"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }"
+                :src="album.cover"
+                :alt="album.title"
+                loading="lazy"
+                @load="onImageLoad(album.cover)"
+              />
               <div class="unit-overlay">
                 <span class="unit-overlay__count">{{ album.photos.length }} 张照片</span>
                 <span class="unit-overlay__hint">Click to Open</span>

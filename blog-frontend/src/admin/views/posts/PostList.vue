@@ -26,19 +26,28 @@ interface PostItem {
 
 const router = useRouter()
 
-const { loading, data, keyword, pagination, loadData, handleSearch, handlePageChange, handleSizeChange, handleDelete } =
-  useAdminTable<PostItem>({
-    fetchData: async ({ page, pageSize, keyword: kw }) => {
-      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-      if (kw) params.set('category', kw)
-      const res = await api.get<{ items: PostItem[]; total: number }>(`/api/v1/posts?${params}`, true)
-      return res
-    },
-    deleteItem: async (item) => {
-      await api.delete(`/api/v1/posts/${item.slug}`)
-    },
-    defaultPageSize: 15,
-  })
+const {
+  loading,
+  data,
+  keyword,
+  pagination,
+  loadData,
+  handleSearch,
+  handlePageChange,
+  handleSizeChange,
+  handleDelete,
+} = useAdminTable<PostItem>({
+  fetchData: async ({ page, pageSize, keyword: kw }) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (kw) params.set('category', kw)
+    const res = await api.get<{ items: PostItem[]; total: number }>(`/api/v1/posts?${params}`, true)
+    return res
+  },
+  deleteItem: async (item) => {
+    await api.delete(`/api/v1/posts/${item.slug}`)
+  },
+  defaultPageSize: 15,
+})
 
 /** 跳转到编辑页 */
 function goEdit(slug: string) {
@@ -71,7 +80,7 @@ onMounted(() => loadData())
 
     <!-- 文章表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="(data as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <div class="title-cell">
@@ -84,14 +93,22 @@ onMounted(() => loadData())
         <el-table-column prop="category" label="分类" width="100" />
         <el-table-column prop="tags" label="标签" min-width="150">
           <template #default="{ row }">
-            <el-tag v-for="tag in row.tags" :key="tag" size="small" class="tag-item">{{ tag }}</el-tag>
+            <el-tag v-for="tag in row.tags" :key="tag" size="small" class="tag-item">{{
+              tag
+            }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="date" label="日期" width="120" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }: { row: any }">
             <el-button type="primary" link size="small" @click="goEdit(row.slug)">编辑</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row, `「${row.title}」`)">删除</el-button>
+            <el-button
+              type="danger"
+              link
+              size="small"
+              @click="handleDelete(row, `「${row.title}」`)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>

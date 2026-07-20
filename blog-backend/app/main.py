@@ -15,7 +15,9 @@ from app.database import engine, AsyncSessionLocal
 from app.middleware.cors import setup_cors
 from app.models import Base
 from app.models.user import User
+from app.services.schema_migration import migrate_existing_schema
 from app.utils.security import hash_password
+from app.services.book_download import cleanup_expired_book_archives
 
 
 @asynccontextmanager
@@ -25,6 +27,9 @@ async def lifespan(app: FastAPI):
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     (settings.UPLOAD_DIR / "images").mkdir(exist_ok=True)
     (settings.UPLOAD_DIR / "books").mkdir(exist_ok=True)
+    (settings.UPLOAD_DIR / "files").mkdir(exist_ok=True)
+    settings.BOOK_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    cleanup_expired_book_archives()
     settings.CONTENT_DIR.mkdir(parents=True, exist_ok=True)
     (settings.CONTENT_DIR / "posts").mkdir(exist_ok=True)
     (settings.CONTENT_DIR / "gallery").mkdir(exist_ok=True)
@@ -33,6 +38,7 @@ async def lifespan(app: FastAPI):
     # 建表
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await migrate_existing_schema(engine)
 
     # 初始化管理员账户（如果不存在）
     async with AsyncSessionLocal() as session:
@@ -62,15 +68,14 @@ app = FastAPI(
 # 中间件
 setup_cors(app)
 
-# 静态文件服务（图床 + EPUB）
-# 用 CORSMiddleware 包装 StaticFiles，确保 WebGL 等需要 crossOrigin 的请求能获取 CORS 头
-static_app = CORSMiddleware(
-    app=StaticFiles(directory=str(settings.UPLOAD_DIR)),
+# 仅公开图片目录；普通文件、EPUB 和 ZIP 必须通过鉴权 API 访问。
+static_images = CORSMiddleware(
+    app=StaticFiles(directory=str(settings.UPLOAD_DIR / "images")),
     allow_origins=settings.CORS_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-app.mount("/uploads", static_app, name="uploads")
+app.mount("/uploads/images", static_images, name="uploaded-images")
 
 # API 路由
 app.include_router(v1_router)

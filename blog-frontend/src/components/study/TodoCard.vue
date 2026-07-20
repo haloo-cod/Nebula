@@ -2,7 +2,10 @@
   <div class="todo-card-wrapper">
     <!-- 右上角 badge：进行中 与 累计 互斥，只显示一个 -->
     <span v-if="isActive" class="todo-active-badge">进行中</span>
-    <span v-else-if="todo.completedPomodoros > 0 && todo.todayCompleted === 0" class="todo-total-badge">
+    <span
+      v-else-if="todo.completedPomodoros > 0 && todo.todayCompleted === 0"
+      class="todo-total-badge"
+    >
       累计 {{ todo.completedPomodoros }} 个
     </span>
 
@@ -18,7 +21,11 @@
       ripple-trail
       @click="$emit('select', todo.id)"
     >
-      <TodoCardContent :todo="todo" @delete="$emit('delete', todo.id)" @toggle="$emit('toggle', todo.id)" />
+      <TodoCardContent
+        :todo="todo"
+        @delete="$emit('delete', todo.id)"
+        @toggle="$emit('toggle', todo.id)"
+      />
     </LiquidGlass>
 
     <PanelFallbackGlass
@@ -28,7 +35,11 @@
       :class="{ 'todo-card--active': isActive, 'todo-card--completed': todo.isCompleted }"
       @click="$emit('select', todo.id)"
     >
-      <TodoCardContent :todo="todo" @delete="$emit('delete', todo.id)" @toggle="$emit('toggle', todo.id)" />
+      <TodoCardContent
+        :todo="todo"
+        @delete="$emit('delete', todo.id)"
+        @toggle="$emit('toggle', todo.id)"
+      />
     </PanelFallbackGlass>
   </div>
 </template>

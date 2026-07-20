@@ -26,15 +26,19 @@ async def get_current_user(
     if payload is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效或过期的 Token")
 
-    username: str | None = payload.get("sub")
-    if not username:
+    subject: str | None = payload.get("sub")
+    if not subject:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token 格式错误")
 
-    result = await db.execute(select(User).where(User.username == username))
+    # 新 Token 使用稳定 user id；兼容升级前以 username 为 sub 的管理员 Token。
+    condition = User.id == int(subject) if subject.isdigit() else User.username == subject
+    result = await db.execute(select(User).where(condition))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
 
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账户已被禁用")
     return user
 
 

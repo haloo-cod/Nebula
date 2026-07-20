@@ -28,7 +28,9 @@
                 >
                   {{ currentPost.category }}
                 </span>
-                <span v-for="tag in currentPost.tags.slice(0, 4)" :key="tag" class="post-tag">#{{ tag }}</span>
+                <span v-for="tag in currentPost.tags.slice(0, 4)" :key="tag" class="post-tag"
+                  >#{{ tag }}</span
+                >
               </div>
             </div>
 
@@ -267,19 +269,58 @@ function goBack() {
   color: var(--text-muted);
 }
 
-.cat-cyan { color: #67e8f9; border-color: rgba(103, 232, 249, 0.5); }
-.cat-violet { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.5); }
-.cat-pink { color: #f9a8d4; border-color: rgba(249, 168, 212, 0.5); }
-.cat-emerald { color: #6ee7b7; border-color: rgba(110, 231, 183, 0.5); }
-.cat-blue { color: #93c5fd; border-color: rgba(147, 197, 253, 0.5); }
-.cat-sky { color: #7dd3fc; border-color: rgba(125, 211, 252, 0.5); }
-.cat-indigo { color: #a5b4fc; border-color: rgba(165, 180, 252, 0.5); }
-.cat-purple { color: #d8b4fe; border-color: rgba(216, 180, 254, 0.5); }
-.cat-orange { color: #fdba74; border-color: rgba(253, 186, 116, 0.5); }
-.cat-teal { color: #5eead4; border-color: rgba(94, 234, 212, 0.5); }
-.cat-rose { color: #fda4af; border-color: rgba(253, 164, 175, 0.5); }
-.cat-amber { color: #fcd34d; border-color: rgba(252, 211, 77, 0.5); }
-.cat-slate { color: #cbd5e1; border-color: rgba(203, 213, 225, 0.4); }
+.cat-cyan {
+  color: #67e8f9;
+  border-color: rgba(103, 232, 249, 0.5);
+}
+.cat-violet {
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, 0.5);
+}
+.cat-pink {
+  color: #f9a8d4;
+  border-color: rgba(249, 168, 212, 0.5);
+}
+.cat-emerald {
+  color: #6ee7b7;
+  border-color: rgba(110, 231, 183, 0.5);
+}
+.cat-blue {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.5);
+}
+.cat-sky {
+  color: #7dd3fc;
+  border-color: rgba(125, 211, 252, 0.5);
+}
+.cat-indigo {
+  color: #a5b4fc;
+  border-color: rgba(165, 180, 252, 0.5);
+}
+.cat-purple {
+  color: #d8b4fe;
+  border-color: rgba(216, 180, 254, 0.5);
+}
+.cat-orange {
+  color: #fdba74;
+  border-color: rgba(253, 186, 116, 0.5);
+}
+.cat-teal {
+  color: #5eead4;
+  border-color: rgba(94, 234, 212, 0.5);
+}
+.cat-rose {
+  color: #fda4af;
+  border-color: rgba(253, 164, 175, 0.5);
+}
+.cat-amber {
+  color: #fcd34d;
+  border-color: rgba(252, 211, 77, 0.5);
+}
+.cat-slate {
+  color: #cbd5e1;
+  border-color: rgba(203, 213, 225, 0.4);
+}
 
 /* ===== Markdown 正文 ===== */
 .prose {

@@ -131,7 +131,9 @@ export const useUIStore = defineStore('ui', () => {
   const darkBgIndex = ref(readStoredBgIndex(DARK_BG_KEY, darkBgs.value.length))
   const lightBgIndex = ref(readStoredBgIndex(LIGHT_BG_KEY, lightBgs.value.length))
   const mobileDarkBgIndex = ref(readStoredBgIndex(MOBILE_DARK_BG_KEY, mobileDarkBgs.value.length))
-  const mobileLightBgIndex = ref(readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBgs.value.length))
+  const mobileLightBgIndex = ref(
+    readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBgs.value.length),
+  )
   const rainEnabled = ref(readStoredBoolean(RAIN_ENABLED_KEY, false))
   const rainIntensity = ref(readStoredRainIntensity())
   const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
@@ -143,9 +145,14 @@ export const useUIStore = defineStore('ui', () => {
     const darkGroup = isMobile.value ? mobileDarkBgs.value : darkBgs.value
     const lightGroup = isMobile.value ? mobileLightBgs.value : lightBgs.value
     const group = theme.value === 'dark' ? darkGroup : lightGroup
-    const idx = theme.value === 'dark'
-      ? (isMobile.value ? mobileDarkBgIndex.value : darkBgIndex.value)
-      : (isMobile.value ? mobileLightBgIndex.value : lightBgIndex.value)
+    const idx =
+      theme.value === 'dark'
+        ? isMobile.value
+          ? mobileDarkBgIndex.value
+          : darkBgIndex.value
+        : isMobile.value
+          ? mobileLightBgIndex.value
+          : lightBgIndex.value
     return group[Math.min(idx, group.length - 1)]?.src ?? ''
   })
 

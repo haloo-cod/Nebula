@@ -134,11 +134,7 @@
           </article>
         </LiquidGlass>
 
-        <PanelFallbackGlass
-          v-else
-          tag="article"
-          class="exchange-card exchange-card-fallback"
-        >
+        <PanelFallbackGlass v-else tag="article" class="exchange-card exchange-card-fallback">
           <h2 class="exchange-title">交换友链</h2>
 
           <div class="exchange-site">
@@ -200,7 +196,11 @@ const exchangeInfo = {
   contact: 'your-email@example.com',
 }
 
-const { items: floatingItems, pause, resume } = useFloatingAvatars({
+const {
+  items: floatingItems,
+  pause,
+  resume,
+} = useFloatingAvatars({
   containerRef: aquariumRef,
   friends,
   mode: 'bounce',
@@ -261,7 +261,9 @@ onMounted(async () => {
   border-radius: 50%;
   text-decoration: none;
   will-change: transform;
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
 }
 
 .floating-avatar:hover,
@@ -278,7 +280,9 @@ onMounted(async () => {
   background: var(--glass-bg);
   object-fit: cover;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .floating-avatar:hover .floating-avatar__img,
@@ -302,7 +306,9 @@ onMounted(async () => {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .floating-avatar:hover .floating-avatar__name,

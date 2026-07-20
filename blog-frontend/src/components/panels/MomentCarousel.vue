@@ -1,12 +1,7 @@
 <template>
   <div class="moment-carousel" @mouseenter="pause" @mouseleave="resume" @click="handleClick">
     <!-- 所有 slide 绝对定位叠放 -->
-    <div
-      v-for="(moment, i) in slides"
-      :key="moment.id"
-      class="slide"
-      :class="slideClass(i)"
-    >
+    <div v-for="(moment, i) in slides" :key="moment.id" class="slide" :class="slideClass(i)">
       <div class="slide-header">
         <span class="slide-mood">{{ moodEmoji(moment.mood) }}</span>
         <span v-if="moment.mood" class="slide-mood-label">{{ moment.mood }}</span>

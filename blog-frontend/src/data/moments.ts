@@ -44,7 +44,8 @@ const allMoments: Moment[] = [
   {
     id: 4,
     date: '2026-07-10T16:45:00',
-    content: '在 Vue 里把一个 UI 拆成小组件的时候，就像在搭积木一样有成就感。今天把归档页的时间河流做好了！',
+    content:
+      '在 Vue 里把一个 UI 拆成小组件的时候，就像在搭积木一样有成就感。今天把归档页的时间河流做好了！',
     mood: '开心',
     tags: ['前端', 'vue'],
     images: [img02, img03],
@@ -62,7 +63,8 @@ const allMoments: Moment[] = [
   {
     id: 6,
     date: '2026-07-05T11:00:00',
-    content: '发现了一个超棒的 CSS 技巧，用 backdrop-filter 可以做出真正的毛玻璃效果，不过性能开销不小。后来改用 WebGL 实现了液态玻璃，效果炸裂。',
+    content:
+      '发现了一个超棒的 CSS 技巧，用 backdrop-filter 可以做出真正的毛玻璃效果，不过性能开销不小。后来改用 WebGL 实现了液态玻璃，效果炸裂。',
     mood: '灵感',
     tags: ['前端', 'CSS'],
     images: [img04, img05, img01],
@@ -89,7 +91,8 @@ const allMoments: Moment[] = [
   {
     id: 9,
     date: '2026-06-28T15:20:00',
-    content: '读完了《重构》第二版，虽然很多内容已经知道了，但系统性地再看一遍还是有新的体会。代码就像文章，要反复打磨才能简洁有力。',
+    content:
+      '读完了《重构》第二版，虽然很多内容已经知道了，但系统性地再看一遍还是有新的体会。代码就像文章，要反复打磨才能简洁有力。',
     mood: '思考',
     tags: ['阅读', '编程'],
     images: [],
@@ -98,7 +101,8 @@ const allMoments: Moment[] = [
   {
     id: 10,
     date: '2026-06-25T19:45:00',
-    content: '今天尝试用 Rust 写了一个小工具，编译器的错误提示真的太友好了，感觉被编译器教育了一整天。',
+    content:
+      '今天尝试用 Rust 写了一个小工具，编译器的错误提示真的太友好了，感觉被编译器教育了一整天。',
     mood: '疲惫',
     tags: ['Rust', '学习'],
     images: [],

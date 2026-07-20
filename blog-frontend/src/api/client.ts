@@ -53,7 +53,7 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  options?: { auth?: boolean },
+  options?: { auth?: boolean; retry?: boolean },
 ): Promise<T> {
   // API 开关关闭时直接抛异常，触发各页面 fallback
   if (!USE_API) {
@@ -78,11 +78,28 @@ async function request<T>(
     method,
     headers,
     body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   })
 
   if (!response.ok) {
-    if (response.status === 401) {
-      clearToken()
+    if (
+      response.status === 401 &&
+      auth &&
+      options?.retry !== false &&
+      path !== '/api/v1/auth/refresh'
+    ) {
+      try {
+        const refreshed = await request<{ access_token: string }>(
+          'POST',
+          '/api/v1/auth/refresh',
+          undefined,
+          { retry: false },
+        )
+        setToken(refreshed.access_token)
+        return request<T>(method, path, body, { auth, retry: false })
+      } catch {
+        clearToken()
+      }
     }
     let detail = `请求失败 (${response.status})`
     try {

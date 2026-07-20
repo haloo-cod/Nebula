@@ -59,7 +59,15 @@ const raindrops: Raindrop[] = []
 const splashes: Splash[] = []
 
 for (let i = 0; i < MAX_RAINDROPS; i++) {
-  raindrops.push({ x: 0, y: 0, speed: 0, length: 0, opacity: 0, active: false, wasInsidePane: false })
+  raindrops.push({
+    x: 0,
+    y: 0,
+    speed: 0,
+    length: 0,
+    opacity: 0,
+    active: false,
+    wasInsidePane: false,
+  })
 }
 for (let i = 0; i < MAX_SPLASHES; i++) {
   splashes.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, active: false })
@@ -75,15 +83,11 @@ let dropsSpawnAcc = 0
 
 // —— Theme colors ——
 const rainColor = computed(() =>
-  theme.value === 'dark'
-    ? 'rgba(180, 210, 255, {{o}})'
-    : 'rgba(60, 120, 220, {{o}})',
+  theme.value === 'dark' ? 'rgba(180, 210, 255, {{o}})' : 'rgba(60, 120, 220, {{o}})',
 )
 
 const splashColor = computed(() =>
-  theme.value === 'dark'
-    ? 'rgba(200, 230, 255, {{o}})'
-    : 'rgba(80, 140, 220, {{o}})',
+  theme.value === 'dark' ? 'rgba(200, 230, 255, {{o}})' : 'rgba(80, 140, 220, {{o}})',
 )
 
 function colorWithOpacity(template: string, opacity: number): string {
@@ -159,7 +163,9 @@ function tick() {
   while (dropsSpawnAcc >= 1) {
     dropsSpawnAcc -= 1
     let activeCount = 0
-    for (const d of raindrops) { if (d.active) activeCount++ }
+    for (const d of raindrops) {
+      if (d.active) activeCount++
+    }
     if (activeCount < cfg.maxDrops) {
       for (const d of raindrops) {
         if (!d.active) {
@@ -209,7 +215,10 @@ function tick() {
     s.y += s.vy
     s.vy += 0.12
     s.life--
-    if (s.life <= 0) { s.active = false; continue }
+    if (s.life <= 0) {
+      s.active = false
+      continue
+    }
 
     const t = s.life / s.maxLife
     const angle = Math.atan2(s.vy, s.vx)

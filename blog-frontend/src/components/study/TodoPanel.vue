@@ -15,7 +15,13 @@
       <div class="todo-form-row">
         <label class="form-field">
           <span>专注</span>
-          <input v-model.number="newDuration" class="panel-number" type="number" min="1" max="180" />
+          <input
+            v-model.number="newDuration"
+            class="panel-number"
+            type="number"
+            min="1"
+            max="180"
+          />
           <span>分钟</span>
         </label>
         <label class="form-field">
@@ -54,7 +60,12 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  add: [todo: Omit<StudyTodo, 'id' | 'createdAt' | 'completedPomodoros' | 'todayCompleted' | 'isRunning' | 'isCompleted'>]
+  add: [
+    todo: Omit<
+      StudyTodo,
+      'id' | 'createdAt' | 'completedPomodoros' | 'todayCompleted' | 'isRunning' | 'isCompleted'
+    >,
+  ]
   select: [id: string]
   delete: [id: string]
   toggle: [id: string]

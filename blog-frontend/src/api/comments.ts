@@ -12,6 +12,9 @@ export interface CommentItem {
   date: string
   content: string
   avatar_color: string
+  avatar_url: string
+  user_id: number | null
+  can_delete: boolean
   children: CommentItem[]
 }
 
@@ -24,6 +27,7 @@ interface CommentListResponse {
 export async function fetchComments(pageKey: string): Promise<CommentItem[]> {
   const res = await api.get<CommentListResponse>(
     `/api/v1/comments?page_key=${encodeURIComponent(pageKey)}`,
+    true,
   )
   return res.items
 }
@@ -37,9 +41,7 @@ export async function fetchCommentCount(pageKey: string): Promise<number> {
 }
 
 /** 批量获取多个页面的评论总数 */
-export async function fetchBatchCommentCount(
-  pageKeys: string[],
-): Promise<Record<string, number>> {
+export async function fetchBatchCommentCount(pageKeys: string[]): Promise<Record<string, number>> {
   return api.post<Record<string, number>>('/api/v1/comments/batch-count', {
     page_keys: pageKeys,
   })
@@ -48,19 +50,21 @@ export async function fetchBatchCommentCount(
 /** 发表评论 */
 export async function postComment(
   pageKey: string,
-  author: string,
   content: string,
   parentId?: number | null,
 ): Promise<CommentItem> {
-  return api.post<CommentItem>('/api/v1/comments', {
-    page_key: pageKey,
-    author,
-    content,
-    parent_id: parentId || null,
-  })
+  return api.post<CommentItem>(
+    '/api/v1/comments',
+    {
+      page_key: pageKey,
+      content,
+      parent_id: parentId || null,
+    },
+    true,
+  )
 }
 
 /** 删除评论（需认证） */
-export async function deleteComment(pageKey: string, commentId: number): Promise<void> {
-  await api.delete(`/api/v1/comments/${commentId}?page_key=${encodeURIComponent(pageKey)}`)
+export async function deleteComment(commentId: number): Promise<void> {
+  await api.delete(`/api/v1/comments/${commentId}`)
 }

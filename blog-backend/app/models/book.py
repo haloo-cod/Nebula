@@ -2,7 +2,7 @@
 Book 模型 — EPUB 电子书索引
 """
 
-from sqlalchemy import String, Text
+from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -17,5 +17,6 @@ class Book(Base, TimestampMixin):
     author: Mapped[str] = mapped_column(String(200), default="")
     description: Mapped[str] = mapped_column(Text, default="")
     cover_url: Mapped[str] = mapped_column(String(500), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
     # 相对于 uploads/books/ 的文件路径
     file_path: Mapped[str] = mapped_column(String(500), default="")

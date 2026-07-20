@@ -51,7 +51,13 @@ function openCreate() {
 function openEdit(item: FriendItem) {
   isEdit.value = true
   editingId.value = item.id
-  form.value = { name: item.name, bio: item.bio, avatar: item.avatar, url: item.url, sort_order: item.sort_order }
+  form.value = {
+    name: item.name,
+    bio: item.bio,
+    avatar: item.avatar,
+    url: item.url,
+    sort_order: item.sort_order,
+  }
   showDialog.value = true
 }
 
@@ -86,7 +92,9 @@ async function handleDelete(item: FriendItem) {
     await api.delete(`/api/v1/friends/${item.id}`)
     ElMessage.success('删除成功')
     loadFriends()
-  } catch { /* 取消 */ }
+  } catch {
+    /* 取消 */
+  }
 }
 
 onMounted(() => loadFriends())
@@ -102,7 +110,7 @@ onMounted(() => loadFriends())
     </div>
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="(friends as any)" v-loading="loading" stripe style="width: 100%">
+      <el-table :data="friends as any" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="name" label="站名" width="140" />
         <el-table-column prop="bio" label="简介" min-width="200" />
         <el-table-column prop="avatar" label="头像" width="70">
@@ -147,18 +155,44 @@ onMounted(() => loadFriends())
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">{{ isEdit ? '更新' : '创建' }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{
+          isEdit ? '更新' : '创建'
+        }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.friend-list-page { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; }
-.page-title { font-size: 14px; color: var(--admin-text-secondary, #909399); }
-.table-card { border-radius: 12px; }
-.avatar-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.link-text { color: #409eff; text-decoration: none; font-size: 13px; }
-.link-text:hover { text-decoration: underline; }
+.friend-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-title {
+  font-size: 14px;
+  color: var(--admin-text-secondary, #909399);
+}
+.table-card {
+  border-radius: 12px;
+}
+.avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.link-text {
+  color: #409eff;
+  text-decoration: none;
+  font-size: 13px;
+}
+.link-text:hover {
+  text-decoration: underline;
+}
 </style>

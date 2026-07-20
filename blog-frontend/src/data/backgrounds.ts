@@ -14,26 +14,13 @@ export interface BackgroundItem {
 }
 
 /** 静态 fallback: dark 主题桌面端背景图组 */
-export const darkBackgrounds: BackgroundItem[] = [
-  { src: img01 },
-  { src: img02 },
-  { src: img03 },
-]
+export const darkBackgrounds: BackgroundItem[] = [{ src: img01 }, { src: img02 }, { src: img03 }]
 
 /** 静态 fallback: light 主题桌面端背景图组 */
-export const lightBackgrounds: BackgroundItem[] = [
-  { src: img05 },
-  { src: img04 },
-]
+export const lightBackgrounds: BackgroundItem[] = [{ src: img05 }, { src: img04 }]
 
 /** 静态 fallback: dark 主题移动端背景图组 */
-export const mobileDarkBackgrounds: BackgroundItem[] = [
-  { src: mob01 },
-  { src: mob03 },
-]
+export const mobileDarkBackgrounds: BackgroundItem[] = [{ src: mob01 }, { src: mob03 }]
 
 /** 静态 fallback: light 主题移动端背景图组 */
-export const mobileLightBackgrounds: BackgroundItem[] = [
-  { src: mob05 },
-  { src: mob07 },
-]
+export const mobileLightBackgrounds: BackgroundItem[] = [{ src: mob05 }, { src: mob07 }]

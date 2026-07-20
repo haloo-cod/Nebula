@@ -3,7 +3,9 @@
     <!-- 头部:时间 + 心情 -->
     <div class="detail-inner__head">
       <span class="detail-inner__time">{{ fullDate(moment.date) }}</span>
-      <span v-if="moment.mood" class="detail-inner__mood">{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span>
+      <span v-if="moment.mood" class="detail-inner__mood"
+        >{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span
+      >
     </div>
 
     <!-- 完整正文(不截断) -->
@@ -24,7 +26,9 @@
         :class="{ 'detail-inner__like-btn--active': isLiked }"
         @click="toggleLike"
       >
-        <span class="detail-inner__heart" :class="{ 'detail-inner__heart--pop': justLiked }">♥</span>
+        <span class="detail-inner__heart" :class="{ 'detail-inner__heart--pop': justLiked }"
+          >♥</span
+        >
         <span>{{ displayLikes }}</span>
       </button>
     </div>
@@ -109,7 +113,9 @@ function toggleLike() {
     localLikeDelta.value++
     isLiked.value = true
     justLiked.value = true
-    setTimeout(() => { justLiked.value = false }, 400)
+    setTimeout(() => {
+      justLiked.value = false
+    }, 400)
     // 调用后端 API 点赞（静默）
     likeMoment(props.moment.id).catch(() => {})
   }
@@ -240,9 +246,15 @@ function moodEmoji(mood: string): string {
 }
 
 @keyframes heartPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 评论区 */

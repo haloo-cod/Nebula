@@ -22,12 +22,16 @@
       <span class="toolbar-toggle-icon">{{ toolbarVisible ? '✕' : '≡' }}</span>
     </button>
     <header class="reader-toolbar" :class="{ 'reader-toolbar--hidden': !toolbarVisible }">
-      <button class="reader-back reader-back--desktop" type="button" @click="goBack">返回书架</button>
+      <button class="reader-back reader-back--desktop" type="button" @click="goBack">
+        返回书架
+      </button>
 
       <div class="reader-title-wrap">
         <div class="reader-title-head">
           <p class="reader-kicker">Glass Study</p>
-          <button class="reader-back reader-back--mobile" type="button" @click="goBack">返回书架</button>
+          <button class="reader-back reader-back--mobile" type="button" @click="goBack">
+            返回书架
+          </button>
         </div>
         <h1 class="reader-title">{{ book?.title || '图书阅读器' }}</h1>
         <p v-if="book?.author" class="reader-author">{{ book.author }}</p>
@@ -163,9 +167,8 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getBook } from '@/data/books'
 import { fetchBook } from '@/api/books'
-import { resolveUrl } from '@/api/client'
+import { BASE_URL, resolveUrl } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import type { Book } from '@/types'
 import type EpubBook from 'epubjs/types/book'
@@ -524,10 +527,10 @@ async function loadReader(anchor?: ReaderAnchor) {
   // 优先从 API 获取
   try {
     const apiBook = await fetchBook(slug)
-    currentBook = { ...apiBook, file: resolveUrl(apiBook.file), cover: resolveUrl(apiBook.cover) }
+    currentBook = { ...apiBook, cover: resolveUrl(apiBook.cover) }
   } catch {
-    // 后端不可用时 fallback 到本地 glob
-    currentBook = getBook(slug)
+    // 阅读内容统一走后端公开阅读接口，避免通过前端静态资源绕过访问控制。
+    currentBook = null
   }
 
   if (!currentBook) {
@@ -551,7 +554,10 @@ async function loadReader(anchor?: ReaderAnchor) {
     const { default: ePub } = await import('epubjs')
     if (!isCurrentRun(runId)) return
 
-    epubBook = ePub(currentBook.file)
+    const epubResponse = await fetch(`${BASE_URL}/api/v1/books/${encodeURIComponent(slug)}/read`)
+    if (!epubResponse.ok) throw new Error('图书阅读内容加载失败')
+    const epubBuffer = await epubResponse.arrayBuffer()
+    epubBook = ePub(epubBuffer)
     const navigation = await epubBook.loaded.navigation
     tocItems.value = flattenToc(navigation.toc)
     rendition.value = epubBook.renderTo(viewerRef.value, getRenditionOptions())

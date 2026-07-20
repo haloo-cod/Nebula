@@ -1,25 +1,276 @@
 """
-图书路由 — Books CRUD
+图书路由 — Books CRUD 与下载
 """
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+import json
+import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.database import get_db
 from app.models.book import Book
+from app.models.book_download import BookDownloadJob
 from app.models.user import User
-from app.schemas.book import BookDetail, BookCreate, BookListItem, BookListResponse
+from app.schemas.book import (
+    BookDetail,
+    BookCoverCandidate,
+    BookCoverSelection,
+    BookListItem,
+    BookListResponse,
+    BookReorderRequest,
+    BookUpdate,
+)
+from app.schemas.book_download import (
+    BookDownloadJobCreate,
+    BookDownloadJobListResponse,
+    BookDownloadJobResponse,
+)
 from app.services.book import (
     BOOKS_DIR,
     extract_cover_image,
     get_epub_files,
+    list_cover_candidates,
     read_epub_metadata,
+    save_epub_upload,
+    select_cover_image,
+    delete_book_files,
     slugify,
 )
+from app.services.book_download import normalize_utc, process_book_download_job
+from app.models.analytics import AnalyticsEvent
+from app.services.analytics import get_client_ip, hash_ip, utc_now
 
 router = APIRouter(prefix="/books", tags=["图书"])
+
+
+def _download_name(book: Book) -> str:
+    """生成安全的 EPUB 下载文件名。"""
+    value = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", f"{book.title} - {book.author}".strip(" -"))
+    return f"{value or book.slug}.epub"
+
+
+def _book_path(book: Book):
+    """解析图书文件路径，并确保文件位于图书存储目录内。"""
+    path = BOOKS_DIR / f"{book.slug}.epub"
+    try:
+        path.resolve().relative_to(BOOKS_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="图书文件路径无效")
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书文件不存在")
+    return path
+
+
+@router.post("/download-jobs", response_model=BookDownloadJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def create_book_download_job(
+    data: BookDownloadJobCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """创建批量下载任务，打包工作在响应返回后执行。"""
+    unique_slugs = list(dict.fromkeys(data.slugs))
+    if not unique_slugs or len(unique_slugs) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="一次最多选择 100 本图书")
+    result = await db.execute(select(Book).where(Book.slug.in_(unique_slugs)))
+    books = list(result.scalars().all())
+    if len(books) != len(unique_slugs):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="部分图书不存在")
+    job = BookDownloadJob(user_id=user.id, slugs_json=json.dumps(unique_slugs), total_books=len(unique_slugs))
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    background_tasks.add_task(process_book_download_job, job.id)
+    return _job_response(job)
+
+
+def _job_response(job: BookDownloadJob) -> BookDownloadJobResponse:
+    """将任务模型转换为前端状态响应。"""
+    progress = round(job.completed_books / job.total_books * 100) if job.total_books else 0
+    expires_at = normalize_utc(job.expires_at)
+    is_expired = bool(expires_at and expires_at < datetime.now(timezone.utc))
+    display_status = "expired" if job.status == "completed" and is_expired else job.status
+    download_url = (
+        f"/api/v1/books/download-jobs/{job.id}/file"
+        if display_status == "completed"
+        else None
+    )
+    return BookDownloadJobResponse(
+        id=job.id, status=display_status, total_books=job.total_books,
+        completed_books=job.completed_books, progress=progress, file_size=job.file_size,
+        error_message=job.error_message,
+        expires_at=expires_at,
+        download_url=download_url,
+        created_at=normalize_utc(job.created_at),
+    )
+
+
+@router.get("/download-jobs/{job_id}", response_model=BookDownloadJobResponse)
+async def get_book_download_job(job_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)):
+    """查询管理员创建的批量下载任务。"""
+    job = await db.get(BookDownloadJob, job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="下载任务不存在")
+    return _job_response(job)
+
+
+@router.get("/download-jobs", response_model=BookDownloadJobListResponse)
+async def list_book_download_jobs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """获取当前管理员创建的图书归档历史。"""
+    count = await db.execute(
+        select(func.count(BookDownloadJob.id)).where(BookDownloadJob.user_id == user.id)
+    )
+    total = count.scalar() or 0
+    result = await db.execute(
+        select(BookDownloadJob)
+        .where(BookDownloadJob.user_id == user.id)
+        .order_by(BookDownloadJob.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return BookDownloadJobListResponse(
+        items=[_job_response(job) for job in result.scalars().all()],
+        total=total,
+    )
+
+
+@router.post("/download-jobs/{job_id}/retry", response_model=BookDownloadJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def retry_book_download_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """重新生成已完成、已过期或失败的图书归档。"""
+    job = await db.get(BookDownloadJob, job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="下载任务不存在")
+    if job.status in {"pending", "running"}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="任务正在打包中")
+    background_tasks.add_task(process_book_download_job, job.id)
+    job.status = "pending"
+    await db.commit()
+    await db.refresh(job)
+    return _job_response(job)
+
+
+@router.delete("/download-jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book_download_job(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """删除图书归档历史和对应的 ZIP 文件。"""
+    job = await db.get(BookDownloadJob, job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="下载任务不存在")
+    if job.output_path:
+        Path(job.output_path).unlink(missing_ok=True)
+    await db.delete(job)
+    await db.commit()
+
+
+@router.get("/download-jobs/{job_id}/file", response_class=FileResponse)
+async def download_book_job_file(job_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(require_admin)):
+    """下载已完成的 ZIP，并拒绝过期任务。"""
+    job = await db.get(BookDownloadJob, job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="下载任务不存在")
+    if job.status != "completed" or not job.output_path:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="ZIP 尚未准备好")
+    expires_at = normalize_utc(job.expires_at)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="ZIP 已过期，请重新打包")
+    path = Path(job.output_path)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ZIP 文件不存在")
+    return FileResponse(path, filename="starlit-books.zip", media_type="application/zip")
+
+
+@router.get("/{slug}/download", response_class=FileResponse)
+async def download_book(
+    slug: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """下载单本 EPUB。"""
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    ip_address = get_client_ip(request)
+    ip_hash = hash_ip(ip_address)
+    since = utc_now() - timedelta(hours=1)
+    recent = await db.execute(
+        select(func.count(AnalyticsEvent.id)).where(
+            AnalyticsEvent.event_type == "book_download",
+            AnalyticsEvent.ip_hash == ip_hash,
+            AnalyticsEvent.occurred_at >= since,
+        )
+    )
+    if int(recent.scalar() or 0) >= 20:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="下载过于频繁，请稍后再试")
+    db.add(
+        AnalyticsEvent(
+            event_type="book_download",
+            path=f"/api/v1/books/{slug}/download",
+            title=book.title,
+            user_agent=request.headers.get("user-agent", "")[:1000],
+            ip_address=ip_address,
+            ip_hash=ip_hash,
+            user_id=user.id,
+            occurred_at=utc_now(),
+        )
+    )
+    await db.commit()
+    return FileResponse(_book_path(book), filename=_download_name(book), media_type="application/epub+zip")
+
+
+@router.get("/{slug}/read", response_class=FileResponse)
+async def read_book(slug: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """公开提供 EPUB 阅读内容，不开放附件下载。"""
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    ip_address = get_client_ip(request)
+    ip_hash = hash_ip(ip_address)
+    since = utc_now() - timedelta(minutes=10)
+    recent = await db.execute(
+        select(func.count(AnalyticsEvent.id)).where(
+            AnalyticsEvent.event_type == "book_open",
+            AnalyticsEvent.ip_hash == ip_hash,
+            AnalyticsEvent.path == f"/api/v1/books/{slug}/read",
+            AnalyticsEvent.occurred_at >= since,
+        )
+    )
+    if int(recent.scalar() or 0) >= 10:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="访问过于频繁，请稍后再试")
+    db.add(
+        AnalyticsEvent(
+            event_type="book_open",
+            path=f"/api/v1/books/{slug}/read",
+            title=book.title,
+            user_agent=request.headers.get("user-agent", "")[:1000],
+            ip_address=ip_address,
+            ip_hash=ip_hash,
+            occurred_at=utc_now(),
+        )
+    )
+    await db.commit()
+    return FileResponse(_book_path(book), media_type="application/epub+zip", content_disposition_type="inline")
 
 
 @router.get("", response_model=BookListResponse)
@@ -41,7 +292,7 @@ async def list_books(
             )
         )
 
-    stmt = stmt.order_by(Book.created_at.desc())
+    stmt = stmt.order_by(Book.sort_order.asc(), Book.created_at.desc())
 
     # 总数
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -53,6 +304,19 @@ async def list_books(
     items = list(result.scalars().all())
 
     return BookListResponse(items=items, total=total)
+
+
+@router.get("/admin/all", response_model=list[BookListItem])
+async def list_all_books_for_admin(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """获取全部图书，用于后台全局排序。"""
+
+    result = await db.execute(
+        select(Book).order_by(Book.sort_order.asc(), Book.created_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 @router.get("/{slug}", response_model=BookDetail)
@@ -81,34 +345,138 @@ async def create_book(
     slug = slugify(file.filename)
     filename = f"{slug}.epub"
 
-    # 保存文件
-    BOOKS_DIR.mkdir(parents=True, exist_ok=True)
-    content = await file.read()
-    internal_path = f"books/{filename}"
-    (BOOKS_DIR / filename).write_bytes(content)
-
-    # 提取元数据
-    meta = read_epub_metadata(internal_path)
-    book_title = title or meta.get("title") or slug
-    book_author = author or meta.get("author") or ""
-
-    # 提取封面
-    cover_url = extract_cover_image(internal_path, slug)
-
-    # 检查 slug 唯一性
+    # 写盘前检查 slug，避免重复上传覆盖现有 EPUB
     existing = await db.execute(select(Book).where(Book.slug == slug))
     if existing.scalar_one_or_none():
+        await file.close()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="slug 已存在")
 
-    book = Book(
-        slug=slug,
-        title=book_title,
-        author=book_author,
-        description=description or meta.get("description", ""),
-        cover_url=cover_url,
-        file_path=f"/uploads/books/{filename}",
-    )
-    db.add(book)
+    # 分块保存到临时文件，完整写入后再原子移动到正式路径
+    internal_path = f"books/{filename}"
+    await save_epub_upload(file, filename)
+
+    try:
+        # 提取元数据
+        meta = read_epub_metadata(internal_path)
+        book_title = title or meta.get("title") or slug
+        book_author = author or meta.get("author") or ""
+
+        # 提取封面
+        cover_url = extract_cover_image(internal_path, slug)
+
+        max_order = (await db.execute(select(func.max(Book.sort_order)))).scalar()
+        book = Book(
+            slug=slug,
+            title=book_title,
+            author=book_author,
+            description=description or meta.get("description", ""),
+            cover_url=cover_url,
+            file_path=f"/uploads/books/{filename}",
+            sort_order=(max_order + 1) if max_order is not None else 0,
+        )
+        db.add(book)
+        await db.commit()
+        await db.refresh(book)
+        return book
+    except Exception:
+        await db.rollback()
+        delete_book_files(slug)
+        raise
+
+
+@router.put("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_books(
+    data: BookReorderRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """按 slug 列表保存全局排序。"""
+
+    if len(data.slugs) != len(set(data.slugs)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="排序列表包含重复 slug")
+    result = await db.execute(select(Book))
+    books = list(result.scalars().all())
+    book_map = {book.slug: book for book in books}
+    if set(data.slugs) != set(book_map):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="排序列表与现有图书不一致")
+    for index, slug in enumerate(data.slugs):
+        book_map[slug].sort_order = index
+    await db.commit()
+
+
+@router.put("/{slug}", response_model=BookDetail)
+async def update_book(
+    slug: str,
+    data: BookUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新图书标题、作者、简介、封面和排序值。"""
+
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(book, field, value)
+    await db.commit()
+    await db.refresh(book)
+    return book
+
+
+@router.post("/{slug}/extract-cover", response_model=BookDetail)
+async def reextract_book_cover(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """使用改进后的规则重新从 EPUB 提取封面。"""
+
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    cover_url = extract_cover_image(f"books/{slug}.epub", slug, force=True)
+    if not cover_url:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="未能从 EPUB 识别封面")
+    book.cover_url = cover_url
+    await db.commit()
+    await db.refresh(book)
+    return book
+
+
+@router.get("/{slug}/cover-candidates", response_model=list[BookCoverCandidate])
+async def get_book_cover_candidates(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """列出当前 EPUB 内可预览和选择的图片。"""
+
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    return list_cover_candidates(f"books/{slug}.epub")
+
+
+@router.post("/{slug}/select-cover", response_model=BookDetail)
+async def select_book_cover(
+    slug: str,
+    data: BookCoverSelection,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """选择当前 EPUB manifest 中的一张图片作为封面。"""
+
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    cover_url = select_cover_image(f"books/{slug}.epub", slug, data.item_name)
+    if not cover_url:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="无法使用该候选图片")
+    book.cover_url = cover_url
     await db.commit()
     await db.refresh(book)
     return book
@@ -127,9 +495,7 @@ async def delete_book(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
 
     # 删除 EPUB 文件
-    epub_path = BOOKS_DIR / f"{slug}.epub"
-    if epub_path.exists():
-        epub_path.unlink()
+    delete_book_files(slug)
 
     await db.delete(book)
     await db.commit()

@@ -5,13 +5,17 @@
 import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.database import get_db
 from app.config import settings
 from app.models.image import UploadedImage
+from app.models.album import Album, AlbumPhoto
+from app.models.background import Background
+from app.models.book import Book
+from app.models.carousel import CarouselSlide
 from app.models.user import User
 from app.schemas.image import ImageListResponse, ImageResponse
 from app.services.image import delete_file, generate_upload_path, save_upload_file
@@ -109,6 +113,30 @@ async def delete_image(
     image = result.scalar_one_or_none()
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图片不存在")
+
+    # 图片可能被多个内容模块共用，删除前统一检查核心外键和图书封面 URL。
+    references: list[str] = []
+    checks = [
+        (CarouselSlide, CarouselSlide.image_id == image_id, "首页轮播"),
+        (Background, Background.image_id == image_id, "背景图"),
+        (Album, Album.cover_image_id == image_id, "相册封面"),
+        (AlbumPhoto, AlbumPhoto.image_id == image_id, "相册照片"),
+    ]
+    for model, condition, label in checks:
+        count = (await db.execute(select(func.count()).select_from(model).where(condition))).scalar() or 0
+        if count:
+            references.append(f"{label} {count} 处")
+    book_count = (
+        await db.execute(
+            select(func.count()).select_from(Book).where(
+                or_(Book.cover_url == image.url, Book.cover_url == image.filename, Book.cover_url == f"/uploads/{image.filename}")
+            )
+        )
+    ).scalar() or 0
+    if book_count:
+        references.append(f"图书封面 {book_count} 处")
+    if references:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"图片正在使用：{'、'.join(references)}，请先解除引用")
 
     # 删除文件
     delete_file(image.filename)

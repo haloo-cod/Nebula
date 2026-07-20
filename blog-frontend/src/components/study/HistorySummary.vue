@@ -9,11 +9,19 @@
     :highlight-width="2.5"
     ripple-trail
   >
-    <HistorySummaryContent :today="todayRecord" :total-pomodoros="totalPomodoros" :total-minutes="totalMinutes" />
+    <HistorySummaryContent
+      :today="todayRecord"
+      :total-pomodoros="totalPomodoros"
+      :total-minutes="totalMinutes"
+    />
   </LiquidGlass>
 
   <PanelFallbackGlass v-else tag="div" class="history-summary history-summary--fallback">
-    <HistorySummaryContent :today="todayRecord" :total-pomodoros="totalPomodoros" :total-minutes="totalMinutes" />
+    <HistorySummaryContent
+      :today="todayRecord"
+      :total-pomodoros="totalPomodoros"
+      :total-minutes="totalMinutes"
+    />
   </PanelFallbackGlass>
 </template>
 
@@ -40,9 +48,7 @@ const totalPomodoros = computed(() =>
   props.history.reduce((sum, r) => sum + r.completedPomodoros, 0),
 )
 
-const totalMinutes = computed(() =>
-  props.history.reduce((sum, r) => sum + r.totalFocusMinutes, 0),
-)
+const totalMinutes = computed(() => props.history.reduce((sum, r) => sum + r.totalFocusMinutes, 0))
 </script>
 
 <style scoped>
@@ -52,7 +58,9 @@ const totalMinutes = computed(() =>
 }
 
 .history-summary--fallback {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .history-summary--fallback:hover {

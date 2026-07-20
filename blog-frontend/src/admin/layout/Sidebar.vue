@@ -6,17 +6,47 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Odometer, Document, ChatDotRound, Reading, Picture,
-  Camera, Connection, Present, ColdDrink, Comment,
-  Film, Sunrise, User, Setting,
+  Odometer,
+  Document,
+  ChatDotRound,
+  Reading,
+  Picture,
+  Camera,
+  Connection,
+  Present,
+  ColdDrink,
+  Comment,
+  Film,
+  Sunrise,
+  EditPen,
+  User,
+  UserFilled,
+  FolderOpened,
+  Setting,
+  DataAnalysis,
 } from '@element-plus/icons-vue'
 import { adminMenus } from './AdminMenu'
 
 /** 图标名称 → 组件映射（用于 <component :is=""> 动态渲染） */
 const iconMap: Record<string, unknown> = {
-  Odometer, Document, ChatDotRound, Reading, Picture,
-  Camera, Connection, Present, ColdDrink, Comment,
-  Film, Sunrise, User, Setting,
+  Odometer,
+  Document,
+  ChatDotRound,
+  Reading,
+  Picture,
+  Camera,
+  Connection,
+  Present,
+  ColdDrink,
+  Comment,
+  Film,
+  Sunrise,
+  EditPen,
+  User,
+  UserFilled,
+  FolderOpened,
+  Setting,
+  DataAnalysis,
 }
 
 defineProps<{
@@ -55,11 +85,7 @@ function handleMenuSelect(path: string) {
         active-text-color="var(--admin-primary-color)"
         @select="handleMenuSelect"
       >
-        <el-menu-item
-          v-for="item in adminMenus"
-          :key="item.path"
-          :index="item.path"
-        >
+        <el-menu-item v-for="item in adminMenus" :key="item.path" :index="item.path">
           <el-icon>
             <component :is="iconMap[item.icon]" />
           </el-icon>

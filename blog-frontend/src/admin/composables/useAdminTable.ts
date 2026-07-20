@@ -16,7 +16,11 @@ export interface Pagination {
 /** useAdminTable 配置项 */
 export interface AdminTableOptions<T> {
   /** 获取列表数据的函数，接收分页和搜索参数 */
-  fetchData: (params: { page: number; pageSize: number; keyword?: string }) => Promise<{ items: T[]; total: number }>
+  fetchData: (params: {
+    page: number
+    pageSize: number
+    keyword?: string
+  }) => Promise<{ items: T[]; total: number }>
   /** 删除单条数据的函数（可选） */
   deleteItem?: (item: T) => Promise<void>
   /** 默认每页条数 */

@@ -1,11 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="drawer-overlay">
-      <div
-        v-show="modelValue"
-        class="drawer-overlay"
-        @click="close"
-      ></div>
+      <div v-show="modelValue" class="drawer-overlay" @click="close"></div>
     </Transition>
 
     <Transition :name="slideTransitionName">
@@ -107,7 +103,9 @@ function close() {
 }
 
 .drawer-glass--fallback {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .drawer-content {
