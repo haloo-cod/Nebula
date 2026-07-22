@@ -30,11 +30,7 @@
           ◀
         </button>
 
-        <img
-          :src="images[currentIndex]"
-          :alt="`图片 ${currentIndex + 1}`"
-          class="lightbox-img"
-        />
+        <img :src="images[currentIndex]" :alt="`图片 ${currentIndex + 1}`" class="lightbox-img" />
 
         <button
           v-if="images.length > 1"

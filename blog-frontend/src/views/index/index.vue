@@ -15,18 +15,18 @@
               class="panel-liquid-glass"
             >
               <HomeProfilePanel
-                :avatar="avatar"
-                :name="profile.name"
-                :bio="profile.bio"
-                :links="socialLinks"
+                :avatar="profileAvatar"
+                :name="profileName"
+                :bio="profileBio"
+                :links="profileLinks"
               />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <HomeProfilePanel
-                :avatar="avatar"
-                :name="profile.name"
-                :bio="profile.bio"
-                :links="socialLinks"
+                :avatar="profileAvatar"
+                :name="profileName"
+                :bio="profileBio"
+                :links="profileLinks"
               />
             </PanelFallbackGlass>
           </div>
@@ -42,7 +42,7 @@
             >
               <DataDashboard />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <DataDashboard />
             </PanelFallbackGlass>
           </div>
@@ -74,7 +74,7 @@
             >
               <Carousel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <Carousel />
             </PanelFallbackGlass>
           </div>
@@ -91,7 +91,7 @@
             >
               <CalendarPanel flat />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <CalendarPanel flat />
             </PanelFallbackGlass>
           </div>
@@ -108,7 +108,7 @@
             >
               <DigitalClockPanel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <DigitalClockPanel />
             </PanelFallbackGlass>
           </div>
@@ -126,7 +126,7 @@
               >
                 <PostCarousel />
               </LiquidGlass>
-              <PanelFallbackGlass v-else>
+              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
                 <PostCarousel />
               </PanelFallbackGlass>
               <LiquidGlass
@@ -140,7 +140,7 @@
               >
                 <MomentCarousel />
               </LiquidGlass>
-              <PanelFallbackGlass v-else>
+              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
                 <MomentCarousel />
               </PanelFallbackGlass>
             </div>
@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
@@ -165,9 +165,21 @@ import MomentCarousel from '@/components/panels/MomentCarousel.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
 import { useUIStore } from '@/stores/ui'
-import { avatar, profile, socialLinks } from '@/data/profile'
+import {
+  avatar as fallbackAvatar,
+  profile as fallbackProfile,
+  socialLinks as fallbackLinks,
+} from '@/data/profile'
+import { fetchProfile } from '@/api/profile'
+import type { SocialLink } from '@/types'
 
 const ui = useUIStore()
+
+// 个人资料（初始 fallback，API 加载后替换）
+const profileAvatar = ref(fallbackAvatar)
+const profileName = ref(fallbackProfile.name)
+const profileBio = ref(fallbackProfile.bio)
+const profileLinks = ref<SocialLink[]>(fallbackLinks)
 const fullTitle = "Starlitn'blog"
 const isMobile = ref(window.innerWidth < 768)
 const showContentDirectly = history.state?.showContent === true
@@ -196,6 +208,19 @@ watch(typewriterDone, (val) => {
       showUIElements.value = true
       ui.showNavbar = true
     }, 850)
+  }
+})
+
+onMounted(async () => {
+  // 从后端 API 加载个人资料
+  try {
+    const data = await fetchProfile()
+    if (data.profile.name) profileName.value = data.profile.name
+    if (data.profile.bio) profileBio.value = data.profile.bio
+    if (data.avatarUrl) profileAvatar.value = data.avatarUrl
+    profileLinks.value = data.socialLinks
+  } catch {
+    // API 失败，保留本地 fallback
   }
 })
 
@@ -348,8 +373,9 @@ const containerClass = computed(() => {
    ============================================ */
 .home-panels {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   top: 90px;
   z-index: 15;
   width: 85%;
@@ -434,8 +460,9 @@ const containerClass = computed(() => {
    ============================================ */
 .home-bottom {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   top: calc(50vh + 40px);
   z-index: 15;
   width: 85%;
@@ -490,7 +517,6 @@ const containerClass = computed(() => {
   height: 100%;
   box-sizing: border-box;
 }
-
 
 @media (max-width: 768px) {
   .home-bottom {

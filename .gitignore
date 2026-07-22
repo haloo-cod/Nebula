@@ -9,5 +9,20 @@
 # Agent 技能锁定（本地工具链产物）
 skills-lock.json
 
+# 参考代码与示例文件（仅本地参考，不入库）
+sample_code/
+
+# 本地环境配置（示例文件显式保留）
+.env
+.env.*
+!.env.example
+
+# 构建与运行时产物
+dist/
+node_modules/
+coverage/
+*.db-shm
+*.db-wal
+
 # macOS
 .DS_Store

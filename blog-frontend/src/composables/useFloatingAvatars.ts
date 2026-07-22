@@ -81,8 +81,14 @@ export function useFloatingAvatars(options: UseFloatingAvatarsOptions) {
       } else {
         item.x = Math.random() * Math.max(1, width.value - size)
         item.y = Math.random() * Math.max(1, height.value - size)
-        item.vx = (Math.random() > 0.5 ? 1 : -1) * (MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED)) * speed
-        item.vy = (Math.random() > 0.5 ? 1 : -1) * (MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED)) * speed
+        item.vx =
+          (Math.random() > 0.5 ? 1 : -1) *
+          (MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED)) *
+          speed
+        item.vy =
+          (Math.random() > 0.5 ? 1 : -1) *
+          (MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED)) *
+          speed
       }
       return item
     })

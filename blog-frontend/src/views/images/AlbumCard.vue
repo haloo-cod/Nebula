@@ -16,17 +16,35 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--back" :src="album.photos[2].url" alt="" loading="lazy" />
+              <img
+                class="unit-img unit-img--back"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }"
+                :src="album.photos[2].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[2].url)"
+              />
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--back" :src="album.photos[2].url" alt="" loading="lazy" />
+              <img
+                class="unit-img unit-img--back"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[2].url) }"
+                :src="album.photos[2].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[2].url)"
+              />
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
 
       <!-- 中层照片(半灰度,悬停向左飞出) -->
@@ -43,17 +61,35 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--mid" :src="album.photos[1].url" alt="" loading="lazy" />
+              <img
+                class="unit-img unit-img--mid"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }"
+                :src="album.photos[1].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[1].url)"
+              />
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img unit-img--mid" :src="album.photos[1].url" alt="" loading="lazy" />
+              <img
+                class="unit-img unit-img--mid"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.photos[1].url) }"
+                :src="album.photos[1].url"
+                alt=""
+                loading="lazy"
+                @load="onImageLoad(album.photos[1].url)"
+              />
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
 
       <!-- 封面(最上层,悬停上浮放大 + 遮罩淡入) -->
@@ -70,7 +106,14 @@
         >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img" :src="album.cover" :alt="album.title" loading="lazy" />
+              <img
+                class="unit-img"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }"
+                :src="album.cover"
+                :alt="album.title"
+                loading="lazy"
+                @load="onImageLoad(album.cover)"
+              />
               <div class="unit-overlay">
                 <span class="unit-overlay__count">{{ album.photos.length }} 张照片</span>
                 <span class="unit-overlay__hint">Click to Open</span>
@@ -78,17 +121,28 @@
             </div>
           </div>
         </LiquidGlass>
-        <div v-else class="unit-glass unit-glass--fallback">
+        <PanelFallbackGlass
+          v-else
+          class="unit-glass unit-glass--fallback"
+          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+        >
           <div class="unit-bezel">
             <div class="unit-mat">
-              <img class="unit-img" :src="album.cover" :alt="album.title" loading="lazy" />
+              <img
+                class="unit-img"
+                :class="{ 'unit-img--loaded': loadedImages.has(album.cover) }"
+                :src="album.cover"
+                :alt="album.title"
+                loading="lazy"
+                @load="onImageLoad(album.cover)"
+              />
               <div class="unit-overlay">
                 <span class="unit-overlay__count">{{ album.photos.length }} 张照片</span>
                 <span class="unit-overlay__hint">Click to Open</span>
               </div>
             </div>
           </div>
-        </div>
+        </PanelFallbackGlass>
       </div>
     </div>
 
@@ -104,7 +158,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
+import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'
 import type { Album } from '@/types'
 
@@ -117,6 +173,14 @@ defineProps<{
 const emit = defineEmits<{
   open: [album: Album]
 }>()
+
+/** 跟踪每张图片的加载状态（key: 图片 URL） */
+const loadedImages = ref<Set<string>>(new Set())
+
+/** 图片加载完成回调 */
+function onImageLoad(url: string) {
+  loadedImages.value.add(url)
+}
 </script>
 
 <style scoped>
@@ -186,9 +250,30 @@ const emit = defineEmits<{
   border-radius: 8px;
 }
 
-/* 玻璃关闭时的兜底:透明边框 + 白色相纸,即参考站原版观感 */
+/* 关闭液态玻璃时,用背景图副本和 filter 模拟毛玻璃,不受堆叠旋转影响 */
 .unit-glass--fallback {
+  position: relative;
   display: block;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+}
+
+.unit-glass--fallback::before {
+  position: absolute;
+  inset: -18px;
+  z-index: 0;
+  content: '';
+  background-image: inherit;
+  background-size: cover;
+  background-position: center;
+  filter: blur(12px);
+  opacity: 0.72;
+}
+
+.unit-glass--fallback > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* 玻璃包边:内缩出玻璃折射可见的边框区 */
@@ -199,14 +284,14 @@ const emit = defineEmits<{
   padding: 10px;
 }
 
-/* 白色相纸(拍立得白边) */
+/* 白色相纸(拍立得白边) — 加载前显示柔和灰色占位 */
 .unit-mat {
   position: relative;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(120, 120, 120, 0.15);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -217,6 +302,13 @@ const emit = defineEmits<{
   height: 100%;
   object-fit: cover;
   border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+/* 图片加载完成后淡入显示,同时恢复白色相纸底色 */
+.unit-img--loaded {
+  opacity: 1;
 }
 
 /* 底层/中层照片的做旧滤镜(只作用于照片本身,不影响玻璃包边) */

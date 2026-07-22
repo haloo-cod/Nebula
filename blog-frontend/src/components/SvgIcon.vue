@@ -5,14 +5,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-// 加载图标目录下所有 svg,?url + eager 让构建时拿到每个图标的最终 URL
-const iconUrls = import.meta.glob<string>('../assets/iconfont/goole/*.svg', {
+// 分开加载通用界面图标与社交平台图标，避免图标目录混杂。
+const iconUrls = import.meta.glob<string>('../assets/icons/{ui,social}/*.svg', {
   query: '?url',
   import: 'default',
   eager: true,
 })
 
-// 短名 → Google 文件名前缀映射
+// 短名到图标文件名前缀的映射。
 const nameMap: Record<string, string> = {
   home: 'home',
   book: 'book',

@@ -1,8 +1,10 @@
-import avatarImage from '@/assets/img/test2.jpg'
 import type { Profile, SocialLink } from '@/types'
 
 // 头像图片(由 Vite 处理为最终 URL)
-export const avatar: string = avatarImage
+export const avatar = ''
+
+// 关于页封面图
+export const coverImage = ''
 
 // 站点作者资料
 export const profile: Profile = {

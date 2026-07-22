@@ -1,12 +1,18 @@
 <template>
-  <main class="tavern-page" :style="{ backgroundImage: `url(${tavernBg})` }">
+  <main class="tavern-page" :style="bgUrl ? { backgroundImage: `url(${bgUrl})` } : {}">
     <div class="tavern-shade"></div>
     <div class="tavern-lamp"></div>
 
     <RouterLink class="tavern-exit" to="/">离开酒馆</RouterLink>
     <div class="tavern-auth" aria-label="账号入口">
-      <button class="auth-btn" type="button">登录</button>
-      <button class="auth-btn auth-btn--primary" type="button">注册</button>
+      <template v-if="auth.initialized && !auth.isLoggedIn">
+        <button class="auth-btn" type="button" @click="goToLogin">登录</button>
+        <button class="auth-btn auth-btn--primary" type="button" @click="goToRegister">注册</button>
+      </template>
+      <template v-else-if="auth.initialized">
+        <span class="auth-user">{{ auth.user?.display_name || auth.user?.username }}</span>
+        <button class="auth-btn" type="button" @click="logoutUser">退出</button>
+      </template>
     </div>
 
     <p class="tavern-top-title">今晚的门,只为晚归的人开</p>
@@ -28,7 +34,8 @@
           <p class="message-hint">点开一只旧酒瓶,看看卡片背面藏着什么。</p>
         </div>
 
-        <div class="bottle-grid">
+        <div v-if="tavernPosts.length === 0" class="tavern-empty">今晚的酒瓶还在漂流中，还没有人留下故事。</div>
+        <div v-else class="bottle-grid">
           <div v-for="post in tavernPosts" :key="post.id" class="bottle-item">
             <button
               class="bottle-card"
@@ -79,7 +86,7 @@
       </div>
     </Transition>
 
-    <button class="write-trigger" type="button" @click="composerOpen = true">投下一只瓶子</button>
+    <button class="write-trigger" type="button" @click="openComposer">投下一只瓶子</button>
 
     <Transition name="composer-fade">
       <div
@@ -103,31 +110,40 @@
             ×
           </button>
         </div>
-        <p class="composer-copy">未来登录后,这只瓶子会真正漂进酒馆里。现在先作为 UI 预览。</p>
+        <p class="composer-copy">在这里留下你的心事,它会变成一只瓶子漂在酒馆里。</p>
         <label class="composer-field">
           <span>瓶子署名</span>
-          <input type="text" placeholder="比如:晚归的人" />
+          <input v-model="composeAuthor" type="text" placeholder="比如:晚归的人" />
         </label>
         <label class="composer-field">
           <span>瓶身标签</span>
-          <input type="text" placeholder="一句话贴在瓶身上" />
+          <input v-model="composeTopic" type="text" placeholder="一句话贴在瓶身上" />
         </label>
         <label class="composer-field">
           <span>想封进瓶子里的话</span>
-          <textarea rows="5" placeholder="烦心事或开心事,都可以封进这里。"></textarea>
+          <textarea
+            v-model="composeBody"
+            rows="5"
+            placeholder="烦心事或开心事,都可以封进这里。"
+          ></textarea>
         </label>
-        <button class="composer-submit" type="button">封好瓶塞</button>
+        <button class="composer-submit" type="button" :disabled="submitting" @click="handleSubmit">
+          {{ submitting ? '封瓶中...' : '封好瓶塞' }}
+        </button>
       </div>
     </Transition>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import tavernBg from '@/assets/img/test7.jfif'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { api, resolveUrl } from '@/api/client'
+import { fetchTavernPosts, submitTavernPost } from '@/api/tavern'
+import type { TavernPost as ApiTavernPost } from '@/api/tavern'
+import { useAuthStore } from '@/stores/auth'
 
-/** 深夜酒馆静态留言,后续接入后端后可替换为接口数据 */
+/** 前端留言条目（兼容原有模板 id 为 string） */
 interface TavernPost {
   id: string
   author: string
@@ -135,62 +151,55 @@ interface TavernPost {
   body: string
 }
 
+const bgUrl = ref('')
+
+onMounted(async () => {
+  try {
+    const config = await api.get<{ bg_url: string }>('/api/v1/tavern/config')
+    if (config.bg_url) bgUrl.value = resolveUrl(config.bg_url)
+  } catch {
+    // 使用默认暗色背景
+  }
+})
+
 const activePostId = ref<string | null>(null)
 const composerOpen = ref(false)
+const submitting = ref(false)
+const composeAuthor = ref('')
+const composeTopic = ref('')
+const composeBody = ref('')
+const auth = useAuthStore()
+const router = useRouter()
 
-const tavernPosts: TavernPost[] = [
-  {
-    id: 'late-bus',
-    author: '赶末班车的人',
-    topic: '今天差点哭出来',
-    body: '忙了一整天,回家的时候才发现自己还没好好吃饭。可是走到楼下,看见便利店还亮着灯,忽然觉得也没有那么糟。',
-  },
-  {
-    id: 'rain-cat',
-    author: '躲雨的猫',
-    topic: '捡到一点好运气',
-    body: '下午下雨的时候有人把伞往我这边偏了一点。只是很小的事,但我记了很久。',
-  },
-  {
-    id: 'old-ticket',
-    author: '旧车票',
-    topic: '没说出口的话',
-    body: '有些话错过那一站就不知道怎么再开口了。今晚先寄存在这里,等我勇敢一点再取走。',
-  },
-  {
-    id: 'warm-window',
-    author: '亮着灯的窗',
-    topic: '终于做完了',
-    body: '拖了很久的事情今天终于收尾。不是很完美,但我第一次觉得自己没有逃走。',
-  },
-  {
-    id: 'quiet-star',
-    author: '安静的星星',
-    topic: '想睡个好觉',
-    body: '希望今晚不要再反复想白天的失误。明天醒来,我想重新开始一次。',
-  },
-  {
-    id: 'soda-memory',
-    author: '冰镇汽水',
-    topic: '小小开心',
-    body: '喜欢的歌随机播放到了,路边的风也刚刚好。虽然只是普通一天,但我想把它记下来。',
-  },
-  {
-    id: 'city-soda',
-    author: '冰镇汽水',
-    topic: '小小开心',
-    body: '喜欢的歌随机播放到了,路边的风也刚刚好。虽然只是普通一天,但我想把它记下来。',
-  },
-  {
-    id: 'midnight-soda',
-    author: '冰镇汽水',
-    topic: '小小开心',
-    body: '喜欢的歌随机播放到了,路边的风也刚刚好。虽然只是普通一天,但我想把它记下来。',
-  },
-]
+function goToLogin() {
+  void router.push({ path: '/login', query: { redirect: '/midnight-tavern' } })
+}
+
+function goToRegister() {
+  void router.push({ path: '/register', query: { redirect: '/midnight-tavern' } })
+}
+
+async function logoutUser() {
+  await auth.logout()
+}
+
+function openComposer() {
+  if (!auth.isLoggedIn) {
+    goToLogin()
+    return
+  }
+  composerOpen.value = true
+}
+
+const tavernPosts = ref<TavernPost[]>([])
+
+/** 将 API 返回转为前端格式 */
+function toLocal(post: ApiTavernPost): TavernPost {
+  return { id: String(post.id), author: post.author, topic: post.topic, body: post.body }
+}
 
 const selectedPost = computed(
-  () => tavernPosts.find((post) => post.id === activePostId.value) ?? null,
+  () => tavernPosts.value.find((post) => post.id === activePostId.value) ?? null,
 )
 
 function togglePost(id: string) {
@@ -200,6 +209,43 @@ function togglePost(id: string) {
 function closePost() {
   activePostId.value = null
 }
+
+/** 提交留言 */
+async function handleSubmit() {
+  if (!composeAuthor.value.trim() || !composeTopic.value.trim() || !composeBody.value.trim()) return
+  if (submitting.value) return
+
+  submitting.value = true
+  try {
+    const post = await submitTavernPost(
+      composeAuthor.value.trim(),
+      composeTopic.value.trim(),
+      composeBody.value.trim(),
+    )
+    // 追加到列表顶部
+    tavernPosts.value.unshift(toLocal(post))
+    // 重置表单
+    composeAuthor.value = ''
+    composeTopic.value = ''
+    composeBody.value = ''
+    composerOpen.value = false
+  } catch {
+    // 限频或其他错误（静默处理，后续可加 toast 提示）
+  } finally {
+    submitting.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    const posts = await fetchTavernPosts()
+    if (posts.length > 0) {
+      tavernPosts.value = posts.map(toLocal)
+    }
+  } catch {
+    // API 失败时保持空状态
+  }
+})
 </script>
 
 <style scoped>
@@ -299,6 +345,16 @@ function closePost() {
   border-radius: 999px;
   padding: 0.56rem 0.88rem;
   background: rgba(8, 7, 6, 0.42);
+}
+
+.auth-user {
+  align-self: center;
+  max-width: 9rem;
+  overflow: hidden;
+  color: rgba(255, 240, 218, 0.82);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .auth-btn--primary {
@@ -412,11 +468,20 @@ function closePost() {
   text-align: right;
 }
 
+.tavern-empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: rgba(255, 228, 190, 0.5);
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.7;
+}
+
 .bottle-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12.8rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.1rem 0.9rem;
-  align-items: start;
+  justify-content: center;
 }
 
 .bottle-item {
@@ -425,6 +490,8 @@ function closePost() {
   display: grid;
   justify-items: center;
   gap: 0.58rem;
+  width: 12.8rem;
+  flex: none;
 }
 
 .bottle-item:nth-child(5n + 2) {

@@ -17,6 +17,8 @@ __pycache__/
 # 数据库本地文件
 *.db
 *.sqlite3
+*.db-shm
+*.db-wal
 
 # IDE
 .idea/
@@ -30,3 +32,17 @@ htmlcov/
 *.egg-info/
 dist/
 build/
+
+# ==== 运行时数据（不入库，部署时独立管理） ====
+
+# 用户上传的图片和 EPUB 文件（体积大，部署时通过对象存储或备份管理）
+uploads/
+
+# Markdown 内容文件（运行时由管理后台写入）
+content/
+
+# JSON 数据文件（评论、说说等动态数据）
+data/
+
+# 锁文件（并发写入控制）
+*.lock

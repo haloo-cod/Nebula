@@ -2,7 +2,17 @@
   <PageBackground>
     <div class="page-wrap">
       <div class="timeline-wrap post-rise-inner">
-        <div class="timeline-viewport">
+        <div
+          ref="viewportRef"
+          class="timeline-viewport"
+          :class="{ dragging: isDragging }"
+          @pointerdown="onPointerDown"
+          @pointermove="onPointerMove"
+          @pointerup="onPointerUp"
+          @pointercancel="onPointerUp"
+          @pointerleave="onPointerUp"
+          @click.capture="onCaptureClick"
+        >
           <div class="timeline-stage" :style="stageStyle">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -100,16 +110,73 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import { getPosts } from '@/data/posts'
+import { fetchPosts, toFrontendPost } from '@/api/posts'
 import { useUIStore } from '@/stores/ui'
 import ArchivePostCard from './ArchivePostCard.vue'
+import type { Post } from '@/types'
 
 const ui = useUIStore()
-const posts = getPosts().filter((p) => !p.draft)
+const posts = ref<Post[]>(getPosts().filter((p) => !p.draft))
+
+// 启动时尝试从后端 API 加载（fallback 到 glob）
+onMounted(async () => {
+  try {
+    const res = await fetchPosts(1, 200)
+    if (res.items.length > 0) {
+      posts.value = res.items.map(toFrontendPost)
+    }
+  } catch {
+    // 后端不可用时保持 glob 数据
+  }
+})
+
+// ============ 拖拽滑动 ============
+const viewportRef = ref<HTMLElement | null>(null)
+const isDragging = ref(false)
+const hasDragged = ref(false)
+let dragStartX = 0
+let scrollStartX = 0
+
+function onPointerDown(e: PointerEvent) {
+  if (!viewportRef.value) return
+  isDragging.value = true
+  hasDragged.value = false
+  dragStartX = e.clientX
+  scrollStartX = viewportRef.value.scrollLeft
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!isDragging.value || !viewportRef.value) return
+  const dx = e.clientX - dragStartX
+  if (Math.abs(dx) > 8) {
+    hasDragged.value = true
+    if (!viewportRef.value.hasPointerCapture(e.pointerId)) {
+      viewportRef.value.setPointerCapture(e.pointerId)
+    }
+  }
+  if (hasDragged.value) {
+    viewportRef.value.scrollLeft = scrollStartX - dx
+  }
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (!viewportRef.value) return
+  isDragging.value = false
+  try {
+    viewportRef.value.releasePointerCapture(e.pointerId)
+  } catch {
+    /* 可能未 capture */
+  }
+}
+
+function onCaptureClick(e: MouseEvent) {
+  if (hasDragged.value) e.stopPropagation()
+}
 
 // ============ 布局参数 ============
 const cardW = 280
@@ -124,7 +191,7 @@ const riverAmplitude = 46
 const postX = (i: number) => sidePad + i * (cardW + cardGap)
 
 const trackW = computed(() =>
-  posts.length > 0 ? sidePad * 2 + posts.length * (cardW + cardGap) - cardGap : 600,
+  posts.value.length > 0 ? sidePad * 2 + posts.value.length * (cardW + cardGap) - cardGap : 600,
 )
 
 const riverCenterY = computed(() => riverYTop + cardH + connLen)
@@ -144,7 +211,7 @@ function waveY(t: number): number {
 }
 
 const riverPath = computed(() => {
-  if (posts.length === 0) return 'M 0 0'
+  if (posts.value.length === 0) return 'M 0 0'
   const total = trackW.value
   const y = riverCenterY.value
   const steps = 80
@@ -164,8 +231,8 @@ interface NodePoint {
 }
 
 const nodes = computed<NodePoint[]>(() => {
-  if (posts.length === 0) return []
-  return posts.map((_, i) => {
+  if (posts.value.length === 0) return []
+  return posts.value.map((_, i) => {
     const x = postX(i) + cardW / 2
     const t = x / Math.max(1, trackW.value)
     return { x, y: riverCenterY.value + waveY(t) }
@@ -239,25 +306,23 @@ function cardStyle(index: number) {
 .timeline-viewport {
   overflow-x: auto;
   overflow-y: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  scrollbar-width: none;
+}
+
+.timeline-viewport.dragging {
+  cursor: grabbing;
+}
+
+.timeline-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .timeline-stage {
   position: relative;
   min-width: 100%;
-}
-
-.timeline-viewport::-webkit-scrollbar {
-  height: 4px;
-}
-
-.timeline-viewport::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 2px;
-}
-
-.timeline-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
 }
 
 /* ===== SVG 河流 ===== */

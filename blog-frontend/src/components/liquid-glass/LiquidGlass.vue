@@ -1,5 +1,9 @@
 <template>
-  <div class="liquid-glass" ref="containerRef" :class="{ 'liquid-glass--css-fallback': rendererFailed }">
+  <div
+    class="liquid-glass"
+    ref="containerRef"
+    :class="{ 'liquid-glass--css-fallback': rendererFailed }"
+  >
     <canvas
       ref="canvasRef"
       class="liquid-glass-canvas"
@@ -19,9 +23,7 @@
  * 渲染器在单一 RAF 循环中为所有实例渲染,结果通过 drawImage 拷贝到每个实例的 2D canvas。
  * 这样全站只有 1 个 WebGL 上下文,永远不会触发浏览器的上下文数量限制。
  */
-import { ref, watch, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
-import darkBgUrl from '@/assets/img/test3.jpg'
-import lightBgUrl from '@/assets/img/test6.PNG'
+import { ref, watch, onMounted, onBeforeUnmount, onUnmounted, computed } from 'vue'
 import { useUIStore } from '@/stores/ui'
 import {
   registerInstance,
@@ -36,7 +38,6 @@ import {
   loadImage,
   uploadTexture,
   hasTexture,
-  preloadTexture,
   getTextureAspect,
   getRenderScale,
   MAX_TRAIL_POINTS,
@@ -84,10 +85,8 @@ const props = withDefaults(
 
 type LiquidGlassTheme = 'light' | 'dark'
 
-const backgroundUrls: Record<LiquidGlassTheme, string> = {
-  dark: darkBgUrl,
-  light: lightBgUrl,
-}
+/** 当前主题对应的背景图 URL（从 store 读取用户选择） */
+const currentBgUl = computed(() => ui.currentBgUrl)
 
 // 两套液态玻璃参数预设
 const glassPresets = {
@@ -183,14 +182,13 @@ const uniforms: GlassUniforms = {
   blurRadius: 0,
   overlayColor: [0, 0, 0, 1],
   highlightWidth: 0,
-  trailPoints: Array.from({ length: MAX_TRAIL_POINTS }, () => [0, 0, 1, 0] as [number, number, number, number]),
+  trailPoints: Array.from(
+    { length: MAX_TRAIL_POINTS },
+    () => [0, 0, 1, 0] as [number, number, number, number],
+  ),
   trailRadius: 0,
   trailStrength: 0,
 }
-
-// 预热两张背景图
-void preloadTexture(darkBgUrl)
-void preloadTexture(lightBgUrl)
 
 // ============================================================================
 // Uniform 更新逻辑
@@ -330,8 +328,8 @@ function updateTrailUniforms() {
 // 背景纹理切换
 // ============================================================================
 
-async function syncBackgroundWithTheme(theme: LiquidGlassTheme) {
-  const url = backgroundUrls[theme]
+async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
+  const url = currentBgUl.value
 
   // 先隐藏 canvas（允许 reveal 时）
   if (props.allowReveal || ui.themeTransitioning) {
@@ -408,7 +406,7 @@ onMounted(() => {
   syncCanvasSize()
 
   // 注册到共享渲染器
-  const bgUrl = backgroundUrls[props.theme]
+  const bgUrl = currentBgUl.value
   instanceId = registerInstance(canvas, ctx2d, uniforms, bgUrl, () => {
     visible.value = true
   })
@@ -458,6 +456,13 @@ onMounted(() => {
   // 如果不需要 reveal 动画,且纹理已就绪,直接 skip firstRender 回调
   if (!props.allowReveal && hasTexture(bgUrl)) {
     visible.value = true
+  }
+})
+
+// 背景图切换时重新加载纹理
+watch(currentBgUl, (newUrl) => {
+  if (newUrl && instanceId) {
+    void syncBackgroundWithTheme(props.theme)
   }
 })
 

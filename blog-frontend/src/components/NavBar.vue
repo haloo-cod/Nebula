@@ -2,7 +2,7 @@
   <header class="liquid-glass-nav">
     <!-- 左侧：Logo + 翻译按钮 + 移动端主题切换 -->
     <div class="nav-left">
-      <span class="logo">Starlit'blog</span>
+      <span class="logo">Starlitn'blog</span>
       <div ref="translateRef" class="translate-wrap" translate="no">
         <button class="translate-btn" @click.stop="langOpen = !langOpen">
           <SvgIcon name="international" class="translate-icon" />
@@ -28,7 +28,7 @@
         class="mobile-theme-toggle"
         type="button"
         :aria-label="themeIcon === 'moon' ? '切换到亮色主题' : '切换到暗色主题'"
-        @click="toggleThemeIcon"
+        @click="onMobileThemeClick"
       >
         <SvgIcon :name="themeIcon === 'moon' ? 'moon' : 'sun'" class="mobile-theme-icon" />
       </button>
@@ -56,6 +56,20 @@
 
     <!-- 右侧功能区（仅桌面端可见） -->
     <div class="nav-actions">
+      <template v-if="!auth.isLoggedIn">
+        <button class="auth-btn" type="button" @click="router.push('/login')">登录</button>
+        <button class="auth-btn auth-btn--primary" type="button" @click="router.push('/register')">
+          注册
+        </button>
+      </template>
+      <template v-else>
+        <button v-if="auth.isAdmin" class="auth-btn" type="button" @click="router.push('/admin')">
+          后台
+        </button>
+        <button class="auth-btn auth-btn--primary" type="button" @click="logoutUser">
+          {{ auth.user?.display_name || auth.user?.username }}
+        </button>
+      </template>
       <button
         class="theme-pull-switch"
         :class="{ 'is-moon': themeIcon === 'moon', 'is-dragging': isThemeDragging }"
@@ -125,6 +139,11 @@
         <Transition name="settings-drop">
           <div v-if="settingsOpen" class="settings-panel" role="dialog" aria-label="显示设置面板">
             <div class="settings-section">
+              <span class="settings-title settings-title--block">背景图片</span>
+              <BackgroundPicker />
+            </div>
+
+            <div class="settings-section settings-section--divider">
               <div class="settings-head">
                 <div class="settings-copy">
                   <span class="settings-title">背景模糊</span>
@@ -184,6 +203,49 @@
                 @input="onLiquidGlassBlurInput"
               />
             </div>
+
+            <div class="settings-section settings-section--divider">
+              <div class="settings-head">
+                <div class="settings-copy">
+                  <span class="settings-title">下雨特效</span>
+                </div>
+                <button
+                  class="settings-toggle"
+                  :class="{ 'settings-toggle--on': ui.rainEnabled }"
+                  type="button"
+                  :aria-pressed="ui.rainEnabled"
+                  @click="ui.setRainEnabled(!ui.rainEnabled)"
+                >
+                  <span class="settings-toggle-thumb"></span>
+                </button>
+              </div>
+              <div v-if="ui.rainEnabled" class="rain-btns">
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 0 }"
+                  type="button"
+                  @click="ui.setRainIntensity(0)"
+                >
+                  轻
+                </button>
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 1 }"
+                  type="button"
+                  @click="ui.setRainIntensity(1)"
+                >
+                  中
+                </button>
+                <button
+                  class="rain-btn"
+                  :class="{ 'rain-btn--active': ui.rainIntensity === 2 }"
+                  type="button"
+                  @click="ui.setRainIntensity(2)"
+                >
+                  重
+                </button>
+              </div>
+            </div>
           </div>
         </Transition>
       </div>
@@ -204,6 +266,27 @@
     <!-- 移动端下拉菜单 -->
     <Transition name="menu-slide">
       <ul v-if="menuOpen" class="mobile-menu">
+        <li class="mobile-auth-row">
+          <template v-if="!auth.isLoggedIn">
+            <button class="mobile-auth-btn" type="button" @click="goToAuth('/login')">登录</button>
+            <button
+              class="mobile-auth-btn mobile-auth-btn--primary"
+              type="button"
+              @click="goToAuth('/register')"
+            >
+              注册
+            </button>
+          </template>
+          <button
+            v-else
+            class="mobile-auth-btn mobile-auth-btn--primary"
+            type="button"
+            @click="logoutUser"
+          >
+            退出 {{ auth.user?.display_name || auth.user?.username }}
+          </button>
+        </li>
+        <li class="mobile-menu-divider" aria-hidden="true"></li>
         <li v-for="item in navItems" :key="item.path">
           <RouterLink
             :to="
@@ -230,9 +313,12 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
+import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 
 const ui = useUIStore()
+const auth = useAuthStore()
 const currentLang = ref(getCurrentLang())
 const langOpen = ref(false)
 const translateRef = ref<HTMLElement | null>(null)
@@ -275,6 +361,12 @@ const pullStyle = computed(() => {
 
 function toggleThemeIcon() {
   ui.toggleTheme()
+}
+
+/** 移动端主题按钮：切换主题 + 记录彩蛋点击（连点5次触发酒馆入口） */
+function onMobileThemeClick() {
+  toggleThemeIcon()
+  recordThemeEggTrigger()
 }
 
 function clearThemeResetTimer() {
@@ -497,6 +589,18 @@ function closeMenu() {
   menuOpen.value = false
 }
 
+/** 跳转前台认证页面并关闭移动菜单。 */
+function goToAuth(path: '/login' | '/register') {
+  closeMenu()
+  void router.push(path)
+}
+
+/** 退出前台账户并关闭移动菜单。 */
+async function logoutUser() {
+  await auth.logout()
+  closeMenu()
+}
+
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
 })
@@ -515,7 +619,7 @@ onUnmounted(() => {
    ============================================ */
 .liquid-glass-nav {
   position: fixed;
-  top: 0;
+  top: -1px;
   left: 0;
   z-index: 50;
   display: flex;
@@ -527,21 +631,29 @@ onUnmounted(() => {
   width: 100%;
   max-width: 100%;
 
-  /* 极致通透：极低透明度 + 背景模糊 */
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* 背景由独立伪元素承载，避免导航内容交互触发滤镜层重绘。 */
+  background: transparent;
   border-radius: 0 0 16px 16px;
 
   /* 液态玻璃边缘光晕 */
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 
   /* 内高光折射 + 外悬浮阴影 */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 0 20px rgba(255, 255, 255, 0.08),
     0 4px 32px rgba(0, 0, 0, 0.25),
     0 12px 60px rgba(0, 0, 0, 0.15);
+}
+
+.liquid-glass-nav::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  content: '';
+  pointer-events: none;
 }
 
 .nav-left,
@@ -1051,6 +1163,73 @@ onUnmounted(() => {
   font-size: 20px;
 }
 
+/* 登录/注册按钮 — 与 NavBar 主题保持一致 */
+.auth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.auth-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.auth-btn--primary {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(140, 185, 255, 0.3);
+  color: rgba(200, 225, 255, 0.95);
+}
+
+.auth-btn--primary:hover {
+  background: rgba(100, 150, 255, 0.25);
+  border-color: rgba(140, 185, 255, 0.5);
+}
+
+/* 雨量选择按钮组 */
+.rain-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.rain-btn {
+  flex: 1;
+  padding: 0.4rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rain-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.rain-btn--active {
+  background: rgba(100, 150, 255, 0.22);
+  border-color: rgba(140, 185, 255, 0.5);
+  color: rgba(210, 235, 255, 1);
+}
+
 .settings-panel {
   position: absolute;
   top: calc(100% + 10px);
@@ -1059,13 +1238,13 @@ onUnmounted(() => {
   width: 268px;
   padding: 14px;
   border-radius: 16px;
-  background: rgba(18, 24, 38, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(30, 30, 45, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 16px 38px rgba(0, 0, 0, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 38px rgba(0, 0, 0, 0.18);
 }
 
 .settings-section {
@@ -1102,6 +1281,11 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
+}
+
+.settings-title--block {
+  display: block;
+  margin-bottom: 0.6rem;
 }
 
 .settings-subtitle {
@@ -1235,9 +1419,11 @@ onUnmounted(() => {
     margin-left: auto;
   }
 
-  .theme-pull-switch,
-  .theme-toast,
-  .tavern-confirm {
+  .theme-pull-switch {
+    display: none !important;
+  }
+
+  .nav-actions .auth-btn {
     display: none !important;
   }
 
@@ -1299,6 +1485,8 @@ onUnmounted(() => {
    移动端汉堡按钮
    ============================================ */
 .mobile-toggle {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   width: 40px;
   height: 40px;
@@ -1354,9 +1542,9 @@ onUnmounted(() => {
   left: 1rem;
   right: 1rem;
   z-index: 55;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   padding: 10px;
   border-radius: 1.5rem;
   background: rgba(20, 20, 40, 0.94);
@@ -1365,12 +1553,54 @@ onUnmounted(() => {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
+.mobile-menu li {
+  list-style: none;
+}
+
+.mobile-auth-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-auth-btn {
+  flex: 1;
+  padding: 0.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.mobile-auth-btn--primary {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(140, 185, 255, 0.3);
+  color: rgba(200, 225, 255, 0.95);
+}
+
+.mobile-menu-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.1);
+  list-style: none;
+}
+
 .mobile-link {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  font-size: 16px;
+  gap: 4px;
+  padding: 10px 6px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 12px;
   text-decoration: none;
@@ -1412,5 +1642,102 @@ onUnmounted(() => {
 .menu-slide-leave-to {
   opacity: 0;
   transform: translateY(-6px);
+}
+</style>
+
+<style>
+[data-theme='light'] .auth-btn {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(50, 50, 50, 0.85);
+}
+
+[data-theme='light'] .auth-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(20, 20, 20, 0.95);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] .auth-btn--primary {
+  background: rgba(50, 100, 220, 0.1);
+  border-color: rgba(50, 100, 220, 0.3);
+  color: rgba(30, 70, 180, 0.95);
+}
+
+[data-theme='light'] .auth-btn--primary:hover {
+  background: rgba(50, 100, 220, 0.18);
+  border-color: rgba(50, 100, 220, 0.45);
+}
+
+[data-theme='light'] .mobile-auth-btn {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(50, 50, 50, 0.85);
+}
+
+[data-theme='light'] .mobile-auth-btn--primary {
+  background: rgba(50, 100, 220, 0.1);
+  border-color: rgba(50, 100, 220, 0.3);
+  color: rgba(30, 70, 180, 0.95);
+}
+
+[data-theme='light'] .rain-btn {
+  border-color: rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(50, 50, 50, 0.75);
+}
+
+[data-theme='light'] .rain-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(20, 20, 20, 0.9);
+}
+
+[data-theme='light'] .rain-btn--active {
+  background: rgba(50, 100, 220, 0.15);
+  border-color: rgba(50, 100, 220, 0.45);
+  color: rgba(25, 60, 160, 1);
+}
+
+[data-theme='light'] .settings-panel {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 16px 38px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .settings-title {
+  color: rgba(20, 20, 20, 0.92);
+}
+
+[data-theme='light'] .settings-subtitle {
+  color: rgba(50, 50, 50, 0.8);
+}
+
+[data-theme='light'] .settings-value {
+  color: rgba(40, 70, 150, 0.95);
+}
+
+[data-theme='light'] .settings-section--divider {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .settings-toggle {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='light'] .settings-toggle--on {
+  background: rgba(50, 100, 220, 0.4);
+  border-color: rgba(50, 100, 220, 0.5);
+}
+
+[data-theme='light'] .settings-slider {
+  background: linear-gradient(to right, rgba(50, 100, 220, 0.4), rgba(0, 0, 0, 0.06));
+}
+
+[data-theme='light'] .settings-slider::-webkit-slider-thumb {
+  background: rgba(50, 100, 220, 0.85);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 </style>

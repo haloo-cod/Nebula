@@ -17,12 +17,12 @@
           <span class="stat-label">文章</span>
         </div>
         <div class="stat-box">
-          <span class="stat-value">{{ totalTags }}</span>
-          <span class="stat-label">标签</span>
+          <span class="stat-value">{{ totalMoments }}</span>
+          <span class="stat-label">说说</span>
         </div>
         <div class="stat-box">
-          <span class="stat-value">{{ totalCategories }}</span>
-          <span class="stat-label">分类</span>
+          <span class="stat-value">{{ totalProjects }}</span>
+          <span class="stat-label">展览</span>
         </div>
         <div class="stat-box">
           <span class="stat-value">{{ daysActive }}</span>
@@ -47,39 +47,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { SocialLink } from '@/types'
-import { getPosts } from '@/data/posts'
 import SvgIcon from '@/components/SvgIcon.vue'
+import { fetchContentStats } from '@/api/content-stats'
 
-const posts = getPosts()
+const totalPosts = ref(0)
+const totalMoments = ref(0)
+const totalProjects = ref(0)
+const daysActive = ref(0)
 
-const totalPosts = computed(() => posts.length)
-
-const totalTags = computed(() => {
-  const tagSet = new Set<string>()
-  for (const p of posts) {
-    for (const tag of p.tags) {
-      tagSet.add(tag)
-    }
+onMounted(async () => {
+  try {
+    const stats = await fetchContentStats()
+    totalPosts.value = stats.posts
+    totalMoments.value = stats.moments
+    totalProjects.value = stats.gallery_projects
+    daysActive.value = stats.active_days
+  } catch {
+    // 后端不可用时保持零值，避免显示过期静态统计
   }
-  return tagSet.size
-})
-
-const totalCategories = computed(() => {
-  const catSet = new Set<string>()
-  for (const p of posts) {
-    if (p.category) catSet.add(p.category)
-  }
-  return catSet.size
-})
-
-const daysActive = computed(() => {
-  const dates = new Set<string>()
-  for (const p of posts) {
-    if (p.date) dates.add(p.date)
-  }
-  return dates.size
 })
 
 withDefaults(

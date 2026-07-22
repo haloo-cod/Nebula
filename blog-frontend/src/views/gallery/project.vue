@@ -31,16 +31,36 @@ import { ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import { getGalleryProject, renderGalleryProject } from '@/data/gallery'
+import { fetchGalleryProject } from '@/api/gallery'
+import { renderMarkdown } from '@/data/posts'
+import type { GalleryProject } from '@/types'
 
 const route = useRoute()
 const html = ref('')
 const loading = ref(true)
-const project = ref(getGalleryProject(String(route.params.slug)))
+const project = ref<GalleryProject | null>(getGalleryProject(String(route.params.slug)))
 
 async function loadProject(slug: string) {
   loading.value = true
-  project.value = getGalleryProject(slug)
-  html.value = (await renderGalleryProject(slug)) || ''
+  try {
+    // 优先从后端 API 获取
+    const detail = await fetchGalleryProject(slug)
+    project.value = {
+      slug: detail.slug,
+      title: detail.title,
+      description: detail.description,
+      tags: detail.tags,
+      status: detail.status,
+      year: detail.year,
+      featured: detail.is_featured,
+      content: detail.content_md,
+    }
+    html.value = detail.content_md ? await renderMarkdown(detail.content_md) : ''
+  } catch {
+    // 后端不可用时 fallback 到本地 glob
+    project.value = getGalleryProject(slug)
+    html.value = (await renderGalleryProject(slug)) || ''
+  }
   loading.value = false
 }
 

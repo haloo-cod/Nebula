@@ -9,8 +9,8 @@
  */
 
 import { waitForTexture, hasTexture } from '@/components/liquid-glass/liquidGlassRenderer'
-import darkBgUrl from '@/assets/img/test3.jpg'
-import lightBgUrl from '@/assets/img/test6.PNG'
+const darkBgUrl = ''
+const lightBgUrl = ''
 
 /** 等待下次纹理上传完成（主题切换时调用,等待新主题纹理就绪） */
 export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void> {
@@ -19,8 +19,8 @@ export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void>
   // 由于调用方无法传入具体 URL,我们等待两个纹理都就绪（它们通常已经预加载好了）
   return Promise.race([
     Promise.all([
-      hasTexture(darkBgUrl) ? Promise.resolve() : waitForTexture(darkBgUrl, timeoutMs),
-      hasTexture(lightBgUrl) ? Promise.resolve() : waitForTexture(lightBgUrl, timeoutMs),
+      darkBgUrl && !hasTexture(darkBgUrl) ? waitForTexture(darkBgUrl, timeoutMs) : Promise.resolve(),
+      lightBgUrl && !hasTexture(lightBgUrl) ? waitForTexture(lightBgUrl, timeoutMs) : Promise.resolve(),
     ]).then(() => {}),
     new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
   ])
@@ -33,11 +33,12 @@ export function waitForTextureUploadQueueIdle(): Promise<void> {
 
 /** 兼容旧接口：等待首个纹理就绪 */
 export function waitForFirstTextureUploadSettled(): Promise<void> {
+  if (!darkBgUrl && !lightBgUrl) return Promise.resolve()
   if (hasTexture(darkBgUrl) || hasTexture(lightBgUrl)) {
     return Promise.resolve()
   }
   return Promise.race([
-    waitForTexture(darkBgUrl, 1200),
-    waitForTexture(lightBgUrl, 1200),
+    darkBgUrl ? waitForTexture(darkBgUrl, 1200) : Promise.resolve(),
+    lightBgUrl ? waitForTexture(lightBgUrl, 1200) : Promise.resolve(),
   ])
 }

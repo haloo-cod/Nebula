@@ -3,9 +3,9 @@
     <div class="moments-page">
       <!-- 页头 -->
       <header class="moments-header post-rise-inner">
-        <p class="moments-kicker">Moments</p>
-        <h1 class="moments-title">说说</h1>
-        <p class="moments-desc">一些碎碎念，和偶然闪过的灵感。</p>
+        <p class="moments-kicker">{{ siteText.moments.kicker }}</p>
+        <h1 class="moments-title">{{ siteText.moments.title }}</h1>
+        <p class="moments-desc">{{ siteText.moments.subtitle }}</p>
         <span class="moments-count">共 {{ total }} 条</span>
       </header>
 
@@ -75,7 +75,8 @@ import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'
-import { getMoments } from '@/data/moments'
+import { fetchMoments } from '@/api/moments'
+import { siteText } from '@/data/site-text'
 import type { Moment } from '@/types'
 import MomentCard from './MomentCard.vue'
 import MomentDetail from './MomentDetail.vue'
@@ -110,14 +111,22 @@ const noMore = ref(false)
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
-function loadNextPage() {
+async function loadNextPage() {
   if (loadingMore.value || noMore.value) return
   loadingMore.value = true
   currentPage.value++
-  const { items, total: t } = getMoments(currentPage.value, PAGE_SIZE)
-  total.value = t
-  allLoaded.value = [...allLoaded.value, ...items]
-  if (allLoaded.value.length >= t) {
+
+  try {
+    // 优先从后端 API 获取
+    const res = await fetchMoments(currentPage.value, PAGE_SIZE)
+    total.value = res.total
+    allLoaded.value = [...allLoaded.value, ...res.items]
+  } catch {
+    total.value = 0
+    noMore.value = true
+  }
+
+  if (allLoaded.value.length >= total.value) {
     noMore.value = true
   }
   loadingMore.value = false
@@ -152,9 +161,9 @@ function formatDayLabel(dateStr: string): string {
 
 // ============ IntersectionObserver ============
 
-onMounted(() => {
+onMounted(async () => {
   // 首次加载
-  loadNextPage()
+  await loadNextPage()
 
   // hash 定位：如果 URL 中带有 #moment-{id}，加载全部数据后滚动到对应卡片
   const hash = route.hash
@@ -163,7 +172,7 @@ onMounted(() => {
     const targetId = Number(hashMatch[1])
     // 确保目标说说已加载（持续加载直到找到或全部加载完）
     while (!allLoaded.value.some((m) => m.id === targetId) && !noMore.value) {
-      loadNextPage()
+      await loadNextPage()
     }
     nextTick(() => {
       const el = document.getElementById(`moment-${targetId}`)
@@ -268,12 +277,7 @@ onUnmounted(() => {
 .moments-day-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(140, 200, 255, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(140, 200, 255, 0.2), transparent);
 }
 
 .moments-day-label {
@@ -298,11 +302,15 @@ onUnmounted(() => {
 @keyframes momentHighlight {
   0%,
   20% {
-    box-shadow: 0 0 0 2px rgba(140, 200, 255, 0.6), 0 0 24px rgba(140, 200, 255, 0.3);
+    box-shadow:
+      0 0 0 2px rgba(140, 200, 255, 0.6),
+      0 0 24px rgba(140, 200, 255, 0.3);
     border-radius: 1.1rem;
   }
   100% {
-    box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 0 transparent;
   }
 }
 
@@ -329,6 +337,9 @@ onUnmounted(() => {
 .moments-panel {
   width: 100%;
   border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition:
     border-color 0.25s ease,
     box-shadow 0.25s ease;

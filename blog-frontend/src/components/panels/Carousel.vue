@@ -1,6 +1,6 @@
 <template>
   <div class="carousel">
-    <div class="carousel-viewport">
+    <div v-if="images.length > 0" class="carousel-viewport">
       <div class="carousel-track" ref="trackRef" :style="trackStyle">
         <!-- 尾部克隆：最后一张 -->
         <img :src="images[images.length - 1]" class="carousel-slide clone" loading="lazy" />
@@ -17,7 +17,8 @@
         <img :src="images[0]" class="carousel-slide clone" loading="lazy" />
       </div>
     </div>
-    <div class="carousel-dots">
+    <div v-else class="carousel-empty">暂无轮播图片</div>
+    <div v-if="images.length > 1" class="carousel-dots">
       <span
         v-for="(_, i) in images"
         :key="i"
@@ -31,16 +32,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { fetchCarouselSlides } from '@/api/carousel'
 
-const images = [
-  new URL('@/assets/img2/01.PNG', import.meta.url).href,
-  new URL('@/assets/img2/02.PNG', import.meta.url).href,
-  new URL('@/assets/img2/03.PNG', import.meta.url).href,
-  new URL('@/assets/img2/04.PNG', import.meta.url).href,
-  new URL('@/assets/img2/05.PNG', import.meta.url).href,
-  new URL('@/assets/img2/06.JPG', import.meta.url).href,
-  new URL('@/assets/img2/07.PNG', import.meta.url).href,
-]
+const fallbackImages = import.meta.glob<string>('../../assets/carousel/*.{png,PNG,jpg,JPG,jpeg,webp,WEBP}', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+})
+
+const images = ref<string[]>(Object.values(fallbackImages))
 
 const currentIndex = ref(0)
 const autoPlayTimer = ref<number | null>(null)
@@ -72,7 +72,7 @@ function next() {
 
 // 使用 transitionend 事件确保动画完成后才重置，避免瞬间跳回
 function onTransitionEnd() {
-  if (currentIndex.value === images.length) {
+  if (currentIndex.value === images.value.length) {
     transitioning.value = false
     currentIndex.value = 0
     void trackRef.value?.offsetWidth
@@ -86,9 +86,20 @@ function resetAutoPlay() {
   autoPlayTimer.value = window.setInterval(next, INTERVAL)
 }
 
-onMounted(() => {
+onMounted(async () => {
   trackRef.value?.addEventListener('transitionend', onTransitionEnd)
-  autoPlayTimer.value = window.setInterval(next, INTERVAL)
+  // 尝试从后端 API 加载轮播图列表
+  try {
+    const slides = await fetchCarouselSlides()
+    if (slides.length > 0) {
+      images.value = slides
+      // 重置索引避免越界
+      currentIndex.value = 0
+      resetAutoPlay()
+    }
+  } catch {
+    // API 失败时保留本地预览图片
+  }
 })
 
 onUnmounted(() => {
@@ -113,6 +124,15 @@ onUnmounted(() => {
   height: 100%;
   overflow: hidden;
   border-radius: 8px;
+}
+
+.carousel-empty {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .carousel-track {

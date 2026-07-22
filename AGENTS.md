@@ -175,6 +175,7 @@ git branch -d feat/backend-post-api
 - 提交前确保 `pnpm type-check` 通过（前端）
 - 单次提交尽量原子化：一个提交解决一个问题
 - 避免提交 `debug`、`test`、`wip` 等无意义信息（如确需临时提交，合并前 squash）
+- `sample_code/` 目录不入库（`.gitignore` 已排除），仅存放本地参考源码
 
 ## Skill awareness
 

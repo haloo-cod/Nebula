@@ -3,7 +3,9 @@
     <!-- 头部:时间 + 心情 -->
     <div class="detail-inner__head">
       <span class="detail-inner__time">{{ fullDate(moment.date) }}</span>
-      <span v-if="moment.mood" class="detail-inner__mood">{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span>
+      <span v-if="moment.mood" class="detail-inner__mood"
+        >{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span
+      >
     </div>
 
     <!-- 完整正文(不截断) -->
@@ -24,19 +26,28 @@
         :class="{ 'detail-inner__like-btn--active': isLiked }"
         @click="toggleLike"
       >
-        <span class="detail-inner__heart" :class="{ 'detail-inner__heart--pop': justLiked }">♥</span>
+        <span class="detail-inner__heart" :class="{ 'detail-inner__heart--pop': justLiked }"
+          >♥</span
+        >
         <span>{{ displayLikes }}</span>
       </button>
     </div>
 
     <!-- 评论区 -->
     <div class="detail-inner__comments">
-      <h4 class="detail-inner__comments-title">评论</h4>
-      <div class="detail-inner__comments-empty">暂无评论</div>
+      <h4 class="detail-inner__comments-title">评论 ({{ comments.length }})</h4>
+      <div v-if="comments.length === 0" class="detail-inner__comments-empty">暂无评论</div>
+      <div v-else class="detail-inner__comments-list">
+        <div v-for="c in comments" :key="c.id" class="detail-inner__comment-item">
+          <span class="detail-inner__comment-nick">{{ c.nickname }}</span>
+          <span class="detail-inner__comment-date">{{ c.date }}</span>
+          <p class="detail-inner__comment-text">{{ c.content }}</p>
+        </div>
+      </div>
       <div class="detail-inner__comment-input-wrap">
         <input
           type="text"
-          placeholder="评论功能即将开放..."
+          placeholder="登录后可评论..."
           disabled
           class="detail-inner__comment-input"
         />
@@ -47,13 +58,27 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import type { Moment } from '@/types'
+import type { Moment, MomentComment } from '@/types'
 import ImageGrid from './ImageGrid.vue'
+import { likeMoment, fetchMomentComments } from '@/api/moments'
 
 const props = defineProps<{
   moment: Moment
 }>()
 
+// ============ 评论列表 ============
+
+const comments = ref<MomentComment[]>([])
+
+onMounted(async () => {
+  isLiked.value = getLikedIds().has(props.moment.id)
+  // 从 API 加载评论
+  try {
+    comments.value = await fetchMomentComments(props.moment.id)
+  } catch {
+    // 后端不可用时保持空
+  }
+})
 // ============ 点赞逻辑(与 MomentCard 共享 localStorage key) ============
 
 const LIKED_KEY = 'moments_liked_ids'
@@ -75,10 +100,6 @@ const isLiked = ref(false)
 const localLikeDelta = ref(0)
 const justLiked = ref(false)
 
-onMounted(() => {
-  isLiked.value = getLikedIds().has(props.moment.id)
-})
-
 const displayLikes = computed(() => props.moment.likes + localLikeDelta.value)
 
 function toggleLike() {
@@ -92,7 +113,11 @@ function toggleLike() {
     localLikeDelta.value++
     isLiked.value = true
     justLiked.value = true
-    setTimeout(() => { justLiked.value = false }, 400)
+    setTimeout(() => {
+      justLiked.value = false
+    }, 400)
+    // 调用后端 API 点赞（静默）
+    likeMoment(props.moment.id).catch(() => {})
   }
   saveLikedIds(ids)
 }
@@ -221,9 +246,15 @@ function moodEmoji(mood: string): string {
 }
 
 @keyframes heartPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 评论区 */
@@ -265,6 +296,38 @@ function moodEmoji(mood: string): string {
 .detail-inner__comment-input:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.detail-inner__comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.detail-inner__comment-item {
+  padding: 0.6rem 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.6rem;
+}
+
+.detail-inner__comment-nick {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 0.5rem;
+}
+
+.detail-inner__comment-date {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.detail-inner__comment-text {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 </style>
 

@@ -47,10 +47,10 @@ function slugify(path: string): string {
   return path.split('/').pop()!.replace(/\.md$/, '').replace(/\s+/g, '-').toLowerCase()
 }
 
-/** 将相对图片路径转为 Vite 可解析的绝对路径（处理 ../img/xxx → /src/assets/img/xxx） */
+/** 将相对图片路径转为 Vite 可解析的绝对路径（处理 ../post-images/xxx） */
 function resolveImagePath(path: string): string {
   if (!path || path.startsWith('http://') || path.startsWith('https://')) return path
-  return path.replace(/^(\.\.\/)?(img\/.*)$/, '/src/assets/$2')
+  return path.replace(/^(\.\.\/)?(post-images\/.*)$/, '/src/assets/$2')
 }
 
 const posts: Post[] = Object.entries(rawFiles)
@@ -100,11 +100,34 @@ export function getPost(slug: string): Post | null {
 }
 
 // 懒加载 marked,仅在真正渲染文章正文时才下载并解析
-let markedPromise: Promise<typeof import('marked').marked> | null = null
+let markedInstance: typeof import('marked').marked | null = null
 const htmlCache = new Map<string, string>()
+
+/** 获取配置好 highlight.js 的 marked 实例 */
+async function getMarked() {
+  if (markedInstance) return markedInstance
+  const [{ marked }, { markedHighlight }, { hljs }] = await Promise.all([
+    import('marked'),
+    import('marked-highlight'),
+    import('@/utils/highlight'),
+  ])
+  marked.use(
+    markedHighlight({
+      highlight(code: string, lang: string) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value
+        }
+        return code
+      },
+    }),
+  )
+  markedInstance = marked
+  return marked
+}
 
 /**
  * 渲染指定文章正文为 HTML(带缓存,marked 按需懒加载)
+ * 集成 highlight.js 代码高亮
  * @param slug 文章标识
  * @returns 渲染后的 HTML 字符串;文章不存在时返回 null
  */
@@ -112,13 +135,19 @@ export async function renderPost(slug: string): Promise<string | null> {
   const post = getPost(slug)
   if (!post) return null
   if (htmlCache.has(slug)) return htmlCache.get(slug)!
-  if (!markedPromise) {
-    markedPromise = import('marked').then((m) => m.marked)
-  }
-  const marked = await markedPromise
+  const marked = await getMarked()
   const html = (await marked.parse(post.content))
-    // 把 ../img/xxx 这种相对路径转成 Vite 可解析的绝对路径
-    .replace(/(<img\s+src=")(\.\.?\/)?(img\/[^"]+)"/g, '$1/src/assets/$3"')
+    // 把 ../post-images/xxx 这种相对路径转成 Vite 可解析的绝对路径
+    .replace(/(<img\s+src=")(\.\.?\/)?(post-images\/[^"]+)"/g, '$1/src/assets/$3"')
   htmlCache.set(slug, html)
   return html
+}
+
+/**
+ * 渲染任意 Markdown 字符串为 HTML（用于 API 返回的 content_md）
+ * 集成 highlight.js 代码高亮
+ */
+export async function renderMarkdown(content: string): Promise<string> {
+  const marked = await getMarked()
+  return marked.parse(content)
 }

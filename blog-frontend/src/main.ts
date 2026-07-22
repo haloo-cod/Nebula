@@ -1,4 +1,5 @@
 import './assets/main.css'
+import 'highlight.js/styles/github-dark-dimmed.css'
 
 import { createApp, nextTick } from 'vue'
 import { createPinia } from 'pinia'

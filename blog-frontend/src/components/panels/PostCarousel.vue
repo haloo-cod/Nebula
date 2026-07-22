@@ -35,19 +35,35 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getPosts } from '@/data/posts'
+import { fetchPosts, toFrontendPost } from '@/api/posts'
 import type { Post } from '@/types'
 
 const router = useRouter()
 
-// 取最新 5 篇非草稿文章
-const slides = getPosts()
-  .filter((p) => !p.draft)
-  .slice(0, 5)
+// 取最新 5 篇非草稿文章（先用 glob fallback）
+const slides = ref<Post[]>(
+  getPosts()
+    .filter((p) => !p.draft)
+    .slice(0, 5),
+)
 
 const current = ref(0)
 const paused = ref(false)
 let timer: number | null = null
 const INTERVAL = 5000
+
+// 启动时尝试从 API 获取
+onMounted(async () => {
+  try {
+    const res = await fetchPosts(1, 5)
+    if (res.items.length > 0) {
+      slides.value = res.items.map(toFrontendPost)
+    }
+  } catch {
+    // 后端不可用时保持 glob 数据
+  }
+  resetTimer()
+})
 
 /** 分类 → 颜色 */
 const categoryColors: Record<string, string> = {
@@ -73,13 +89,13 @@ function catColor(cat: string): string {
 function slideClass(i: number): string {
   if (i === current.value) return 'slide--active'
   // 判断方向:上一张 or 下一张(支持循环)
-  const prev = (current.value - 1 + slides.length) % slides.length
+  const prev = (current.value - 1 + slides.value.length) % slides.value.length
   if (i === prev) return 'slide--prev'
   return 'slide--next'
 }
 
 function next() {
-  current.value = (current.value + 1) % slides.length
+  current.value = (current.value + 1) % slides.value.length
 }
 
 function goTo(i: number) {
@@ -105,10 +121,6 @@ function resume() {
 function goPost(post: Post) {
   router.push('/post/' + post.slug)
 }
-
-onMounted(() => {
-  resetTimer()
-})
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)

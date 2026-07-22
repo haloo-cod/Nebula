@@ -3,9 +3,9 @@
     <main class="friends-page">
       <!-- 页面标题 -->
       <header class="friends-header">
-        <p class="friends-kicker">Friends</p>
-        <h1 class="friends-title">友链</h1>
-        <p class="friends-desc">一些有趣、温和且持续发光的站点。</p>
+        <p class="friends-kicker">{{ siteText.friends.kicker }}</p>
+        <h1 class="friends-title">{{ siteText.friends.title }}</h1>
+        <p class="friends-desc">{{ siteText.friends.subtitle }}</p>
       </header>
 
       <!-- 顶部液态玻璃鱼缸 -->
@@ -115,6 +115,7 @@
                 <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
                 <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
                 <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+                <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
               </div>
             </div>
 
@@ -134,11 +135,7 @@
           </article>
         </LiquidGlass>
 
-        <PanelFallbackGlass
-          v-else
-          tag="article"
-          class="exchange-card exchange-card-fallback"
-        >
+        <PanelFallbackGlass v-else tag="article" class="exchange-card exchange-card-fallback">
           <h2 class="exchange-title">交换友链</h2>
 
           <div class="exchange-site">
@@ -152,6 +149,7 @@
               <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
               <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
               <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+              <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
             </div>
           </div>
 
@@ -175,35 +173,57 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { getFriends } from '@/data/friends'
+import { fetchFriends, fetchFriendExchangeInfo, type FriendExchangeInfo } from '@/api/friends'
+import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
 import { useFloatingAvatars } from '@/composables/useFloatingAvatars'
 
 const ui = useUIStore()
-const friends = getFriends()
+const friends = ref(getFriends())
 const aquariumRef = ref<HTMLElement | null>(null)
 
 // 交换友链占位信息，后续替换为真实内容
-const exchangeInfo = {
+const exchangeInfo = ref<FriendExchangeInfo>({
   name: '你的站点名称',
   url: 'https://example.com',
   avatar: 'https://api.dicebear.com/9.x/adventurer/svg?seed=myblog',
   bio: '这里填写你的站点简介。',
   requirements: ['原创内容优先', '站点稳定可访问', '无违法违规内容', '最好有定期更新'],
   contact: 'your-email@example.com',
-}
+})
 
-const { items: floatingItems, pause, resume } = useFloatingAvatars({
+const {
+  items: floatingItems,
+  pause,
+  resume,
+} = useFloatingAvatars({
   containerRef: aquariumRef,
   friends,
   mode: 'bounce',
   avatarSize: 72,
   speed: 0.8,
+})
+
+// 尝试从后端 API 加载友链列表
+onMounted(async () => {
+  try {
+    const [apiFriends, apiExchangeInfo] = await Promise.all([
+      fetchFriends(),
+      fetchFriendExchangeInfo(),
+    ])
+    if (apiFriends.length > 0) {
+      friends.value = apiFriends
+    }
+    exchangeInfo.value = apiExchangeInfo
+  } catch {
+    // API 失败，保留本地 fallback 数据
+  }
 })
 </script>
 
@@ -247,7 +267,9 @@ const { items: floatingItems, pause, resume } = useFloatingAvatars({
   border-radius: 50%;
   text-decoration: none;
   will-change: transform;
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
 }
 
 .floating-avatar:hover,
@@ -264,7 +286,9 @@ const { items: floatingItems, pause, resume } = useFloatingAvatars({
   background: var(--glass-bg);
   object-fit: cover;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .floating-avatar:hover .floating-avatar__img,
@@ -288,7 +312,9 @@ const { items: floatingItems, pause, resume } = useFloatingAvatars({
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .floating-avatar:hover .floating-avatar__name,
@@ -498,6 +524,14 @@ const { items: floatingItems, pause, resume } = useFloatingAvatars({
   color: var(--text-secondary);
   font-size: 0.8rem;
   line-height: 1.55;
+}
+
+.exchange-site-avatar-url {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  word-break: break-all;
 }
 
 .exchange-block {

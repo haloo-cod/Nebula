@@ -3,9 +3,9 @@
     <main class="gallery-page">
       <section id="gallery-projects" class="gallery-section">
         <div class="section-heading">
-          <span class="gallery-kicker">Projects</span>
-          <h2>项目</h2>
-          <p>点击项目卡片进入独立 Markdown 文档,不进入博客归档和统计。</p>
+          <span class="gallery-kicker">{{ siteText.gallery.kicker }}</span>
+          <h2>{{ siteText.gallery.title }}</h2>
+          <p>{{ siteText.gallery.subtitle }}</p>
         </div>
 
         <div class="project-grid">
@@ -22,11 +22,27 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import PageBackground from '@/components/PageBackground.vue'
 import GlassProjectLink from '@/components/gallery/GlassProjectLink.vue'
 import { getGalleryProjects } from '@/data/gallery'
+import { fetchGalleryProjects, toFrontendGalleryProject } from '@/api/gallery'
+import { siteText } from '@/data/site-text'
+import type { GalleryProject } from '@/types'
 
-const projects = getGalleryProjects()
+const projects = ref<GalleryProject[]>(getGalleryProjects())
+
+// 启动时尝试从后端 API 加载（fallback 到 glob）
+onMounted(async () => {
+  try {
+    const items = await fetchGalleryProjects()
+    if (items.length > 0) {
+      projects.value = items.map(toFrontendGalleryProject)
+    }
+  } catch {
+    // 后端不可用时保持 glob 数据
+  }
+})
 </script>
 
 <style scoped>
