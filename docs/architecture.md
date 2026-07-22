@@ -45,6 +45,18 @@ Starlit Blog 是一个基于 **Vue 3 + FastAPI** 的全栈个人博客系统，�
 | 文件系统 (`uploads/`) | 图片/EPUB/静态资源 |
 | 文件系统 (`content/`) | Markdown 原文（博文/展览/关于页） |
 
+## 前端特色实现
+
+### Liquid Glass
+
+液态玻璃不是简单地给每个面板添加 `backdrop-filter`。前端通过共享的 WebGL 渲染器，将多个 `LiquidGlass` 组件统一调度到一条渲染管线中。这里的“单一实例”指共享一个 WebGL context 和 renderer singleton，并不是页面只能有一个玻璃面板。每个面板仍然拥有独立的 canvas、尺寸、uniform 状态和背景纹理引用。
+
+渲染器负责统一管理 WebGL 初始化、shader、纹理缓存、动画帧、实例注册以及 context 丢失恢复；组件本身只负责生命周期、尺寸同步、主题参数和交互轨迹。完整说明见 [`frontend-features.md`](frontend-features.md)。
+
+### EPUB Reader
+
+图书页面通过后端 API 获取分页元数据和受保护的 EPUB 资源，阅读器页面使用 `epubjs` 创建 EPUB 实例与 rendition，支持目录导航、分页/滚动模式、CFI 位置恢复、阅读主题、字体缩放和滚动到底自动切换章节。前端 `import.meta.glob()` 仅保留本地 UI 预览 fallback，不是生产图书资源的主要来源。完整说明见 [`frontend-features.md`](frontend-features.md)。
+
 ## 目录结构
 
 ```

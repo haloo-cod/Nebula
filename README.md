@@ -90,6 +90,7 @@ pnpm test:unit
 - `docs/api-reference.md`：API 参考
 - `docs/database.md`：数据库说明
 - `docs/deployment.md`：部署说明
+- `docs/frontend-features.md`：液态玻璃与 EPUB 阅读器实现说明
 - `AGENTS.md`：开发约定
 
 ## 当前状态
