@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 class TreasureCreate(BaseModel):
     """创建藏宝条目（管理员）"""
-    slug: str
+    slug: str = ""
     title: str
     description: str = ""
     category: str  # '开源项目' | '工具' | '资源下载'
@@ -44,6 +44,9 @@ class TreasureResponse(BaseModel):
     tags: list[str]
     sort_order: int
     created_at: datetime
+    archive_id: int | None = None
+    archive_status: str | None = None
+    archive_expires_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

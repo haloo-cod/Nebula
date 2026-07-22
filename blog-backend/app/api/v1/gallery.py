@@ -23,6 +23,7 @@ from app.services.gallery import (
     slug_to_filename,
     write_md_file,
 )
+from app.services.slug import unique_slug
 
 router = APIRouter(prefix="/gallery", tags=["展览"])
 
@@ -69,18 +70,16 @@ async def create_gallery_project(
     _: User = Depends(require_admin),
 ):
     """创建展览项目"""
-    existing = await db.execute(select(GalleryProject).where(GalleryProject.slug == body.slug))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="slug 已存在")
+    slug = await unique_slug(db, GalleryProject, body.slug or body.title, "project")
 
-    md_filename = slug_to_filename(body.slug)
+    md_filename = slug_to_filename(slug)
     if body.content_md:
         write_md_file(md_filename, body.content_md)
 
     content_html = render_gallery_content(body.content_md) if body.content_md else ""
 
     project = GalleryProject(
-        slug=body.slug,
+        slug=slug,
         title=body.title,
         description=body.description,
         tags=body.tags,

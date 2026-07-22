@@ -14,6 +14,7 @@ import Topbar from './Topbar.vue'
 
 /** 侧边栏折叠状态 */
 const collapsed = ref(false)
+const mobileSidebarOpen = ref(false)
 
 /** 暗色模式状态（独立于博客前台,存 localStorage） */
 const DARK_KEY = 'admin_dark_mode'
@@ -32,7 +33,15 @@ onBeforeUnmount(() => {
 
 /** 切换侧边栏折叠 */
 function toggleCollapse() {
+  if (window.matchMedia('(max-width: 767px)').matches) {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+    return
+  }
   collapsed.value = !collapsed.value
+}
+
+function closeMobileSidebar() {
+  mobileSidebarOpen.value = false
 }
 
 /** 切换暗色模式 */
@@ -50,11 +59,23 @@ function applyDarkTheme() {
 </script>
 
 <template>
-  <div id="admin-app" class="admin-layout" :class="{ 'admin-dark': isDark }">
+  <div
+    id="admin-app"
+    class="admin-layout"
+    :class="{ 'admin-dark': isDark, 'mobile-sidebar-open': mobileSidebarOpen }"
+  >
     <!-- 侧边栏 -->
     <aside class="admin-layout-sidebar" :class="{ 'is-collapsed': collapsed }">
-      <Sidebar :collapsed="collapsed" />
+      <Sidebar :collapsed="collapsed" @navigate="closeMobileSidebar" />
     </aside>
+
+    <button
+      v-if="mobileSidebarOpen"
+      class="admin-sidebar-overlay"
+      type="button"
+      aria-label="关闭菜单"
+      @click="closeMobileSidebar"
+    ></button>
 
     <!-- 右侧主区域 -->
     <div class="admin-layout-main">
@@ -152,6 +173,10 @@ function applyDarkTheme() {
   background: var(--admin-content-bg);
 }
 
+.admin-sidebar-overlay {
+  display: none;
+}
+
 /* ---------- 页面切换过渡动画 ---------- */
 .admin-fade-enter-active,
 .admin-fade-leave-active {
@@ -161,5 +186,111 @@ function applyDarkTheme() {
 .admin-fade-enter-from,
 .admin-fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 767px) {
+  .admin-layout-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1001;
+    width: min(82vw, 280px);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-layout-sidebar.is-collapsed {
+    width: min(82vw, 280px);
+  }
+
+  .admin-layout.mobile-sidebar-open .admin-layout-sidebar {
+    transform: translateX(0);
+  }
+
+  .admin-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.38);
+    cursor: pointer;
+  }
+
+  .admin-layout-content {
+    padding: 12px;
+  }
+}
+</style>
+
+<style>
+/* 后台弹窗挂载到 body，使用全局规则保证移动端尺寸不被各页面的 width 属性撑破。 */
+.admin-layout ~ .el-overlay .el-dialog,
+.el-overlay .el-dialog {
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+}
+
+.el-overlay .el-dialog__body {
+  max-height: min(70vh, 680px);
+  overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+  .el-overlay .el-dialog {
+    width: calc(100vw - 24px) !important;
+    margin: 12px auto;
+    border-radius: 10px;
+  }
+
+  .el-overlay .el-dialog__header {
+    padding: 16px 16px 10px;
+  }
+
+  .el-overlay .el-dialog__title {
+    font-size: 16px;
+  }
+
+  .el-overlay .el-dialog__body {
+    max-height: calc(100vh - 180px);
+    padding: 12px 16px 16px;
+  }
+
+  .el-overlay .el-dialog__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px 16px;
+  }
+
+  .el-overlay .el-dialog__footer .el-button {
+    min-width: 76px;
+    margin-left: 0;
+  }
+
+  .el-overlay .el-form-item {
+    margin-bottom: 16px;
+  }
+
+  .el-overlay .el-form-item__label {
+    padding-bottom: 4px;
+  }
+
+  .el-overlay .el-form--inline .el-form-item {
+    display: flex;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .el-overlay .el-form--inline .el-form-item__content,
+  .el-overlay .el-form--inline .el-input,
+  .el-overlay .el-form--inline .el-select {
+    width: 100% !important;
+  }
+
+  .el-overlay .el-upload-dragger {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 </style>

@@ -145,4 +145,28 @@ async function handleCommand(command: string) {
 .username {
   font-size: 14px;
 }
+
+@media (max-width: 767px) {
+  .admin-topbar {
+    height: 52px;
+    padding: 0 12px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 10px;
+  }
+
+  .breadcrumb-text {
+    font-size: 14px;
+  }
+
+  .username {
+    max-width: 92px;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 </style>

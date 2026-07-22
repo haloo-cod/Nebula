@@ -45,6 +45,20 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
 
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_download_jobs_status ON book_download_jobs (status)"))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_download_jobs_expires_at ON book_download_jobs (expires_at)"))
+        download_job_columns = await conn.run_sync(
+            lambda sync_conn: {
+                column["name"]
+                for column in inspect(sync_conn).get_columns("book_download_jobs")
+            }
+        )
+        if "archive_name" not in download_job_columns:
+            await conn.execute(
+                text("ALTER TABLE book_download_jobs ADD COLUMN archive_name VARCHAR(160) NOT NULL DEFAULT 'starlit-books'")
+            )
+        if "expire_days" not in download_job_columns:
+            await conn.execute(
+                text("ALTER TABLE book_download_jobs ADD COLUMN expire_days INTEGER NOT NULL DEFAULT 7")
+            )
         # 7 天策略上线前创建的已完成任务仍可能保留旧的 1 小时过期时间。
         await conn.execute(
             text(

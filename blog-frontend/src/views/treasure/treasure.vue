@@ -194,20 +194,23 @@ async function handleTreasureClick(event: MouseEvent, item: Treasure) {
   }
 
   const url = resolveUrl(item.downloadUrl)
-  if (!item.downloadUrl.startsWith('/api/v1/files/')) return
+  const isManagedDownload =
+    item.downloadUrl.startsWith('/api/v1/files/') ||
+    item.downloadUrl.startsWith('/api/v1/treasures/')
+  if (!isManagedDownload) return
 
   event.preventDefault()
   if (downloading.value) return
   downloading.value = true
   downloadProgress.value = 0
   try {
-    await downloadWithProgress(url, 'download', {
+    await downloadWithProgress(url, item.title, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
       onProgress: (percent) => (downloadProgress.value = percent),
     })
     showDownloadNotice('下载已开始')
-  } catch {
-    showDownloadNotice('文件暂时无法下载，请稍后重试')
+  } catch (err: unknown) {
+    showDownloadNotice(err instanceof Error ? err.message : '文件暂时无法下载，请稍后重试')
   } finally {
     downloading.value = false
   }
@@ -338,22 +341,42 @@ onMounted(async () => {
 }
 
 .treasure-glass--fallback {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition:
     transform 0.24s ease,
-    border-color 0.28s ease,
-    box-shadow 0.28s ease;
+    filter 0.24s ease;
 }
 
-.treasure-link:hover .treasure-glass {
-  transform: translateY(-4px);
-  filter: drop-shadow(0 14px 32px rgba(255, 200, 100, 0.12));
+@media (hover: hover) and (pointer: fine) {
+  .treasure-link:hover .treasure-glass {
+    transform: translateY(-4px);
+    filter: drop-shadow(0 14px 32px rgba(255, 200, 100, 0.12));
+  }
+
+  .treasure-link:hover .treasure-glass--fallback {
+    transform: translateY(-3px);
+    filter: drop-shadow(0 8px 24px rgba(80, 140, 255, 0.14));
+  }
 }
 
-.treasure-link:hover .treasure-glass--fallback {
-  border-color: rgba(255, 200, 100, 0.32);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 14px 32px rgba(255, 200, 100, 0.1);
+/* 触摸设备上的 hover 可能会粘滞，保持藏宝卡片稳定的基础表面。 */
+@media (hover: none), (pointer: coarse) {
+  .treasure-link:hover .treasure-glass,
+  .treasure-link:active .treasure-glass,
+  .treasure-link:focus .treasure-glass {
+    transform: none;
+    filter: none;
+  }
+
+  .treasure-link:hover .treasure-glass--fallback,
+  .treasure-link:active .treasure-glass--fallback,
+  .treasure-link:focus .treasure-glass--fallback {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+  }
 }
 
 .download-notice {

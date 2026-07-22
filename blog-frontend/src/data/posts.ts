@@ -47,10 +47,10 @@ function slugify(path: string): string {
   return path.split('/').pop()!.replace(/\.md$/, '').replace(/\s+/g, '-').toLowerCase()
 }
 
-/** 将相对图片路径转为 Vite 可解析的绝对路径（处理 ../img/xxx → /src/assets/img/xxx） */
+/** 将相对图片路径转为 Vite 可解析的绝对路径（处理 ../post-images/xxx） */
 function resolveImagePath(path: string): string {
   if (!path || path.startsWith('http://') || path.startsWith('https://')) return path
-  return path.replace(/^(\.\.\/)?(img\/.*)$/, '/src/assets/$2')
+  return path.replace(/^(\.\.\/)?(post-images\/.*)$/, '/src/assets/$2')
 }
 
 const posts: Post[] = Object.entries(rawFiles)
@@ -137,8 +137,8 @@ export async function renderPost(slug: string): Promise<string | null> {
   if (htmlCache.has(slug)) return htmlCache.get(slug)!
   const marked = await getMarked()
   const html = (await marked.parse(post.content))
-    // 把 ../img/xxx 这种相对路径转成 Vite 可解析的绝对路径
-    .replace(/(<img\s+src=")(\.\.?\/)?(img\/[^"]+)"/g, '$1/src/assets/$3"')
+    // 把 ../post-images/xxx 这种相对路径转成 Vite 可解析的绝对路径
+    .replace(/(<img\s+src=")(\.\.?\/)?(post-images\/[^"]+)"/g, '$1/src/assets/$3"')
   htmlCache.set(slug, html)
   return html
 }

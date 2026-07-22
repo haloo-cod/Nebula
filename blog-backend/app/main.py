@@ -21,6 +21,7 @@ from app.models.rate_limit import RateLimitHit
 from app.services.schema_migration import migrate_existing_schema
 from app.utils.security import hash_password
 from app.services.book_download import cleanup_expired_book_archives
+from app.services.post_download import cleanup_expired_post_archives
 from app.services.analytics import utc_now
 
 
@@ -34,7 +35,6 @@ async def lifespan(app: FastAPI):
     (settings.UPLOAD_DIR / "books").mkdir(exist_ok=True)
     (settings.UPLOAD_DIR / "files").mkdir(exist_ok=True)
     settings.BOOK_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    cleanup_expired_book_archives()
     settings.CONTENT_DIR.mkdir(parents=True, exist_ok=True)
     (settings.CONTENT_DIR / "posts").mkdir(exist_ok=True)
     (settings.CONTENT_DIR / "gallery").mkdir(exist_ok=True)
@@ -47,6 +47,9 @@ async def lifespan(app: FastAPI):
             await conn.execute(text("PRAGMA journal_mode=WAL"))
             await conn.execute(text("PRAGMA busy_timeout=5000"))
     await migrate_existing_schema(engine)
+    # 先完成旧数据库字段迁移，再查询归档任务进行过期清理。
+    await cleanup_expired_book_archives()
+    await cleanup_expired_post_archives()
 
     # 启动时清理过期访问明细，避免原始 IP 长期保留。
     async with AsyncSessionLocal() as cleanup_session:

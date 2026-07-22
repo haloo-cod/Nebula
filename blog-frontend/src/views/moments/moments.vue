@@ -75,7 +75,6 @@ import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'
-import { getMoments } from '@/data/moments'
 import { fetchMoments } from '@/api/moments'
 import { siteText } from '@/data/site-text'
 import type { Moment } from '@/types'
@@ -123,10 +122,8 @@ async function loadNextPage() {
     total.value = res.total
     allLoaded.value = [...allLoaded.value, ...res.items]
   } catch {
-    // 后端不可用时 fallback 到本地 mock 数据
-    const { items, total: t } = getMoments(currentPage.value, PAGE_SIZE)
-    total.value = t
-    allLoaded.value = [...allLoaded.value, ...items]
+    total.value = 0
+    noMore.value = true
   }
 
   if (allLoaded.value.length >= total.value) {
@@ -340,6 +337,9 @@ onUnmounted(() => {
 .moments-panel {
   width: 100%;
   border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition:
     border-color 0.25s ease,
     box-shadow 0.25s ease;

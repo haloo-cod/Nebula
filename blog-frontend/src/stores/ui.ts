@@ -119,7 +119,8 @@ export const useUIStore = defineStore('ui', () => {
   const theme = ref<Theme>(readStoredTheme())
   const backgroundBlurEnabled = ref(readStoredBoolean(BACKGROUND_BLUR_ENABLED_KEY, false))
   const backgroundBlur = ref(readStoredBackgroundBlur() ?? DEFAULT_BACKGROUND_BLUR)
-  const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, false))
+  const isDesktopOnInit = typeof window !== 'undefined' && window.innerWidth > 768
+  const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, isDesktopOnInit))
   const liquidGlassBlur = ref(readStoredLiquidGlassBlur())
 
   // 背景图动态列表（初始用静态 fallback，API 加载成功后替换）
@@ -353,11 +354,10 @@ export const useUIStore = defineStore('ui', () => {
         fetchBackgrounds('light', 'mobile'),
       ])
 
-      // 仅当 API 返回有效数据时替换（避免空数组导致页面无背景）
-      if (darkDesktop.length > 0) darkBgs.value = darkDesktop.map((i) => ({ src: i.url }))
-      if (lightDesktop.length > 0) lightBgs.value = lightDesktop.map((i) => ({ src: i.url }))
-      if (darkMobile.length > 0) mobileDarkBgs.value = darkMobile.map((i) => ({ src: i.url }))
-      if (lightMobile.length > 0) mobileLightBgs.value = lightMobile.map((i) => ({ src: i.url }))
+      darkBgs.value = darkDesktop.map((i) => ({ src: i.url }))
+      lightBgs.value = lightDesktop.map((i) => ({ src: i.url }))
+      mobileDarkBgs.value = darkMobile.map((i) => ({ src: i.url }))
+      mobileLightBgs.value = lightMobile.map((i) => ({ src: i.url }))
 
       // 索引越界修正（API 返回的列表可能比 localStorage 存的索引短）
       if (darkBgIndex.value >= darkBgs.value.length) darkBgIndex.value = 0
@@ -365,7 +365,7 @@ export const useUIStore = defineStore('ui', () => {
       if (mobileDarkBgIndex.value >= mobileDarkBgs.value.length) mobileDarkBgIndex.value = 0
       if (mobileLightBgIndex.value >= mobileLightBgs.value.length) mobileLightBgIndex.value = 0
     } catch {
-      // API 失败时静默保留 fallback 静态图片，不影响用户体验
+      // API 失败时保持 CSS 纯色背景，不依赖本地图片
     }
   }
 

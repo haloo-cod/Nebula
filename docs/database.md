@@ -26,7 +26,7 @@
 | `password_hash` | String(200) | — | bcrypt 哈希 |
 | `is_admin` | Boolean | default=False | 是否管理员 |
 
-默认管理员：`admin` / `admin123`
+管理员账户由 `.env` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 配置；首次启动时创建。请不要在生产环境使用示例密码。
 
 ---
 

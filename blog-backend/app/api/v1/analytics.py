@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +60,11 @@ async def record_event(
         )
         db.add(event)
         await db.commit()
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_429_TOO_MANY_REQUESTS:
+            raise
+        # 访问统计不是关键链路，达到限流上限时静默丢弃事件，避免污染服务日志。
+        await db.rollback()
     except OperationalError:
         # 统计属于非关键链路,SQLite 瞬时 I/O 故障不应让前台请求失败。
         await db.rollback()

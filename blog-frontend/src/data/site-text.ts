@@ -16,36 +16,36 @@ export const siteText: Record<string, PageText> = {
   images: {
     kicker: 'Images',
     title: '图片',
-    subtitle: '定格时间，封存每一次心跳。',
+    subtitle: '分享好看的图片',
   },
   friends: {
     kicker: 'Friends',
     title: '友链',
-    subtitle: '一些有趣、温和且持续发光的站点。',
+    subtitle: '想做海洋馆的样子，收集互联网茫茫大海里有趣的朋友们。',
   },
   treasure: {
     kicker: 'Treasure',
     title: '藏宝阁',
-    subtitle: '收集有趣的开源项目和实用资源，未来会提供文件下载。',
+    subtitle: '收集有趣的开源项目和实用工具，也会提供一些日轻的资源下载',
   },
   moments: {
     kicker: 'Moments',
     title: '说说',
-    subtitle: '一些碎碎念，和偶然闪过的灵感。',
+    subtitle: '一些碎碎念，一些心情，一些生活的点滴。',
   },
   books: {
     kicker: 'Library',
     title: '图书',
-    subtitle: '一块一块的玻璃书格。点击任意图书后进入全屏 EPUB 阅读器。',
+    subtitle: '分享一些小说，大多数我自己看过然后再上来的（资源来自网络，侵删）',
   },
   gallery: {
     kicker: 'Projects',
     title: '项目',
-    subtitle: '点击项目卡片进入独立 Markdown 文档，不进入博客归档和统计。',
+    subtitle: '记录下自己做的一些项目',
   },
   blog: {
     kicker: 'Blog',
     title: '博文',
-    subtitle: '一片一片的玻璃卡片。点击任意卡片进入文章页。',
+    subtitle: '记录下自己的一些想法和生活',
   },
 }

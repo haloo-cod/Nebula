@@ -8,6 +8,8 @@ import base64
 import hashlib
 import posixpath
 import uuid
+import re
+import unicodedata
 import xml.etree.ElementTree as ET
 
 from fastapi import UploadFile
@@ -367,7 +369,10 @@ def get_epub_files() -> list[Path]:
 
 def slugify(filename: str) -> str:
     """文件名 → slug"""
-    return Path(filename).stem
+    value = Path(filename).stem
+    value = unicodedata.normalize("NFKC", value).strip().lower()
+    value = re.sub(r"[^\w\u4e00-\u9fff]+", "-", value, flags=re.UNICODE)
+    return re.sub(r"[-_]+", "-", value).strip("-") or "book"
 
 
 def title_from_filename(filename: str) -> str:

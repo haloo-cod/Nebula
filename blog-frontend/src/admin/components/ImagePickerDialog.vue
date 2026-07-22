@@ -262,5 +262,14 @@ watch(
   .picker-toolbar .el-input {
     max-width: none;
   }
+
+  .image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: calc(100vh - 300px);
+  }
+
+  .image-option img {
+    height: 82px;
+  }
 }
 </style>

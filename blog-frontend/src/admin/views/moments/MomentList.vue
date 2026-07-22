@@ -6,8 +6,9 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { api } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 说说项（匹配后端 MomentResponse） */
 interface MomentItem {
@@ -29,6 +30,7 @@ const createForm = ref({
   images: '',
 })
 const creating = ref(false)
+const showImagePicker = ref(false)
 
 const { loading, data, pagination, loadData, handlePageChange, handleSizeChange, handleDelete } =
   useAdminTable<MomentItem>({
@@ -50,6 +52,18 @@ function openCreate() {
   createForm.value = { content: '', mood: '', tags: '', images: '' }
   showCreateDialog.value = true
 }
+
+/** 将图库选择的图片追加到说说图片列表。 */
+function handleImagesSelected(images: PickerImage[]) {
+  const selectedUrls = images.map((image) => resolveUrl(image.url))
+  const currentUrls = createForm.value.images
+    .split('\n')
+    .map((url) => url.trim())
+    .filter(Boolean)
+  createForm.value.images = [...new Set([...currentUrls, ...selectedUrls])].join('\n')
+}
+
+/** 将图库选择的图片追加到说说图片列表。 */
 
 /** 提交新建说说 */
 async function submitCreate() {
@@ -183,11 +197,17 @@ onMounted(() => loadData())
           <el-input v-model="createForm.tags" placeholder="标签1, 标签2" />
         </el-form-item>
         <el-form-item label="图片 URL（每行一个）">
+          <div class="image-picker-actions">
+            <el-button type="primary" plain @click="showImagePicker = true">从图库选择或上传</el-button>
+            <span class="image-count">
+              {{ createForm.images.split('\n').filter((url) => url.trim()).length }} 张已选择
+            </span>
+          </div>
           <el-input
             v-model="createForm.images"
             type="textarea"
             :rows="3"
-            placeholder="http://..."
+            placeholder="可手动填写 URL，每行一个；也可从图库选择或上传"
           />
         </el-form-item>
       </el-form>
@@ -196,6 +216,14 @@ onMounted(() => loadData())
         <el-button type="primary" :loading="creating" @click="submitCreate">发布</el-button>
       </template>
     </el-dialog>
+
+    <ImagePickerDialog
+      v-model="showImagePicker"
+      title="选择说说图片"
+      multiple
+      @select-many="handleImagesSelected"
+    />
+
   </div>
 </template>
 
@@ -225,6 +253,19 @@ onMounted(() => loadData())
   line-height: 1.5;
   color: var(--admin-text-color, #303133);
 }
+
+.image-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.image-count {
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+
 
 .pagination-wrap {
   display: flex;

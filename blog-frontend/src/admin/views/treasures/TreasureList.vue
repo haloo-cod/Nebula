@@ -22,6 +22,22 @@ interface TreasureItem {
   tags: string[]
   sort_order: number
   created_at: string
+  archive_id: number | null
+  archive_status: string | null
+  archive_expires_at: string | null
+}
+
+/** 已完成的图书归档任务。 */
+interface BookArchiveJob {
+  id: number
+  status: string
+  total_books: number
+  file_size: number
+  created_at: string
+  download_url: string | null
+  archive_name: string
+  expire_days: number
+  expires_at: string | null
 }
 
 const loading = ref(false)
@@ -33,6 +49,8 @@ const isEdit = ref(false)
 const saving = ref(false)
 const editingId = ref(0)
 const uploadedFiles = ref<UploadedFile[]>([])
+const bookArchives = ref<BookArchiveJob[]>([])
+const loadingArchives = ref(false)
 const loadingFiles = ref(false)
 const uploadingFile = ref(false)
 const uploadProgress = ref(0)
@@ -89,12 +107,63 @@ async function loadFiles() {
   }
 }
 
+/** 加载可挂载到藏宝阁的已完成图书归档。 */
+async function loadBookArchives() {
+  loadingArchives.value = true
+  try {
+    const response = await api.get<{ items: BookArchiveJob[]; total: number }>(
+      '/api/v1/books/download-jobs?page_size=100',
+      true,
+    )
+    bookArchives.value = response.items.filter(
+      (job) => job.status === 'completed' && Boolean(job.download_url),
+    )
+  } catch {
+    ElMessage.error('加载图书归档失败')
+  } finally {
+    loadingArchives.value = false
+  }
+}
+
+/** 生成藏宝阁归档下载地址。 */
+function archiveDownloadUrl(jobId: number): string {
+  return `/api/v1/treasures/archive/${jobId}/download`
+}
+
+/** 选择归档后使用藏宝阁自己的下载地址，避免直接暴露后台任务地址。 */
+function selectBookArchive(jobId: number) {
+  if (!form.value.slug.trim()) {
+    ElMessage.warning('请先填写 Slug，再选择图书归档')
+    return
+  }
+  form.value.download_file = archiveDownloadUrl(jobId)
+}
+
+/** 根据标题生成 slug 预览，后端负责最终唯一化。 */
+function previewSlug(title: string): string {
+  return title
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180)
+}
+
 /** 格式化文件大小 */
 function formatFileSize(size: number): string {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
   return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+/** 格式化归档剩余时间。 */
+function archiveExpiryLabel(item: TreasureItem): string {
+  if (!item.archive_id || !item.archive_expires_at) return ''
+  const remaining = Math.ceil(
+    (new Date(item.archive_expires_at).getTime() - Date.now()) / 86400000,
+  )
+  return remaining > 0 ? `${remaining} 天后过期` : '已过期'
 }
 
 /** 当前关联的文件记录 */
@@ -194,10 +263,7 @@ async function handleSave() {
     ElMessage.warning('标题和分类不能为空')
     return
   }
-  if (!isEdit.value && !form.value.slug.trim()) {
-    ElMessage.warning('请填写 Slug')
-    return
-  }
+  if (!isEdit.value && !form.value.slug.trim()) form.value.slug = previewSlug(form.value.title) || 'treasure'
 
   saving.value = true
   try {
@@ -244,6 +310,7 @@ onMounted(() => {
   loadData()
   loadCategories()
   loadFiles()
+  loadBookArchives()
 })
 </script>
 
@@ -251,7 +318,7 @@ onMounted(() => {
   <div class="treasure-list-page">
     <div class="page-header">
       <div class="filter-row">
-        <el-select
+             <el-select
           v-model="filterCategory"
           placeholder="全部分类"
           clearable
@@ -293,6 +360,13 @@ onMounted(() => {
           </template>
         </el-table-column>
         <el-table-column prop="sort_order" label="排序" width="60" />
+        <el-table-column label="下载状态" min-width="130">
+          <template #default="{ row }: { row: any }">
+            <el-tag v-if="row.archive_id" :type="row.archive_status === 'expired' ? 'danger' : 'warning'" size="small">
+              {{ row.archive_status === 'expired' ? '归档已过期' : archiveExpiryLabel(row as TreasureItem) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }: { row: any }">
             <el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
@@ -306,8 +380,8 @@ onMounted(() => {
     <el-dialog v-model="showDialog" :title="isEdit ? '编辑资源' : '新增资源'" width="540px">
       <el-form label-position="top">
         <div class="form-grid">
-          <el-form-item label="Slug" v-if="!isEdit">
-            <el-input v-model="form.slug" placeholder="url-friendly-slug" />
+          <el-form-item label="Slug">
+            <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
           </el-form-item>
           <el-form-item label="标题">
             <el-input v-model="form.title" placeholder="资源名称" />
@@ -378,6 +452,23 @@ onMounted(() => {
                   </el-button>
                 </div>
               </el-option>
+             </el-select>
+
+            <el-select
+              :model-value="bookArchives.find((job) => form.download_file.includes(`/treasures/${encodeURIComponent(form.slug)}/download`) && form.download_file.includes(`archive=${job.id}`))?.id"
+              filterable
+              clearable
+              :loading="loadingArchives"
+              placeholder="或选择已完成的图书归档"
+              style="width: 100%"
+              @update:model-value="(value: number | undefined) => value && selectBookArchive(value)"
+            >
+              <el-option
+                v-for="job in bookArchives"
+                :key="job.id"
+                :label="`图书归档 #${job.id}（${job.total_books} 本，${formatFileSize(job.file_size)}）`"
+                :value="job.id"
+              />
             </el-select>
 
             <el-input

@@ -3,10 +3,13 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.database import get_db
+from app.models.site_config import SiteConfig
 from app.models.user import User
 from app.schemas.tavern import (
     TavernAdminListResponse,
@@ -26,6 +29,42 @@ from app.services.tavern import (
 )
 
 router = APIRouter(prefix="/tavern", tags=["深夜酒馆"])
+
+
+CONFIG_KEY_BG = "tavern_bg_url"
+
+
+class TavernBgResponse(BaseModel):
+    bg_url: str = ""
+
+
+@router.get("/config", response_model=TavernBgResponse)
+async def get_tavern_config(db: AsyncSession = Depends(get_db)):
+    """获取酒馆背景图配置（公开接口）"""
+    result = await db.execute(select(SiteConfig).where(SiteConfig.key == CONFIG_KEY_BG))
+    config = result.scalar_one_or_none()
+    return TavernBgResponse(bg_url=config.value if config else "")
+
+
+class TavernBgUpdate(BaseModel):
+    bg_url: str = ""
+
+
+@router.put("/config", response_model=TavernBgResponse)
+async def update_tavern_config(
+    data: TavernBgUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """设置酒馆背景图（管理员）"""
+    result = await db.execute(select(SiteConfig).where(SiteConfig.key == CONFIG_KEY_BG))
+    config = result.scalar_one_or_none()
+    if config:
+        config.value = data.bg_url
+    else:
+        db.add(SiteConfig(key=CONFIG_KEY_BG, value=data.bg_url, description="酒馆背景图 URL"))
+    await db.commit()
+    return TavernBgResponse(bg_url=data.bg_url)
 
 
 @router.get("", response_model=TavernListResponse)

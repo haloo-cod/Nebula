@@ -182,6 +182,7 @@ onMounted(() => {
 /* Tab 面板：平滑高度过渡 */
 .tab-panel {
   position: relative;
+  min-width: 0;
   overflow: hidden;
   transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }

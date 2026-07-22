@@ -1,6 +1,6 @@
 <template>
   <div class="carousel">
-    <div class="carousel-viewport">
+    <div v-if="images.length > 0" class="carousel-viewport">
       <div class="carousel-track" ref="trackRef" :style="trackStyle">
         <!-- 尾部克隆：最后一张 -->
         <img :src="images[images.length - 1]" class="carousel-slide clone" loading="lazy" />
@@ -17,7 +17,8 @@
         <img :src="images[0]" class="carousel-slide clone" loading="lazy" />
       </div>
     </div>
-    <div class="carousel-dots">
+    <div v-else class="carousel-empty">暂无轮播图片</div>
+    <div v-if="images.length > 1" class="carousel-dots">
       <span
         v-for="(_, i) in images"
         :key="i"
@@ -33,18 +34,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { fetchCarouselSlides } from '@/api/carousel'
 
-/** 静态 fallback 图片（本地打包，确保 API 挂了也能显示） */
-const fallbackImages = [
-  new URL('@/assets/img2/01.PNG', import.meta.url).href,
-  new URL('@/assets/img2/02.PNG', import.meta.url).href,
-  new URL('@/assets/img2/03.PNG', import.meta.url).href,
-  new URL('@/assets/img2/04.PNG', import.meta.url).href,
-  new URL('@/assets/img2/05.PNG', import.meta.url).href,
-  new URL('@/assets/img2/06.JPG', import.meta.url).href,
-  new URL('@/assets/img2/07.PNG', import.meta.url).href,
-]
+const fallbackImages = import.meta.glob<string>('../../assets/carousel/*.{png,PNG,jpg,JPG,jpeg,webp,WEBP}', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+})
 
-const images = ref<string[]>(fallbackImages)
+const images = ref<string[]>(Object.values(fallbackImages))
 
 const currentIndex = ref(0)
 const autoPlayTimer = ref<number | null>(null)
@@ -92,8 +88,6 @@ function resetAutoPlay() {
 
 onMounted(async () => {
   trackRef.value?.addEventListener('transitionend', onTransitionEnd)
-  autoPlayTimer.value = window.setInterval(next, INTERVAL)
-
   // 尝试从后端 API 加载轮播图列表
   try {
     const slides = await fetchCarouselSlides()
@@ -101,9 +95,10 @@ onMounted(async () => {
       images.value = slides
       // 重置索引避免越界
       currentIndex.value = 0
+      resetAutoPlay()
     }
   } catch {
-    // API 失败，保留 fallback 静态图片
+    // API 失败时保留本地预览图片
   }
 })
 
@@ -129,6 +124,15 @@ onUnmounted(() => {
   height: 100%;
   overflow: hidden;
   border-radius: 8px;
+}
+
+.carousel-empty {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .carousel-track {

@@ -19,6 +19,7 @@ interface ApiTreasureItem {
   tags: string[]
   sort_order: number
   created_at: string
+  archive_id?: number | null
 }
 
 /** 藏宝列表响应 */
@@ -38,7 +39,10 @@ export async function fetchTreasures(category?: string): Promise<Treasure[]> {
     category: item.category as TreasureCategory,
     icon: item.icon,
     url: item.url,
-    downloadUrl: item.download_file || undefined,
+    downloadUrl:
+      item.archive_id != null
+        ? `/api/v1/treasures/archive/${item.archive_id}/download`
+        : item.download_file || undefined,
     tags: item.tags,
   }))
 }

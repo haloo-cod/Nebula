@@ -2,7 +2,7 @@
   <header class="liquid-glass-nav">
     <!-- 左侧：Logo + 翻译按钮 + 移动端主题切换 -->
     <div class="nav-left">
-      <span class="logo">Starlit'blog</span>
+      <span class="logo">Starlitn'blog</span>
       <div ref="translateRef" class="translate-wrap" translate="no">
         <button class="translate-btn" @click.stop="langOpen = !langOpen">
           <SvgIcon name="international" class="translate-icon" />
@@ -619,7 +619,7 @@ onUnmounted(() => {
    ============================================ */
 .liquid-glass-nav {
   position: fixed;
-  top: 0;
+  top: -1px;
   left: 0;
   z-index: 50;
   display: flex;
@@ -631,21 +631,29 @@ onUnmounted(() => {
   width: 100%;
   max-width: 100%;
 
-  /* 极致通透：极低透明度 + 背景模糊 */
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* 背景由独立伪元素承载，避免导航内容交互触发滤镜层重绘。 */
+  background: transparent;
   border-radius: 0 0 16px 16px;
 
   /* 液态玻璃边缘光晕 */
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 
   /* 内高光折射 + 外悬浮阴影 */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 0 20px rgba(255, 255, 255, 0.08),
     0 4px 32px rgba(0, 0, 0, 0.25),
     0 12px 60px rgba(0, 0, 0, 0.15);
+}
+
+.liquid-glass-nav::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  content: '';
+  pointer-events: none;
 }
 
 .nav-left,
@@ -1477,6 +1485,8 @@ onUnmounted(() => {
    移动端汉堡按钮
    ============================================ */
 .mobile-toggle {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   width: 40px;
   height: 40px;

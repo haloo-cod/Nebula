@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models.file import UploadedFile
+from app.models.treasure import Treasure
 from app.models.user import User
 from app.schemas.file import FileListResponse, FileResponse
 from app.services.file import delete_file, generate_file_path, get_file_path, save_file
@@ -93,6 +94,13 @@ async def download_file(
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
+
+    if not user.is_admin:
+        mounted = await db.execute(
+            select(Treasure.id).where(Treasure.download_file == record.url).limit(1)
+        )
+        if mounted.scalar_one_or_none() is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该文件未挂载到藏宝阁")
 
     path = get_file_path(record.filename)
     if not path.is_file():

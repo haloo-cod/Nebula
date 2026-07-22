@@ -66,6 +66,13 @@ def get_moments(page: int = 1, page_size: int = 10) -> tuple[list[dict], int]:
     return items, total
 
 
+def get_moment_activity_dates() -> tuple[set[str], int]:
+    """获取说说总数和用于主页活跃天数统计的日期。"""
+    moments = _read_all()
+    dates = {str(item.get("date", ""))[:10] for item in moments if item.get("date")}
+    return dates, len(moments)
+
+
 def get_moment_by_id(moment_id: int) -> dict | None:
     """获取单条说说"""
     for m in _read_all():

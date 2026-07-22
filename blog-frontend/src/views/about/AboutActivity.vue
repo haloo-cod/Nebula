@@ -20,7 +20,17 @@
         </div>
 
         <!-- 热力图网格 -->
-        <div class="heatmap-scroll">
+        <div
+          ref="heatmapScrollRef"
+          class="heatmap-scroll"
+          :class="{ 'is-dragging': isHeatmapDragging }"
+          @pointerdown="onHeatmapPointerDown"
+          @pointermove="onHeatmapPointerMove"
+          @pointerup="onHeatmapPointerUp"
+          @pointercancel="onHeatmapPointerUp"
+          @pointerleave="onHeatmapPointerUp"
+          @click.capture="onHeatmapClick"
+        >
           <!-- 月份标签 -->
           <div class="heatmap-months">
             <span
@@ -64,8 +74,8 @@
         <div class="timeline-dot"></div>
         <RouterLink :to="act.url" class="timeline-card">
           <div class="timeline-card-head">
-            <img :src="avatar" alt="author" class="timeline-avatar" />
-            <span class="timeline-author">{{ profile.name }}</span>
+            <img :src="activeAvatar" alt="author" class="timeline-avatar" />
+            <span class="timeline-author">{{ activeName }}</span>
             <span class="timeline-type">发布了 {{ act.type }}</span>
           </div>
           <div class="timeline-card-body">
@@ -84,11 +94,24 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getPosts } from '@/data/posts'
-import { avatar, profile } from '@/data/profile'
+import { fetchProfile } from '@/api/profile'
 import { fetchPosts, toFrontendPost } from '@/api/posts'
 import { fetchMoments } from '@/api/moments'
 import { fetchAlbums } from '@/api/albums'
 import type { ActivityRecord } from '@/types'
+
+const activeAvatar = ref('')
+const activeName = ref('Starlit')
+
+onMounted(async () => {
+  try {
+    const profileData = await fetchProfile()
+    if (profileData.avatarUrl) activeAvatar.value = profileData.avatarUrl
+    if (profileData.profile.name) activeName.value = profileData.profile.name
+  } catch {
+    // API 不可用时使用默认值
+  }
+})
 
 // 从本地 getPosts() 生成 fallback 活动记录
 function buildFallbackActivities(): ActivityRecord[] {
@@ -106,6 +129,49 @@ function buildFallbackActivities(): ActivityRecord[] {
 }
 
 const activities = ref<ActivityRecord[]>(buildFallbackActivities())
+
+// 热力图横向拖拽状态
+const heatmapScrollRef = ref<HTMLElement | null>(null)
+const isHeatmapDragging = ref(false)
+const hasHeatmapDragged = ref(false)
+let heatmapDragStartX = 0
+let heatmapScrollStartX = 0
+
+function onHeatmapPointerDown(event: PointerEvent) {
+  if (!heatmapScrollRef.value) return
+  isHeatmapDragging.value = true
+  hasHeatmapDragged.value = false
+  heatmapDragStartX = event.clientX
+  heatmapScrollStartX = heatmapScrollRef.value.scrollLeft
+}
+
+function onHeatmapPointerMove(event: PointerEvent) {
+  if (!isHeatmapDragging.value || !heatmapScrollRef.value) return
+  const distance = event.clientX - heatmapDragStartX
+  if (Math.abs(distance) > 8) {
+    hasHeatmapDragged.value = true
+    if (!heatmapScrollRef.value.hasPointerCapture(event.pointerId)) {
+      heatmapScrollRef.value.setPointerCapture(event.pointerId)
+    }
+  }
+  if (hasHeatmapDragged.value) {
+    heatmapScrollRef.value.scrollLeft = heatmapScrollStartX - distance
+  }
+}
+
+function onHeatmapPointerUp(event: PointerEvent) {
+  if (!heatmapScrollRef.value) return
+  isHeatmapDragging.value = false
+  try {
+    heatmapScrollRef.value.releasePointerCapture(event.pointerId)
+  } catch {
+    // 可能尚未捕获指针
+  }
+}
+
+function onHeatmapClick(event: MouseEvent) {
+  if (hasHeatmapDragged.value) event.stopPropagation()
+}
 
 // 从后端 API 加载多类型活动
 onMounted(async () => {
@@ -294,6 +360,7 @@ function getCellClass(count: number): string {
 .heatmap-wrapper {
   display: flex;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .heatmap-weekdays {
@@ -312,12 +379,29 @@ function getCellClass(count: number): string {
 }
 
 .heatmap-scroll {
+  min-width: 0;
   flex: 1;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 0.5rem;
+  /* 保留横向滚动能力，但隐藏原生滚动条，避免破坏卡片视觉。 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.heatmap-scroll.is-dragging {
+  cursor: grabbing;
+}
+
+.heatmap-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .heatmap-months {
+  width: max-content;
+  min-width: 100%;
   display: grid;
   grid-template-columns: repeat(53, 11px);
   gap: 3px;
@@ -332,6 +416,7 @@ function getCellClass(count: number): string {
 }
 
 .heatmap-grid {
+  width: max-content;
   display: grid;
   grid-template-rows: repeat(7, 11px);
   grid-auto-flow: column;

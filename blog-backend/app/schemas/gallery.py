@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class GalleryBase(BaseModel):
-    slug: str
+    slug: str = ""
     title: str
     description: str = ""
     tags: list[str] = []

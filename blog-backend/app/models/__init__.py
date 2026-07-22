@@ -5,6 +5,7 @@ from app.models.post import Post
 from app.models.gallery import GalleryProject
 from app.models.book import Book
 from app.models.book_download import BookDownloadJob
+from app.models.post_download import PostDownloadJob
 from app.models.image import UploadedImage
 from app.models.file import UploadedFile
 from app.models.background import Background
@@ -28,6 +29,7 @@ __all__ = [
     "GalleryProject",
     "Book",
     "BookDownloadJob",
+    "PostDownloadJob",
     "UploadedImage",
     "UploadedFile",
     "Background",

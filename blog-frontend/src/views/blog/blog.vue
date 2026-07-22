@@ -377,25 +377,29 @@ watch(totalPages, (nextTotal) => {
 }
 
 .post-card-fallback {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 20px rgba(255, 255, 255, 0.06);
   transition:
-    transform 0.24s ease,
-    box-shadow 0.24s ease,
-    border-color 0.24s ease;
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
-@media (hover: hover) {
-  .blog-link:hover .blog-glass {
-    transform: translateY(-5px);
-    filter: drop-shadow(0 16px 34px rgba(80, 140, 255, 0.18));
-  }
-
+@media (hover: hover) and (pointer: fine) {
   .blog-link:hover .post-card-fallback {
-    border-color: rgba(140, 185, 255, 0.24);
+    border-color: rgba(140, 185, 255, 0.2);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      0 16px 34px rgba(80, 140, 255, 0.18);
+      0 12px 36px rgba(80, 120, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 0 20px rgba(255, 255, 255, 0.06);
   }
 }
+
 
 .post-date {
   font-size: 0.72rem;

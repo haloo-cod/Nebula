@@ -23,20 +23,20 @@
         @click.stop="goTo(i)"
       />
     </div>
+    <div v-if="slides.length === 0" class="carousel-empty">暂无说说</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAllMoments } from '@/data/moments'
 import { fetchMoments } from '@/api/moments'
 import type { Moment } from '@/types'
 
 const router = useRouter()
 
-// 取最新 5 条说说（先用 mock fallback）
-const slides = ref<Moment[]>(getAllMoments().slice(0, 5))
+// 首页说说只使用后端数据，API 不可用时显示空状态
+const slides = ref<Moment[]>([])
 
 const current = ref(0)
 const paused = ref(false)
@@ -51,7 +51,7 @@ onMounted(async () => {
       slides.value = res.items
     }
   } catch {
-    // 后端不可用时保持 mock 数据
+    // 后端不可用时保持空状态
   }
   resetTimer()
 })
@@ -99,6 +99,7 @@ function slideClass(i: number): string {
 }
 
 function next() {
+  if (slides.value.length === 0) return
   current.value = (current.value + 1) % slides.value.length
 }
 

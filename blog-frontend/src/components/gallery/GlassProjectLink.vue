@@ -51,19 +51,18 @@ defineProps<{
 }
 
 .project-glass--fallback {
-  transition:
-    border-color 0.28s ease,
-    box-shadow 0.28s ease;
-}
-
-.project-link:hover .project-glass--fallback {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-color: rgba(177, 232, 229, 0.38);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 0 24px rgba(255, 255, 255, 0.08),
-    0 14px 38px rgba(3, 12, 22, 0.32);
+  transition:
+    transform 0.24s ease,
+    filter 0.24s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-link:hover .project-glass--fallback {
+    transform: translateY(-3px);
+    filter: drop-shadow(0 8px 24px rgba(80, 140, 255, 0.14));
+  }
 }
 </style>

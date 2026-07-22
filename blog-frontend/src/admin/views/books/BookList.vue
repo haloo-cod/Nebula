@@ -7,6 +7,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Close, Download, Rank, RefreshRight, Upload } from '@element-plus/icons-vue'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import type { BookSort } from '@/api/books'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import { downloadWithProgress } from '@/utils/download'
 
@@ -71,6 +72,11 @@ const sortBooks = ref<BookItem[]>([])
 const draggedSlug = ref('')
 const selectedBooks = ref<BookItem[]>([])
 const downloading = ref(false)
+const listSort = ref<BookSort>('newest')
+const showArchiveDialog = ref(false)
+const archiveName = ref('starlit-books')
+const archiveExpireDays = ref(7)
+const archiveOnly = ref(false)
 const downloadProgress = ref(0)
 const downloadStatus = ref('')
 
@@ -96,13 +102,24 @@ const {
   handleDelete,
 } = useAdminTable<BookItem>({
   fetchData: async ({ page, pageSize, keyword: kw }) => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+      sort: listSort.value,
+    })
     if (kw) params.set('keyword', kw)
     return api.get<{ items: BookItem[]; total: number }>(`/api/v1/books?${params}`, true)
   },
   deleteItem: async (item) => api.delete(`/api/v1/books/${item.slug}`),
   defaultPageSize: 15,
 })
+
+/** 切换后台列表排序。 */
+function changeListSort(sort: BookSort) {
+  listSort.value = sort
+  pagination.page = 1
+  void loadData()
+}
 
 /** 打开上传弹窗并重置队列 */
 function openUpload() {
@@ -270,8 +287,23 @@ async function downloadBook(book: BookItem) {
 }
 
 /** 将当前选中的图书打包为 ZIP。 */
+function openArchiveDialog(onlyArchive = false) {
+  if (selectedBooks.value.length === 0 || downloading.value) return
+  archiveOnly.value = onlyArchive
+  archiveName.value = 'starlit-books'
+  archiveExpireDays.value = 7
+  showArchiveDialog.value = true
+}
+
+/** 处理打包菜单选项。 */
+function handleArchiveCommand(command: string | number) {
+  openArchiveDialog(command === 'archive')
+}
+
+/** 创建选中图书的 ZIP，可选择仅生成归档或生成后立即下载。 */
 async function downloadSelectedZip() {
   if (selectedBooks.value.length === 0) return
+  showArchiveDialog.value = false
   downloading.value = true
   downloadProgress.value = 0
   downloadStatus.value = '正在创建打包任务'
@@ -283,15 +315,23 @@ async function downloadSelectedZip() {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({ slugs: selectedBooks.value.map((book) => book.slug) }),
+      body: JSON.stringify({
+        slugs: selectedBooks.value.map((book) => book.slug),
+        archive_name: archiveName.value,
+        expire_days: archiveExpireDays.value,
+      }),
     })
     if (!response.ok) throw new Error('创建 ZIP 打包任务失败')
     const created = (await response.json()) as { id: number }
     const job = await waitForDownloadJob(created.id)
-    await downloadWithProgress(`${BASE_URL}${job.download_url}`, 'starlit-books.zip', {
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      onProgress: (percent) => (downloadProgress.value = percent),
-    })
+    if (!archiveOnly.value) {
+      await downloadWithProgress(`${BASE_URL}${job.download_url}`, `${archiveName.value}.zip`, {
+        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+        onProgress: (percent) => (downloadProgress.value = percent),
+      })
+    } else {
+      ElMessage.success('归档已生成，可在文件管理中下载或挂载到藏宝阁')
+    }
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : 'ZIP 下载失败')
   } finally {
@@ -302,7 +342,7 @@ async function downloadSelectedZip() {
 
 /** 轮询后台打包任务状态。 */
 async function waitForDownloadJob(jobId: number): Promise<{ download_url: string }> {
-  for (;;) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, 1000))
     const response = await fetch(`${BASE_URL}/api/v1/books/download-jobs/${jobId}`, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
@@ -325,6 +365,7 @@ async function waitForDownloadJob(jobId: number): Promise<{ download_url: string
     if (job.status === 'completed' && job.download_url) return { download_url: job.download_url }
     if (job.status === 'failed') throw new Error(job.error_message || 'ZIP 打包失败')
   }
+  throw new Error('图书 ZIP 打包超时，请稍后重试')
 }
 
 /** 打开图书编辑弹窗 */
@@ -505,18 +546,30 @@ onMounted(() => loadData())
 
 <template>
   <div class="book-list-page">
-    <div class="page-header">
-      <el-input
-        v-model="keyword"
-        placeholder="搜索书名/作者..."
-        clearable
-        style="width: 240px"
-        @keyup.enter="handleSearch"
-      />
+      <div class="page-header">
+      <div class="book-list-filters">
+        <el-input
+          v-model="keyword"
+          placeholder="搜索书名/作者..."
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleSearch"
+        />
+        <el-select
+          :model-value="listSort"
+          style="width: 130px"
+          aria-label="图书排序"
+          @update:model-value="changeListSort"
+        >
+          <el-option label="最新上传" value="newest" />
+          <el-option label="最早上传" value="oldest" />
+          <el-option label="自定义排序" value="custom" />
+        </el-select>
+      </div>
       <div class="header-actions">
         <el-dropdown
           :disabled="selectedBooks.length === 0 || downloading"
-          @command="downloadSelectedZip"
+          @command="handleArchiveCommand"
         >
           <el-button :icon="Download" :disabled="selectedBooks.length === 0 || downloading">
             下载选中（{{ selectedBooks.length }}）<el-icon class="el-icon--right"
@@ -525,7 +578,8 @@ onMounted(() => loadData())
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="zip">打包为 ZIP 下载</el-dropdown-item>
+              <el-dropdown-item command="download">打包并下载 ZIP</el-dropdown-item>
+              <el-dropdown-item command="archive">仅打包，不立即下载</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -607,6 +661,31 @@ onMounted(() => loadData())
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="showArchiveDialog" title="打包图书" width="420px">
+      <el-form label-position="top">
+        <el-form-item label="ZIP 文件名">
+          <el-input v-model="archiveName" placeholder="例如：我的阅读清单" clearable>
+            <template #suffix>.zip</template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="归档有效期">
+          <el-input-number v-model="archiveExpireDays" :min="1" :max="3650" />
+          <span class="archive-expire-suffix">天后过期</span>
+        </el-form-item>
+      </el-form>
+      <p class="archive-dialog-hint">
+        已选择 {{ selectedBooks.length }} 本图书，{{
+          archiveOnly ? '仅生成归档，不会自动下载。' : '生成完成后会自动下载。'
+        }}
+      </p>
+      <template #footer>
+        <el-button @click="showArchiveDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="!archiveName.trim()" @click="downloadSelectedZip">
+          {{ archiveOnly ? '开始打包' : '打包并下载' }}
+        </el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="showUploadDialog"
@@ -853,6 +932,22 @@ onMounted(() => loadData())
   justify-content: space-between;
   align-items: center;
 }
+.book-list-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.archive-dialog-hint {
+  margin: 0;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 13px;
+}
+.archive-expire-suffix {
+  margin-left: 8px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 13px;
+}
 .header-actions {
   display: flex;
   align-items: center;
@@ -1081,5 +1176,26 @@ onMounted(() => loadData())
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .book-list-filters,
+  .book-list-filters .el-input,
+  .book-list-filters .el-select {
+    width: 100% !important;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions > * {
+    flex: 1;
+  }
 }
 </style>

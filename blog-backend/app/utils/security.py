@@ -26,6 +26,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
+    # 访问令牌必须带有明确类型，避免其他用途的 JWT 被当作登录凭证。
+    to_encode.setdefault("type", "access")
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )

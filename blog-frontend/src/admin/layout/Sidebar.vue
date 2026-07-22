@@ -57,12 +57,18 @@ defineProps<{
 const route = useRoute()
 const router = useRouter()
 
+const emit = defineEmits<{
+  /** 移动端选择菜单后关闭抽屉。 */
+  navigate: []
+}>()
+
 /** 当前激活的菜单路径 */
 const activeMenu = computed(() => route.path)
 
 /** 菜单点击跳转 */
 function handleMenuSelect(path: string) {
-  router.push(path)
+  void router.push(path)
+  emit('navigate')
 }
 </script>
 

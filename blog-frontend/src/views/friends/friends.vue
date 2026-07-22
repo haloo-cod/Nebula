@@ -115,6 +115,7 @@
                 <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
                 <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
                 <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+                <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
               </div>
             </div>
 
@@ -148,6 +149,7 @@
               <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
               <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
               <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+              <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
             </div>
           </div>
 
@@ -522,6 +524,14 @@ onMounted(async () => {
   color: var(--text-secondary);
   font-size: 0.8rem;
   line-height: 1.55;
+}
+
+.exchange-site-avatar-url {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  word-break: break-all;
 }
 
 .exchange-block {

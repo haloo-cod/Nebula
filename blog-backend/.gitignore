@@ -17,6 +17,8 @@ __pycache__/
 # 数据库本地文件
 *.db
 *.sqlite3
+*.db-shm
+*.db-wal
 
 # IDE
 .idea/

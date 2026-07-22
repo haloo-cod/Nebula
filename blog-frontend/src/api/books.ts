@@ -19,6 +19,9 @@ export interface BookApiItem {
   created_at: string
 }
 
+/** 前台图书列表排序方式。 */
+export type BookSort = 'newest' | 'oldest' | 'custom'
+
 /** 后端返回的图书详情 */
 export interface BookApiDetail {
   id: number
@@ -49,8 +52,9 @@ export async function fetchBooks(
   page = 1,
   pageSize = 20,
   keyword = '',
+  sort: BookSort = 'newest',
 ): Promise<{ items: Book[]; total: number }> {
-  let path = `/api/v1/books?page=${page}&page_size=${pageSize}`
+  let path = `/api/v1/books?page=${page}&page_size=${pageSize}&sort=${sort}`
   if (keyword.trim()) path += `&keyword=${encodeURIComponent(keyword.trim())}`
   const resp = await api.get<BookListResponse>(path)
   return {

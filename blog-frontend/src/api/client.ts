@@ -138,6 +138,9 @@ export const api = {
   put<T>(path: string, body?: unknown, auth = false): Promise<T> {
     return request<T>('PUT', path, body, { auth })
   },
+  patch<T>(path: string, body?: unknown, auth = false): Promise<T> {
+    return request<T>('PATCH', path, body, { auth })
+  },
   delete<T>(path: string, auth = true): Promise<T> {
     return request<T>('DELETE', path, undefined, { auth })
   },

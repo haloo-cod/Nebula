@@ -30,7 +30,8 @@ const bgLayerStyle = computed(() => {
   const blur = backgroundBlurEnabled.value ? backgroundBlur.value : 0
   const scale = blur > 0 ? 1 + Math.min(blur / 240, 0.08) : 1
   return {
-    backgroundImage: `url(${currentBgUrl.value})`,
+    backgroundImage: currentBgUrl.value ? `url(${currentBgUrl.value})` : undefined,
+    backgroundColor: 'var(--page-background)',
     filter: blur > 0 ? `blur(${blur}px)` : undefined,
     transform: scale !== 1 ? `scale(${scale})` : undefined,
   }

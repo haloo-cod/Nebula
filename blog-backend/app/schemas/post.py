@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class PostBase(BaseModel):
-    slug: str
+    slug: str = ""
     title: str
     description: str = ""
     date: str = ""

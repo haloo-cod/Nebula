@@ -97,10 +97,7 @@ async function handleSave() {
     ElMessage.warning('请填写标题')
     return
   }
-  if (!isEdit.value && !form.value.slug.trim()) {
-    ElMessage.warning('请填写 Slug')
-    return
-  }
+  if (!isEdit.value && !form.value.slug.trim()) form.value.slug = previewSlug(form.value.title) || 'project'
 
   saving.value = true
   try {
@@ -137,6 +134,16 @@ async function handleSave() {
 }
 
 onMounted(() => loadData())
+
+/** 根据标题生成 slug 预览，后端负责最终唯一化。 */
+function previewSlug(title: string): string {
+  return title
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180)
+}
 </script>
 
 <template>
@@ -184,8 +191,8 @@ onMounted(() => loadData())
     <el-dialog v-model="showDialog" :title="isEdit ? '编辑展览' : '新建展览'" width="640px">
       <el-form label-position="top">
         <div class="form-grid">
-          <el-form-item label="Slug" v-if="!isEdit">
-            <el-input v-model="form.slug" placeholder="url-friendly-slug" />
+          <el-form-item label="Slug">
+            <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
           </el-form-item>
           <el-form-item label="标题">
             <el-input v-model="form.title" placeholder="项目名称" />

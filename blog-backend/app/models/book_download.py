@@ -16,6 +16,8 @@ class BookDownloadJob(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     slugs_json: Mapped[str] = mapped_column(Text)
+    archive_name: Mapped[str] = mapped_column(String(160), default="starlit-books")
+    expire_days: Mapped[int] = mapped_column(Integer, default=7)
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     total_books: Mapped[int] = mapped_column(Integer, default=0)
     completed_books: Mapped[int] = mapped_column(Integer, default=0)

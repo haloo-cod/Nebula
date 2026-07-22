@@ -31,6 +31,8 @@ interface BookDownloadJob {
   error_message: string
   expires_at: string | null
   download_url: string | null
+  archive_name: string
+  expire_days: number
   created_at: string
 }
 
@@ -228,7 +230,7 @@ async function removeImage(image: UploadedImage) {
 
 async function downloadArchive(job: BookDownloadJob) {
   if (!job.download_url) return
-  await downloadResource(job.download_url, 'starlit-books.zip')
+  await downloadResource(job.download_url, `${job.archive_name || 'starlit-books'}.zip`)
 }
 
 async function retryArchive(job: BookDownloadJob) {
@@ -252,6 +254,25 @@ async function removeArchive(job: BookDownloadJob) {
   }
 }
 
+/** 手动调整归档到期日期。 */
+async function extendArchive(job: BookDownloadJob) {
+  const value = await ElMessageBox.prompt('请选择新的到期日期（YYYY-MM-DD）', '延期归档', {
+    inputValue: job.expires_at?.slice(0, 10) ?? '',
+    inputPattern: /^\d{4}-\d{2}-\d{2}$/,
+    inputErrorMessage: '请输入有效日期',
+    confirmButtonText: '保存',
+    cancelButtonText: '取消',
+  }).catch(() => null)
+  if (!value) return
+  try {
+    await api.patch(`/api/v1/books/download-jobs/${job.id}/expires`, { expires_on: value.value }, true)
+    ElMessage.success('归档到期时间已更新')
+    await loadArchives()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '延期失败')
+  }
+}
+
 function archiveStatus(status: string): string {
   return (
     {
@@ -260,6 +281,7 @@ function archiveStatus(status: string): string {
       completed: '已完成',
       failed: '失败',
       expired: '已过期',
+      missing: '文件缺失',
     }[status] || status
   )
 }
@@ -388,12 +410,17 @@ onMounted(loadFiles)
         </el-table-column>
       </el-table>
       <el-table v-else :data="archives" v-loading="loading" stripe>
-        <el-table-column prop="id" label="任务" width="80" />
+        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column prop="id" label="归档 ID" width="90" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag
               :type="
-                row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : 'info'
+                row.status === 'completed'
+                  ? 'success'
+                  : row.status === 'failed' || row.status === 'missing'
+                    ? 'danger'
+                    : 'info'
               "
             >
               {{ archiveStatus(row.status) }}
@@ -409,7 +436,10 @@ onMounted(loadFiles)
           <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
         </el-table-column>
         <el-table-column label="过期时间" min-width="180">
-          <template #default="{ row }">{{ formatDateTime(row.expires_at) }}</template>
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 'expired'" type="danger">已过期</el-tag>
+            <span v-else>{{ formatDateTime(row.expires_at) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
@@ -423,7 +453,14 @@ onMounted(loadFiles)
               >下载</el-button
             >
             <el-button
-              v-if="row.status === 'failed' || row.status === 'expired'"
+              v-if="row.status === 'completed' || row.status === 'expired'"
+              type="warning"
+              link
+              @click="extendArchive(row as BookDownloadJob)"
+              >延期</el-button
+            >
+            <el-button
+              v-if="row.status === 'failed' || row.status === 'expired' || row.status === 'missing'"
               type="warning"
               link
               :icon="Refresh"

@@ -3,11 +3,13 @@
  * 文章管理 — 列表页
  * 表格展示所有文章，支持搜索、新建、编辑、删除
  */
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
-import { api } from '@/api/client'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download, Plus, Upload } from '@element-plus/icons-vue'
+import { api, BASE_URL, getToken } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import { downloadWithProgress } from '@/utils/download'
 
 /** 文章列表项（匹配后端 PostListItem） */
 interface PostItem {
@@ -25,6 +27,10 @@ interface PostItem {
 }
 
 const router = useRouter()
+const selectedPosts = ref<PostItem[]>([])
+const importing = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const downloading = ref(false)
 
 const {
   loading,
@@ -59,6 +65,130 @@ function goCreate() {
   router.push('/admin/posts/new')
 }
 
+/** 更新当前页文章选择。 */
+function handleSelectionChange(rows: unknown[]) {
+  selectedPosts.value = rows as PostItem[]
+}
+
+/** 下载单篇 Markdown。 */
+async function downloadPost(post: PostItem) {
+  try {
+    await downloadWithProgress(`${BASE_URL}/api/v1/posts/${encodeURIComponent(post.slug)}/download`, `${post.slug}.md`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    })
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '下载失败')
+  }
+}
+
+/** 打开 Markdown 导入选择器。 */
+function openImport() {
+  if (!importing.value) fileInputRef.value?.click()
+}
+
+/** 导入单篇 Markdown，并让后端按草稿创建。 */
+async function handleImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  if (files.length === 0) return
+  importing.value = true
+  try {
+    const previewForm = new FormData()
+    files.forEach((file) => previewForm.append('files', file))
+    const previewResponse = await fetch(`${BASE_URL}/api/v1/posts/import-preview`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      body: previewForm,
+      credentials: 'include',
+    })
+    if (!previewResponse.ok) {
+      const body = await previewResponse.json().catch(() => ({ detail: '预览失败' }))
+      throw new Error(body.detail || '预览失败')
+    }
+    const previews = (await previewResponse.json()) as Array<{ filename: string; title: string; slug: string }>
+    await ElMessageBox.confirm(
+      previews.map((item) => `${item.filename} -> ${item.title} (${item.slug})`).join('\n'),
+      `确认导入 ${previews.length} 篇 Markdown？`,
+      { confirmButtonText: '继续', cancelButtonText: '取消', type: 'info' },
+    )
+    const conflict = await ElMessageBox.prompt('slug 冲突处理：skip / overwrite / rename', '导入选项', {
+      inputValue: 'skip',
+      inputPattern: /^(skip|overwrite|rename)$/,
+      inputErrorMessage: '请输入 skip、overwrite 或 rename',
+      confirmButtonText: '开始导入',
+      cancelButtonText: '取消',
+    })
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+    formData.append('conflict', conflict.value)
+    const response = await fetch(`${BASE_URL}/api/v1/posts/import-batch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      body: formData,
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: '导入失败' }))
+      throw new Error(body.detail || '导入失败')
+    }
+    ElMessage.success('Markdown 导入完成，文章已保存为草稿')
+    await loadData()
+  } catch (err: unknown) {
+    if (err !== 'cancel' && err !== 'close') ElMessage.error(err instanceof Error ? err.message : '导入失败')
+  } finally {
+    importing.value = false
+    input.value = ''
+  }
+}
+
+/** 创建选中文章的 ZIP，并轮询后台任务。 */
+async function downloadSelectedZip() {
+  if (selectedPosts.value.length === 0 || downloading.value) return
+  downloading.value = true
+  try {
+    const response = await fetch(`${BASE_URL}/api/v1/posts/download-jobs`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getToken() ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        slugs: selectedPosts.value.map((post) => post.slug),
+        archive_name: 'starlit-posts',
+        include_images: true,
+      }),
+    })
+    if (!response.ok) throw new Error('创建文章 ZIP 任务失败')
+    const created = (await response.json()) as { id: number }
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 700))
+      const statusResponse = await fetch(`${BASE_URL}/api/v1/posts/download-jobs/${created.id}`, {
+        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+        credentials: 'include',
+      })
+      if (!statusResponse.ok) throw new Error('读取文章 ZIP 任务失败')
+      const job = (await statusResponse.json()) as {
+        status: string
+        download_url: string | null
+        error_message: string
+      }
+      if (job.status === 'failed') throw new Error(job.error_message || '文章 ZIP 打包失败')
+      if (job.status === 'completed' && job.download_url) {
+        await downloadWithProgress(`${BASE_URL}${job.download_url}`, 'starlit-posts.zip', {
+          headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+        })
+        break
+      }
+      if (attempt === 299) throw new Error('文章 ZIP 打包超时，请稍后重试')
+    }
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '文章 ZIP 下载失败')
+  } finally {
+    downloading.value = false
+  }
+}
+
 onMounted(() => loadData())
 </script>
 
@@ -73,14 +203,27 @@ onMounted(() => loadData())
         style="width: 240px"
         @keyup.enter="handleSearch"
       />
-      <el-button type="primary" @click="goCreate">
-        <el-icon><Plus /></el-icon>新建文章
-      </el-button>
+      <div class="header-actions">
+        <input ref="fileInputRef" type="file" accept=".md,text/markdown" multiple hidden @change="handleImport" />
+        <el-button :loading="importing" @click="openImport">
+          <el-icon><Upload /></el-icon>导入 Markdown
+        </el-button>
+        <el-button type="primary" @click="goCreate">
+          <el-icon><Plus /></el-icon>新建文章
+        </el-button>
+      </div>
     </div>
 
     <!-- 文章表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
+      <div class="table-toolbar">
+        <span>已选择 {{ selectedPosts.length }} 篇</span>
+        <el-button :disabled="selectedPosts.length === 0" :loading="downloading" @click="downloadSelectedZip">
+          <el-icon><Download /></el-icon>打包下载
+        </el-button>
+      </div>
+      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="48" />
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <div class="title-cell">
@@ -102,6 +245,7 @@ onMounted(() => loadData())
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }: { row: any }">
             <el-button type="primary" link size="small" @click="goEdit(row.slug)">编辑</el-button>
+            <el-button type="success" link size="small" @click="downloadPost(row)">下载</el-button>
             <el-button
               type="danger"
               link
@@ -140,6 +284,20 @@ onMounted(() => loadData())
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions,
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .table-card {

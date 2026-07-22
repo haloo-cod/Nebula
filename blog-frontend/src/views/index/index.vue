@@ -21,7 +21,7 @@
                 :links="profileLinks"
               />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <HomeProfilePanel
                 :avatar="profileAvatar"
                 :name="profileName"
@@ -42,7 +42,7 @@
             >
               <DataDashboard />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <DataDashboard />
             </PanelFallbackGlass>
           </div>
@@ -74,7 +74,7 @@
             >
               <Carousel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <Carousel />
             </PanelFallbackGlass>
           </div>
@@ -91,7 +91,7 @@
             >
               <CalendarPanel flat />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <CalendarPanel flat />
             </PanelFallbackGlass>
           </div>
@@ -108,7 +108,7 @@
             >
               <DigitalClockPanel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else>
+            <PanelFallbackGlass v-else static-blur>
               <DigitalClockPanel />
             </PanelFallbackGlass>
           </div>
@@ -126,7 +126,7 @@
               >
                 <PostCarousel />
               </LiquidGlass>
-              <PanelFallbackGlass v-else>
+              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
                 <PostCarousel />
               </PanelFallbackGlass>
               <LiquidGlass
@@ -140,7 +140,7 @@
               >
                 <MomentCarousel />
               </LiquidGlass>
-              <PanelFallbackGlass v-else>
+              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
                 <MomentCarousel />
               </PanelFallbackGlass>
             </div>
@@ -218,7 +218,7 @@ onMounted(async () => {
     if (data.profile.name) profileName.value = data.profile.name
     if (data.profile.bio) profileBio.value = data.profile.bio
     if (data.avatarUrl) profileAvatar.value = data.avatarUrl
-    if (data.socialLinks.length > 0) profileLinks.value = data.socialLinks
+    profileLinks.value = data.socialLinks
   } catch {
     // API 失败，保留本地 fallback
   }

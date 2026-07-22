@@ -7,18 +7,18 @@
 
     <!-- 头像 + 个人信息 -->
     <div class="hero-profile">
-      <img :src="avatar" alt="avatar" class="hero-avatar" />
+      <img :src="activeAvatar" alt="avatar" class="hero-avatar" />
 
       <div class="hero-info">
         <div class="hero-text">
           <h1 class="hero-name">关于我</h1>
-          <p class="hero-subtitle">Hello World, I'm {{ profile.name }}</p>
+          <p class="hero-subtitle">Hello World, I'm {{ activeName }}</p>
         </div>
 
         <!-- 社交链接 -->
         <div class="hero-socials">
           <a
-            v-for="link in socialLinks"
+            v-for="link in activeSocialLinks"
             :key="link.label"
             :href="link.url"
             :aria-label="link.label"
@@ -37,17 +37,29 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
-import { avatar, coverImage, profile, socialLinks } from '@/data/profile'
+import { fetchProfile } from '@/api/profile'
 import { api, resolveUrl } from '@/api/client'
 
-const activeCoverImage = ref(coverImage)
+const activeAvatar = ref('')
+const activeCoverImage = ref('')
+const activeName = ref('Starlit')
+const activeSocialLinks = ref<Array<{ label: string; icon: string; url: string }>>([])
 
 onMounted(async () => {
+  try {
+    const profileData = await fetchProfile()
+    if (profileData.avatarUrl) activeAvatar.value = profileData.avatarUrl
+    if (profileData.coverUrl) activeCoverImage.value = profileData.coverUrl
+    if (profileData.profile.name) activeName.value = profileData.profile.name
+    activeSocialLinks.value = profileData.socialLinks
+  } catch {
+    // API 不可用时使用空值占位
+  }
   try {
     const content = await api.get<{ cover_url: string }>('/api/v1/about/content')
     if (content.cover_url) activeCoverImage.value = resolveUrl(content.cover_url)
   } catch {
-    // API 不可用时继续使用静态封面 fallback。
+    // API 不可用时继续
   }
 })
 </script>

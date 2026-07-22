@@ -19,8 +19,8 @@ POST /api/v1/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "admin123"
+  "username": "<ADMIN_USERNAME>",
+  "password": "<ADMIN_PASSWORD>"
 }
 
 → 200 { "access_token": "eyJ...", "token_type": "bearer" }

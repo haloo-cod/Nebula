@@ -150,6 +150,16 @@ function getEditorContent(): string {
   return vditor?.getValue() ?? ''
 }
 
+/** 新建文章时生成 slug 预览，最终值仍由后端校验和唯一化。 */
+function previewSlug(title: string): string {
+  return title
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 180)
+}
+
 /** 保存文章（新建 or 更新） */
 async function handleSave() {
   const content_md = getEditorContent()
@@ -157,10 +167,7 @@ async function handleSave() {
     ElMessage.warning('请填写文章标题')
     return
   }
-  if (!form.value.slug.trim()) {
-    ElMessage.warning('请填写文章 Slug')
-    return
-  }
+  if (!form.value.slug.trim()) form.value.slug = previewSlug(form.value.title) || 'post'
 
   saving.value = true
   try {
@@ -272,7 +279,7 @@ onBeforeUnmount(() => {
           <el-input v-model="form.title" placeholder="文章标题" />
         </el-form-item>
         <el-form-item label="Slug">
-          <el-input v-model="form.slug" placeholder="url-friendly-slug" :disabled="isEdit" />
+          <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
         </el-form-item>
         <el-form-item label="分类">
           <el-input v-model="form.category" placeholder="如：技术、生活" />

@@ -20,6 +20,8 @@ interface TavernPost {
 
 const loading = ref(false)
 const posts = ref<TavernPost[]>([])
+const bgUrl = ref('')
+const savingBg = ref(false)
 
 /** 加载帖子列表（admin 接口，含隐藏帖） */
 async function loadPosts() {
@@ -31,6 +33,29 @@ async function loadPosts() {
     ElMessage.error('加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 加载背景图配置 */
+async function loadBgConfig() {
+  try {
+    const config = await api.get<{ bg_url: string }>('/api/v1/tavern/config', true)
+    bgUrl.value = config.bg_url || ''
+  } catch {
+    // 静默
+  }
+}
+
+/** 保存背景图 URL */
+async function saveBg() {
+  savingBg.value = true
+  try {
+    await api.put('/api/v1/tavern/config', { bg_url: bgUrl.value }, true)
+    ElMessage.success('背景图已保存')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '保存失败')
+  } finally {
+    savingBg.value = false
   }
 }
 
@@ -57,7 +82,10 @@ async function handleDelete(post: TavernPost) {
   }
 }
 
-onMounted(() => loadPosts())
+onMounted(() => {
+  loadPosts()
+  loadBgConfig()
+})
 </script>
 
 <template>
@@ -65,6 +93,14 @@ onMounted(() => loadPosts())
     <div class="page-header">
       <span class="page-title">共 {{ posts.length }} 条帖子</span>
     </div>
+
+    <el-card shadow="never" class="config-card">
+      <template #header><span>酒馆背景图</span></template>
+      <div class="bg-config">
+        <el-input v-model="bgUrl" placeholder="图片 URL，留空使用默认暗色背景" clearable style="flex:1" />
+        <el-button type="primary" :loading="savingBg" @click="saveBg">保存</el-button>
+      </div>
+    </el-card>
 
     <el-card shadow="never" class="table-card">
       <el-table :data="posts as any" v-loading="loading" stripe style="width: 100%">
@@ -110,6 +146,13 @@ onMounted(() => loadPosts())
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.config-card {
+  border-radius: 12px;
+}
+.bg-config {
+  display: flex;
+  gap: 8px;
 }
 .page-header {
   display: flex;

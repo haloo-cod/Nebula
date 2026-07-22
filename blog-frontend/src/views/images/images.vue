@@ -126,12 +126,11 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageBackground from '@/components/PageBackground.vue'
 import AlbumCard from './AlbumCard.vue'
-import { getAlbums } from '@/data/albums'
 import { fetchAlbums, fetchAlbumDetail } from '@/api/albums'
 import { siteText } from '@/data/site-text'
 import type { Album } from '@/types'
 
-const albums = ref<Album[]>(getAlbums())
+const albums = ref<Album[]>([])
 
 // ============ 相册详情状态(页内切换,不进路由) ============
 
@@ -148,7 +147,7 @@ async function openAlbum(album: Album) {
       currentAlbum.value = detail
     }
   } catch {
-    // API 失败，保留 fallback 数据
+    // API 失败时保持当前数据
   }
 }
 
@@ -202,11 +201,9 @@ onMounted(async () => {
   // 尝试从后端 API 获取相册列表
   try {
     const apiAlbums = await fetchAlbums()
-    if (apiAlbums.length > 0) {
-      albums.value = apiAlbums
-    }
+    albums.value = apiAlbums
   } catch {
-    // API 失败，保留本地 fallback 数据
+    // API 失败时保持空状态
   }
 })
 

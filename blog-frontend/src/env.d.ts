@@ -14,7 +14,7 @@ declare module '*.vue' {
 }
 
 // 以 ?raw 方式导入的 Markdown 文件:返回文件原始字符串内容
-// 用于 data/posts.js 通过 import.meta.glob 读取 src/assets/md/*.md
+// 用于 data/posts.ts 通过 import.meta.glob 读取 src/assets/md/*.md
 declare module '*.md?raw' {
   const content: string
   export default content

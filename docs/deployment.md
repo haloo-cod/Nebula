@@ -73,15 +73,15 @@ pnpm dev
 
 ```env
 # 应用配置
-SECRET_KEY=change-me-in-production
+SECRET_KEY=<随机生成的至少 32 位字符串>
 DEBUG=True
 
 # 数据库
 DATABASE_URL=sqlite+aiosqlite:///./blog.db
 
-# 管理员默认账户
+# 管理员账户
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+ADMIN_PASSWORD=<至少 12 位的强密码>
 
 # CORS 允许来源（逗号分隔）
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173"]

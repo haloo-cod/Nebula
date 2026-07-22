@@ -24,6 +24,17 @@ def normalize_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
+def archive_path(job_id: int) -> Path:
+    """根据任务 ID 解析当前环境中的归档路径，不信任历史绝对路径。"""
+    return settings.BOOK_ARCHIVE_DIR / f"job-{job_id}.zip"
+
+
+def existing_archive_path(job: BookDownloadJob) -> Path | None:
+    """返回当前环境中存在的归档文件路径。"""
+    path = archive_path(job.id)
+    return path if path.is_file() else None
+
+
 def _safe_name(book: Book) -> str:
     """生成 ZIP 内安全且可读的文件名。"""
     value = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", f"{book.title} - {book.author}".strip(" -"))
@@ -36,8 +47,8 @@ async def process_book_download_job(job_id: int) -> None:
         job = await db.get(BookDownloadJob, job_id)
         if not job:
             return
-        archive_path = settings.BOOK_ARCHIVE_DIR / f"job-{job.id}.zip"
-        archive_path.unlink(missing_ok=True)
+        output_path = archive_path(job.id)
+        output_path.unlink(missing_ok=True)
         job.output_path = ""
         job.file_size = 0
         job.error_message = ""
@@ -56,7 +67,7 @@ async def process_book_download_job(job_id: int) -> None:
             used_names: set[str] = set()
             manifest: list[dict[str, str]] = []
 
-            with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_STORED) as output:
+            with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_STORED) as output:
                 for index, slug in enumerate(slugs, start=1):
                     book = book_map[slug]
                     book_path = (BOOKS_DIR / f"{book.slug}.epub").resolve()
@@ -79,27 +90,43 @@ async def process_book_download_job(job_id: int) -> None:
 
                 output.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
 
-            job.output_path = str(archive_path)
-            job.file_size = archive_path.stat().st_size
+            job.output_path = str(output_path)
+            job.file_size = output_path.stat().st_size
             job.status = "completed"
             job.expires_at = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(
-                hours=settings.BOOK_ARCHIVE_EXPIRE_HOURS
+                days=job.expire_days
             )
             await db.commit()
         except Exception as exc:
-            archive_path = locals().get("archive_path")
-            if isinstance(archive_path, Path):
-                archive_path.unlink(missing_ok=True)
+            output_path = locals().get("output_path")
+            if isinstance(output_path, Path):
+                output_path.unlink(missing_ok=True)
             job.status = "failed"
             job.error_message = str(exc)[:1000]
             await db.commit()
 
 
-def cleanup_expired_book_archives() -> None:
-    """清理过期 ZIP 和孤立归档文件。"""
+async def cleanup_expired_book_archives() -> None:
+    """按任务到期时间清理 ZIP，并删除没有对应任务的孤立文件。"""
     if not settings.BOOK_ARCHIVE_DIR.exists():
         return
-    now = datetime.now(timezone.utc).timestamp()
-    for path in settings.BOOK_ARCHIVE_DIR.glob("job-*.zip"):
-        if now - path.stat().st_mtime > settings.BOOK_ARCHIVE_EXPIRE_HOURS * 3600:
-            path.unlink(missing_ok=True)
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(BookDownloadJob))
+        jobs = list(result.scalars().all())
+        now = datetime.now(timezone.utc)
+        for job in jobs:
+            expires_at = normalize_utc(job.expires_at)
+            if expires_at and expires_at < now:
+                archive_path(job.id).unlink(missing_ok=True)
+                job.status = "expired" if job.status == "completed" else job.status
+        await db.commit()
+
+        active_paths = {
+            archive_path(job.id).resolve()
+            for job in jobs
+            if job.status in {"pending", "running", "completed"}
+        }
+        for path in settings.BOOK_ARCHIVE_DIR.glob("job-*.zip"):
+            if path.resolve() not in active_paths:
+                # 孤立文件保留，避免清理任务误删尚未完成人工核对的归档。
+                continue
