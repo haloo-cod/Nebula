@@ -104,9 +104,13 @@ VITE_API_BASE_URL=
 
 ## 生产部署
 
-以下方案适用于 `starlitn.top` 在一台 Ubuntu 服务器上的同域部署：Nginx 对外提供 HTTPS 和前端静态文件，`/api/` 反向代理到仅监听本机的 FastAPI，SQLite 和上传目录保留在后端目录。
+以下方案适用于在一台 Ubuntu 服务器上的同域部署：Nginx 对外提供 HTTPS 和前端静态文件，`/api/` 反向代理到仅监听本机的 FastAPI，SQLite 和上传目录保留在后端目录。
 
 ### 方案一：Nginx 反向代理（推荐）
+
+完整的脱敏配置示例见 [`nginx.conf.example`](nginx.conf.example)。其中已将域名、服务器目录和日志路径替换为占位值。
+
+Nginx 负责提供前端 `dist/` 静态文件，并将 `/api/`、`/uploads/images/` 和 `/health` 转发给监听在 `127.0.0.1:8000` 的 FastAPI。前端生产构建时将 `VITE_API_BASE_URL` 留空，浏览器会通过当前域名访问这些路径。
 
 ```
 ┌─────────────┐      ┌─────────────┐
@@ -132,10 +136,10 @@ pnpm build
 ```nginx
 server {
     listen 80;
-    server_name starlitn.top www.starlitn.top;
+    server_name example.com www.example.com;
 
     # 前端静态文件
-    root /srv/starlit/blog-frontend/dist;
+    root /var/www/example.com/blog-frontend/dist;
     index index.html;
 
     # SPA fallback（Hash 模式其实不需要，但保险起见）
@@ -200,7 +204,7 @@ WantedBy=multi-user.target
 
 > 待补充（TODO）
 
-### `starlitn.top` 上线前配置
+### 自定义域名上线前配置
 
 前端同域部署时，在构建前创建 `blog-frontend/.env.production`：
 
@@ -214,8 +218,8 @@ VITE_API_BASE_URL=
 ```env
 ENVIRONMENT=production
 DEBUG=false
-FRONTEND_URL=https://starlitn.top
-CORS_ORIGINS=["https://starlitn.top","https://www.starlitn.top"]
+FRONTEND_URL=https://example.com
+CORS_ORIGINS=["https://example.com","https://www.example.com"]
 COOKIE_SECURE=true
 TRUST_PROXY_HEADERS=true
 REQUIRE_EMAIL_VERIFICATION=false
@@ -236,7 +240,7 @@ sudo systemctl reload nginx
 HTTPS 使用 Certbot：
 
 ```bash
-sudo certbot --nginx -d starlitn.top -d www.starlitn.top
+sudo certbot --nginx -d example.com -d www.example.com
 ```
 
 限流记录写入 SQLite 的 `rate_limit_hits` 表，两个 Uvicorn worker 可以共享限流数据。高并发或多服务器部署时再迁移到 Redis。启动时会清理两天以前的限流记录。
@@ -302,7 +306,7 @@ sudo certbot --nginx -d your-domain.com
 生产上线检查：
 
 ```bash
-curl https://starlitn.top/health
+curl https://example.com/health
 sudo systemctl status blog-backend
 sudo nginx -t
 ```
