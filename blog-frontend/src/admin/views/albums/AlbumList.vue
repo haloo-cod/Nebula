@@ -57,6 +57,7 @@ const loadingPhotos = ref(false)
 const uploading = ref(false)
 const photoInputRef = ref<HTMLInputElement | null>(null)
 const savingPhotoId = ref<number | null>(null)
+const showPhotoPicker = ref(false)
 
 /** 加载相册列表 */
 async function loadAlbums() {
@@ -193,12 +194,38 @@ async function handlePhotoUpload(event: Event) {
     }
     const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
     currentAlbum.value = detail
-    ElMessage[failed ? 'warning' : 'success'](failed ? `${success} 张成功，${failed} 张失败` : `成功添加 ${success} 张照片`)
+    ElMessage[failed ? 'warning' : 'success'](
+      failed ? `${success} 张成功，${failed} 张失败` : `成功添加 ${success} 张照片`,
+    )
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '上传失败')
   } finally {
     uploading.value = false
     input.value = '' // 重置文件选择
+  }
+}
+
+/** 从图片库选择已有图片并关联到当前相册。 */
+async function handlePhotoSelected(images: PickerImage[]) {
+  if (!currentAlbum.value || !images.length) return
+  uploading.value = true
+  try {
+    const results = await Promise.allSettled(
+      images.map((image) =>
+        api.post(`/api/v1/albums/${currentAlbum.value!.id}/photos`, { image_id: image.id }, true),
+      ),
+    )
+    const failed = results.filter((result) => result.status === 'rejected').length
+    const success = images.length - failed
+    const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
+    currentAlbum.value = detail
+    ElMessage[failed ? 'warning' : 'success'](
+      failed ? `${success} 张成功，${failed} 张失败` : `成功添加 ${success} 张照片`,
+    )
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '添加照片失败')
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -290,7 +317,10 @@ onMounted(() => loadAlbums())
         >
         <div class="upload-control">
           <el-button type="primary" :loading="uploading" @click="openPhotoPicker">
-            <el-icon><Plus /></el-icon>添加照片
+            <el-icon><Plus /></el-icon>上传照片
+          </el-button>
+          <el-button :disabled="uploading" @click="showPhotoPicker = true">
+            从图片库选择
           </el-button>
           <input
             ref="photoInputRef"
@@ -313,7 +343,12 @@ onMounted(() => loadAlbums())
             </div>
             <div class="photo-fields">
               <el-input v-model="photo.caption" size="small" placeholder="照片说明" clearable />
-              <el-button size="small" :loading="savingPhotoId === photo.id" @click="savePhoto(photo)">保存</el-button>
+              <el-button
+                size="small"
+                :loading="savingPhotoId === photo.id"
+                @click="savePhoto(photo)"
+                >保存</el-button
+              >
             </div>
           </div>
           <div v-if="currentAlbum.photos.length === 0" class="empty-state">
@@ -349,9 +384,13 @@ onMounted(() => loadAlbums())
         </el-form-item>
         <el-form-item label="相册封面">
           <div class="cover-picker">
-            <span>{{ albumForm.cover_image_id ? `已选择图片 #${albumForm.cover_image_id}` : '未设置封面' }}</span>
+            <span>{{
+              albumForm.cover_image_id ? `已选择图片 #${albumForm.cover_image_id}` : '未设置封面'
+            }}</span>
             <el-button @click="showCoverPicker = true">从已上传图片选择</el-button>
-            <el-button v-if="albumForm.cover_image_id" @click="albumForm.cover_image_id = null">清空</el-button>
+            <el-button v-if="albumForm.cover_image_id" @click="albumForm.cover_image_id = null"
+              >清空</el-button
+            >
           </div>
         </el-form-item>
       </el-form>
@@ -362,7 +401,17 @@ onMounted(() => loadAlbums())
         }}</el-button>
       </template>
     </el-dialog>
-    <ImagePickerDialog v-model="showCoverPicker" title="选择相册封面" @select="handleCoverSelected" />
+    <ImagePickerDialog
+      v-model="showCoverPicker"
+      title="选择相册封面"
+      @select="handleCoverSelected"
+    />
+    <ImagePickerDialog
+      v-model="showPhotoPicker"
+      title="选择相册照片"
+      :multiple="true"
+      @select-many="handlePhotoSelected"
+    />
   </div>
 </template>
 

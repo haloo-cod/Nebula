@@ -123,7 +123,13 @@ function applyDarkTheme() {
   background: var(--admin-content-bg);
   font-family:
     'Zen Maru Gothic',
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
 }
 
 /* ---------- CSS 变量：暗色主题 ---------- */

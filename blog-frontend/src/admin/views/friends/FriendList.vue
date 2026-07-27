@@ -71,7 +71,13 @@ async function saveExchangeInfo() {
   try {
     exchangeInfo.value = await api.put<FriendExchangeInfo>(
       '/api/v1/friends/exchange-info',
-      { ...exchangeInfo.value, requirements: requirementsText.value.split('\n').map((item) => item.trim()).filter(Boolean) },
+      {
+        ...exchangeInfo.value,
+        requirements: requirementsText.value
+          .split('\n')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      },
       true,
     )
     requirementsText.value = exchangeInfo.value.requirements.join('\n')
@@ -203,7 +209,12 @@ onMounted(() => {
           <el-input v-model="exchangeInfo.bio" type="textarea" :rows="2" />
         </el-form-item>
         <el-form-item label="申请要求（每行一条）">
-          <el-input v-model="requirementsText" type="textarea" :rows="4" placeholder="原创内容优先&#10;站点稳定可访问" />
+          <el-input
+            v-model="requirementsText"
+            type="textarea"
+            :rows="4"
+            placeholder="原创内容优先&#10;站点稳定可访问"
+          />
         </el-form-item>
         <div class="exchange-form-actions">
           <el-button type="primary" :loading="exchangeSaving" @click="saveExchangeInfo">

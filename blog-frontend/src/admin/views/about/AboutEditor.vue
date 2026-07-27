@@ -185,7 +185,12 @@ onBeforeUnmount(() => {
     <el-card shadow="never" class="cover-card">
       <template #header>关于页封面图</template>
       <div class="cover-editor">
-        <img v-if="coverUrl" :src="resolveUrl(coverUrl)" alt="关于页封面预览" class="cover-preview" />
+        <img
+          v-if="coverUrl"
+          :src="resolveUrl(coverUrl)"
+          alt="关于页封面预览"
+          class="cover-preview"
+        />
         <div v-else class="cover-empty">未设置封面图</div>
         <div class="cover-actions">
           <el-button type="primary" @click="showImagePicker = true">从媒体库选择</el-button>
@@ -203,7 +208,11 @@ onBeforeUnmount(() => {
       </el-result>
       <div v-show="!error" ref="editorRef" class="vditor-container"></div>
     </el-card>
-    <ImagePickerDialog v-model="showImagePicker" title="选择关于页封面" @select="handleCoverSelected" />
+    <ImagePickerDialog
+      v-model="showImagePicker"
+      title="选择关于页封面"
+      @select="handleCoverSelected"
+    />
   </div>
 </template>
 

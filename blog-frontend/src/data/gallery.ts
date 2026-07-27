@@ -6,41 +6,8 @@ const rawProjectFiles = import.meta.glob<string>('../assets/projects/*.md', {
   import: 'default',
   eager: true,
 })
-
-const projectMeta: Omit<GalleryProject, 'content'>[] = [
-  {
-    slug: 'my-blog',
-    title: 'My Blog',
-    description: '围绕内容、液态玻璃视觉和个人表达构建的 Vue 博客前端。',
-    tags: ['Vue', 'Vite', 'TypeScript', 'Markdown', 'Liquid Glass'],
-    status: '重构中',
-    year: '2026',
-  },
-  {
-    slug: 'deep-sea-gallery',
-    title: '深海玻璃标本柜',
-    description: '一个用于展示项目与技能的深海感作品展厅。',
-    tags: ['Vue Router', 'LiquidGlass', 'Design System', 'Responsive'],
-    status: '构建中',
-    year: '2026',
-  },
-  {
-    slug: 'project-docs',
-    title: '项目文档系统',
-    description: '独立于博客文章的项目 Markdown 详情链路,为后端接入预留边界。',
-    tags: ['Markdown', 'marked', 'Data Layer', 'API Ready'],
-    status: '规划中',
-    year: '2026',
-  },
-  {
-    slug: 'backend-roadmap',
-    title: '后端接入路线',
-    description: '为项目、资源下载和动态内容准备 FastAPI 接口边界。',
-    tags: ['FastAPI', 'API', 'Resource', 'Deployment'],
-    status: '待接入',
-    year: '2026',
-  },
-]
+//下面这个为静态数据
+const projectMeta: Omit<GalleryProject, 'content'>[] = []
 
 /** 由文件路径生成项目文档 slug */
 function slugifyProjectPath(path: string): string {

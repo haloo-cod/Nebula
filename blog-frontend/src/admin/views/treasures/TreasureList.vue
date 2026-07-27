@@ -160,9 +160,7 @@ function formatFileSize(size: number): string {
 /** 格式化归档剩余时间。 */
 function archiveExpiryLabel(item: TreasureItem): string {
   if (!item.archive_id || !item.archive_expires_at) return ''
-  const remaining = Math.ceil(
-    (new Date(item.archive_expires_at).getTime() - Date.now()) / 86400000,
-  )
+  const remaining = Math.ceil((new Date(item.archive_expires_at).getTime() - Date.now()) / 86400000)
   return remaining > 0 ? `${remaining} 天后过期` : '已过期'
 }
 
@@ -263,7 +261,8 @@ async function handleSave() {
     ElMessage.warning('标题和分类不能为空')
     return
   }
-  if (!isEdit.value && !form.value.slug.trim()) form.value.slug = previewSlug(form.value.title) || 'treasure'
+  if (!isEdit.value && !form.value.slug.trim())
+    form.value.slug = previewSlug(form.value.title) || 'treasure'
 
   saving.value = true
   try {
@@ -318,7 +317,7 @@ onMounted(() => {
   <div class="treasure-list-page">
     <div class="page-header">
       <div class="filter-row">
-             <el-select
+        <el-select
           v-model="filterCategory"
           placeholder="全部分类"
           clearable
@@ -362,8 +361,16 @@ onMounted(() => {
         <el-table-column prop="sort_order" label="排序" width="60" />
         <el-table-column label="下载状态" min-width="130">
           <template #default="{ row }: { row: any }">
-            <el-tag v-if="row.archive_id" :type="row.archive_status === 'expired' ? 'danger' : 'warning'" size="small">
-              {{ row.archive_status === 'expired' ? '归档已过期' : archiveExpiryLabel(row as TreasureItem) }}
+            <el-tag
+              v-if="row.archive_id"
+              :type="row.archive_status === 'expired' ? 'danger' : 'warning'"
+              size="small"
+            >
+              {{
+                row.archive_status === 'expired'
+                  ? '归档已过期'
+                  : archiveExpiryLabel(row as TreasureItem)
+              }}
             </el-tag>
           </template>
         </el-table-column>
@@ -381,7 +388,10 @@ onMounted(() => {
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="Slug">
-            <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
+            <el-input
+              :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'"
+              disabled
+            />
           </el-form-item>
           <el-form-item label="标题">
             <el-input v-model="form.title" placeholder="资源名称" />
@@ -452,10 +462,17 @@ onMounted(() => {
                   </el-button>
                 </div>
               </el-option>
-             </el-select>
+            </el-select>
 
             <el-select
-              :model-value="bookArchives.find((job) => form.download_file.includes(`/treasures/${encodeURIComponent(form.slug)}/download`) && form.download_file.includes(`archive=${job.id}`))?.id"
+              :model-value="
+                bookArchives.find(
+                  (job) =>
+                    form.download_file.includes(
+                      `/treasures/${encodeURIComponent(form.slug)}/download`,
+                    ) && form.download_file.includes(`archive=${job.id}`),
+                )?.id
+              "
               filterable
               clearable
               :loading="loadingArchives"

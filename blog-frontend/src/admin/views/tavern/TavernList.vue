@@ -97,7 +97,12 @@ onMounted(() => {
     <el-card shadow="never" class="config-card">
       <template #header><span>酒馆背景图</span></template>
       <div class="bg-config">
-        <el-input v-model="bgUrl" placeholder="图片 URL，留空使用默认暗色背景" clearable style="flex:1" />
+        <el-input
+          v-model="bgUrl"
+          placeholder="图片 URL，留空使用默认暗色背景"
+          clearable
+          style="flex: 1"
+        />
         <el-button type="primary" :loading="savingBg" @click="saveBg">保存</el-button>
       </div>
     </el-card>

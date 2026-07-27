@@ -61,13 +61,12 @@ export async function fetchMomentComments(id: number): Promise<MomentComment[]> 
 }
 
 /** 发表说说评论 */
-export async function postMomentComment(
-  id: number,
-  nickname: string,
-  content: string,
-): Promise<MomentComment> {
-  return api.post<MomentComment>(`/api/v1/moments/${id}/comments`, {
-    nickname,
-    content,
-  })
+export async function postMomentComment(id: number, content: string): Promise<MomentComment> {
+  return api.post<MomentComment>(
+    `/api/v1/moments/${id}/comments`,
+    {
+      content,
+    },
+    true,
+  )
 }

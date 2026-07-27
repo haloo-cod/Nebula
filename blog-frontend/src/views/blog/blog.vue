@@ -400,7 +400,6 @@ watch(totalPages, (nextTotal) => {
   }
 }
 
-
 .post-date {
   font-size: 0.72rem;
   letter-spacing: 0.12em;

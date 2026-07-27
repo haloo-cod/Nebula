@@ -40,6 +40,8 @@ pip install -r requirements.txt
 | `python -m scripts.init_xxx` | 运行初始化脚本 |
 | `python -m scripts.init_xxx --force` | 强制覆盖重新初始化 |
 
+后端应用启动时会自动创建数据库表、执行兼容性字段迁移、准备运行时目录、清理过期归档和统计限流记录，并创建 `.env` 配置的默认管理员账户。初始化脚本主要用于导入或重置内容数据，不是每次启动的必需步骤。
+
 ---
 
 ## 代码风格
@@ -137,6 +139,8 @@ import { siteText } from '@/data/site-text'
 4. **Router** — `app/api/v1/xxx.py`，定义路由端点
 5. **注册** — `app/models/__init__.py` + `app/api/v1/router.py` 注册
 
+需要认证的接口通过 `app.api.deps` 中的当前用户或管理员依赖保护。公开内容接口通常应保持前端 API 优先、静态 fallback 的兼容方式。
+
 ### 前端（3 步）
 
 1. **API 层** — `src/api/xxx.ts`，封装 HTTP 调用
@@ -208,6 +212,7 @@ onMounted(async () => {
 - **API 请求调试**：打开浏览器 Network 面板查看请求/响应
 - **禁用 API**：`.env.local` 设 `VITE_USE_API=false`，只看前端效果
 - **液态玻璃关闭**：设置面板中可关闭 LiquidGlass（降低 GPU 负载）
+- **登录调试**：检查 `Authorization` 请求头、`blog_admin_token` localStorage 项，以及 `/api/v1/auth/refresh` 的 Cookie 请求
 
 ### 后端
 

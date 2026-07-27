@@ -97,7 +97,8 @@ async function handleSave() {
     ElMessage.warning('请填写标题')
     return
   }
-  if (!isEdit.value && !form.value.slug.trim()) form.value.slug = previewSlug(form.value.title) || 'project'
+  if (!isEdit.value && !form.value.slug.trim())
+    form.value.slug = previewSlug(form.value.title) || 'project'
 
   saving.value = true
   try {
@@ -192,7 +193,10 @@ function previewSlug(title: string): string {
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="Slug">
-            <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
+            <el-input
+              :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'"
+              disabled
+            />
           </el-form-item>
           <el-form-item label="标题">
             <el-input v-model="form.title" placeholder="项目名称" />

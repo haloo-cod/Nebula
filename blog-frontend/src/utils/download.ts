@@ -11,7 +11,9 @@ export function downloadWithProgress(
     const xhr = new XMLHttpRequest()
     xhr.open('GET', url)
     xhr.withCredentials = true
-    Object.entries(options.headers ?? {}).forEach(([key, value]) => xhr.setRequestHeader(key, value))
+    Object.entries(options.headers ?? {}).forEach(([key, value]) =>
+      xhr.setRequestHeader(key, value),
+    )
     xhr.responseType = 'blob'
 
     xhr.addEventListener('progress', (event) => {

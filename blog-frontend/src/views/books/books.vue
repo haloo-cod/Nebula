@@ -52,7 +52,7 @@
 
       <div class="books-grid">
         <RouterLink
-            v-for="book in books"
+          v-for="book in books"
           :key="book.slug"
           :to="`/books/read/${book.slug}`"
           class="book-link"

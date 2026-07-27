@@ -90,7 +90,9 @@ async function handleUpload() {
       ),
     )
     const failed = results.filter((result) => result.status === 'rejected').length
-    ElMessage[failed ? 'warning' : 'success'](failed ? `添加完成，${failed} 张失败` : `成功添加 ${images.length} 张`)
+    ElMessage[failed ? 'warning' : 'success'](
+      failed ? `添加完成，${failed} 张失败` : `成功添加 ${images.length} 张`,
+    )
     showUploadDialog.value = false
     loadBackgrounds()
   } catch (err: unknown) {
@@ -120,11 +122,17 @@ function toggleSelection(id: number) {
 async function handleBatchDelete() {
   if (!selectedIds.value.length) return
   try {
-    await ElMessageBox.confirm(`确定移除选中的 ${selectedIds.value.length} 张背景图？`, '确认', { type: 'warning' })
+    await ElMessageBox.confirm(`确定移除选中的 ${selectedIds.value.length} 张背景图？`, '确认', {
+      type: 'warning',
+    })
     deleting.value = true
-    const results = await Promise.allSettled(selectedIds.value.map((id) => api.delete(`/api/v1/backgrounds/${id}`)))
+    const results = await Promise.allSettled(
+      selectedIds.value.map((id) => api.delete(`/api/v1/backgrounds/${id}`)),
+    )
     const failed = results.filter((result) => result.status === 'rejected').length
-    ElMessage[failed ? 'warning' : 'success'](failed ? `删除完成，${failed} 张失败` : '批量删除成功')
+    ElMessage[failed ? 'warning' : 'success'](
+      failed ? `删除完成，${failed} 张失败` : '批量删除成功',
+    )
     selectedIds.value = []
     await loadBackgrounds()
   } catch {
@@ -192,12 +200,24 @@ onMounted(() => loadBackgrounds())
     <el-card shadow="never" class="table-card">
       <div class="batch-toolbar">
         <span>已选择 {{ selectedIds.length }} 张</span>
-        <el-button type="danger" plain :loading="deleting" :disabled="!selectedIds.length" @click="handleBatchDelete">批量删除</el-button>
+        <el-button
+          type="danger"
+          plain
+          :loading="deleting"
+          :disabled="!selectedIds.length"
+          @click="handleBatchDelete"
+          >批量删除</el-button
+        >
       </div>
       <div v-loading="loading" class="bg-grid">
         <div v-for="bg in backgrounds" :key="bg.id" class="bg-item">
           <img :src="resolveUrl(bg.url)" alt="" class="bg-img" />
-          <el-checkbox class="bg-check" :model-value="selectedIds.includes(bg.id)" @click.stop @change="toggleSelection(bg.id)" />
+          <el-checkbox
+            class="bg-check"
+            :model-value="selectedIds.includes(bg.id)"
+            @click.stop
+            @change="toggleSelection(bg.id)"
+          />
           <div class="bg-overlay">
             <el-button type="danger" size="small" @click="handleDelete(bg)">移除</el-button>
           </div>
@@ -226,7 +246,11 @@ onMounted(() => loadBackgrounds())
           <div class="image-picker">
             <el-button plain @click="showImagePicker = true">从媒体库选择</el-button>
             <span class="selected-image-name">
-               {{ selectedImages.length ? `已选择 ${selectedImages.length} 张图片` : selectedImage?.original_name || '尚未选择图片' }}
+              {{
+                selectedImages.length
+                  ? `已选择 ${selectedImages.length} 张图片`
+                  : selectedImage?.original_name || '尚未选择图片'
+              }}
             </span>
           </div>
         </el-form-item>
@@ -236,7 +260,13 @@ onMounted(() => loadBackgrounds())
         <el-button type="primary" :loading="uploading" @click="handleUpload"> 确认上传 </el-button>
       </template>
     </el-dialog>
-    <ImagePickerDialog v-model="showImagePicker" title="选择背景图" :multiple="true" @select-many="handleImagesSelected" @select="handleImageSelected" />
+    <ImagePickerDialog
+      v-model="showImagePicker"
+      title="选择背景图"
+      :multiple="true"
+      @select-many="handleImagesSelected"
+      @select="handleImageSelected"
+    />
   </div>
 </template>
 

@@ -34,11 +34,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { fetchCarouselSlides } from '@/api/carousel'
 
-const fallbackImages = import.meta.glob<string>('../../assets/carousel/*.{png,PNG,jpg,JPG,jpeg,webp,WEBP}', {
-  query: '?url',
-  import: 'default',
-  eager: true,
-})
+const fallbackImages = import.meta.glob<string>(
+  '../../assets/carousel/*.{png,PNG,jpg,JPG,jpeg,webp,WEBP}',
+  {
+    query: '?url',
+    import: 'default',
+    eager: true,
+  },
+)
 
 const images = ref<string[]>(Object.values(fallbackImages))
 

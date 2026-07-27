@@ -95,24 +95,26 @@
     </header>
 
     <main class="reader-main">
-      <aside class="toc-panel" :class="{ 'toc-panel-open': tocOpen }">
-        <div class="toc-head">
-          <p>Table of Contents</p>
-          <button class="reader-icon-btn toc-close" type="button" @click="toggleToc">收起</button>
-        </div>
-        <div v-if="tocItems.length === 0" class="toc-empty">目录整理中...</div>
-        <button
-          v-for="item in tocItems"
-          :key="item.href + item.label + item.depth"
-          class="toc-item"
-          :class="{ 'toc-item-active': isTocItemActive(item.href) }"
-          type="button"
-          :style="{ '--toc-depth': item.depth }"
-          @click="displayTocItem(item.href)"
-        >
-          {{ item.label }}
-        </button>
-      </aside>
+      <Transition name="toc-slide">
+        <aside v-if="tocOpen" class="toc-panel">
+          <div class="toc-head">
+            <p>Table of Contents</p>
+            <button class="reader-icon-btn toc-close" type="button" @click="toggleToc">收起</button>
+          </div>
+          <div v-if="tocItems.length === 0" class="toc-empty">目录整理中...</div>
+          <button
+            v-for="item in tocItems"
+            :key="item.href + item.label + item.depth"
+            class="toc-item"
+            :class="{ 'toc-item-active': isTocItemActive(item.href) }"
+            type="button"
+            :style="{ '--toc-depth': item.depth }"
+            @click="displayTocItem(item.href)"
+          >
+            {{ item.label }}
+          </button>
+        </aside>
+      </Transition>
 
       <section class="book-stage" :class="{ 'book-stage--loading': loading || error }">
         <button
@@ -188,6 +190,7 @@ interface ReaderLocation {
   start?: {
     cfi?: string
     href?: string
+    percentage?: number
   }
   end?: {
     cfi?: string
@@ -206,7 +209,20 @@ interface ReaderAnchor {
   href?: string
 }
 
+/** 单本图书的本地阅读进度。 */
+interface BookReadingProgress {
+  cfi?: string
+  href?: string
+  percentage?: number
+  updatedAt: string
+}
+
+/** 本地阅读进度索引，按图书 slug 隔离。 */
+type BookReadingProgressMap = Record<string, BookReadingProgress>
+
 const READER_PREFERENCES_KEY = 'starlit-blog.reader-preferences'
+const READING_PROGRESS_KEY = 'starlit-blog.book-reading-progress'
+const MAX_READING_PROGRESS_ITEMS = 100
 const defaultReaderPreferences: ReaderPreferences = {
   mode: 'paginated',
   theme: 'light',
@@ -237,6 +253,7 @@ let isUnmounted = false
 let currentCfi: string | undefined
 let currentHref: string | undefined
 let scrollAutoLoadUnlisten: (() => void) | null = null
+let readingProgressSaveTimer: number | null = null
 
 function isReadingMode(value: unknown): value is ReadingMode {
   return value === 'paginated' || value === 'scrolled'
@@ -282,6 +299,99 @@ function restoreReaderPreferences() {
   readingMode.value = preferences.mode
   readerTheme.value = preferences.theme
   fontScale.value = preferences.fontScale
+}
+
+/** 读取所有本地阅读进度，损坏或旧数据直接视为空索引。 */
+function readReadingProgressMap(): BookReadingProgressMap {
+  try {
+    const raw = localStorage.getItem(READING_PROGRESS_KEY)
+    if (!raw) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+
+    const progressMap: BookReadingProgressMap = {}
+    for (const [slug, value] of Object.entries(parsed)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+      // JSON 只经过运行时字段校验后作为部分进度记录使用。
+      const item = value as Partial<BookReadingProgress>
+      if (typeof item.updatedAt !== 'string') continue
+      if (typeof item.cfi !== 'string' && typeof item.href !== 'string') continue
+      progressMap[slug] = {
+        cfi: typeof item.cfi === 'string' ? item.cfi : undefined,
+        href: typeof item.href === 'string' ? item.href : undefined,
+        percentage:
+          typeof item.percentage === 'number' && Number.isFinite(item.percentage)
+            ? Math.min(1, Math.max(0, item.percentage))
+            : undefined,
+        updatedAt: item.updatedAt,
+      }
+    }
+    return progressMap
+  } catch (err) {
+    console.warn('[books] 阅读进度读取失败,从当前位置开始:', err)
+    return {}
+  }
+}
+
+/** 写入本地阅读进度，保留最近更新的记录，避免 localStorage 无限增长。 */
+function writeReadingProgressMap(progressMap: BookReadingProgressMap) {
+  try {
+    const entries = Object.entries(progressMap)
+      .sort(([, a], [, b]) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, MAX_READING_PROGRESS_ITEMS)
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(Object.fromEntries(entries)))
+  } catch (err) {
+    console.warn('[books] 阅读进度保存失败:', err)
+  }
+}
+
+/** 获取指定图书的恢复锚点。 */
+function readBookReadingProgress(slug: string): ReaderAnchor | undefined {
+  const progress = readReadingProgressMap()[slug]
+  if (!progress) return undefined
+  return progress.cfi || progress.href ? { cfi: progress.cfi, href: progress.href } : undefined
+}
+
+/** 保存当前图书位置，CFI 失效时仍保留章节 href 作为回退。 */
+function saveBookReadingProgress(slug: string, location?: ReaderLocation | null) {
+  const start = location?.start
+  const cfi = start?.cfi || currentCfi
+  const href = start?.href || currentHref
+  if (!cfi && !href) return
+
+  const progressMap = readReadingProgressMap()
+  progressMap[slug] = {
+    cfi,
+    href,
+    percentage:
+      typeof start?.percentage === 'number' && Number.isFinite(start.percentage)
+        ? Math.min(1, Math.max(0, start.percentage))
+        : progressMap[slug]?.percentage,
+    updatedAt: new Date().toISOString(),
+  }
+  writeReadingProgressMap(progressMap)
+}
+
+/** 页面卸载前保存一次，覆盖尚未触发 relocated 的最后位置。 */
+function saveCurrentBookReadingProgress() {
+  const slug = String(route.params.slug || '')
+  if (!slug) return
+  saveBookReadingProgress(slug, getCurrentLocation())
+}
+
+/** 合并连续滚动事件，避免高频同步写入 localStorage。 */
+function scheduleReadingProgressSave() {
+  if (readingProgressSaveTimer !== null) return
+  readingProgressSaveTimer = window.setTimeout(() => {
+    readingProgressSaveTimer = null
+    saveCurrentBookReadingProgress()
+  }, 250)
+}
+
+function cleanupReadingProgressSave() {
+  if (readingProgressSaveTimer === null) return
+  window.clearTimeout(readingProgressSaveTimer)
+  readingProgressSaveTimer = null
 }
 
 function waitForNextPaint(): Promise<void> {
@@ -363,6 +473,7 @@ function flattenToc(items: NavItem[], depth = 0): TocEntry[] {
 
 function cleanupReader() {
   cleanupScrollAutoLoad()
+  cleanupReadingProgressSave()
   if (rendition.value) {
     rendition.value.destroy()
     rendition.value = null
@@ -522,6 +633,7 @@ async function loadReader(anchor?: ReaderAnchor) {
   error.value = ''
 
   const slug = String(route.params.slug || '')
+  const savedAnchor = anchor ?? readBookReadingProgress(slug)
   let currentBook: Book | null = null
 
   // 优先从 API 获取
@@ -545,6 +657,8 @@ async function loadReader(anchor?: ReaderAnchor) {
   if (!viewerRef.value || !isCurrentRun(runId)) return
 
   try {
+    // 模式切换会销毁旧 rendition，先保存其最后位置再清理。
+    saveCurrentBookReadingProgress()
     cleanupReader()
     viewerKey.value += 1
     await nextTick()
@@ -567,9 +681,10 @@ async function loadReader(anchor?: ReaderAnchor) {
       if (location.start?.cfi) currentCfi = location.start.cfi
       if (location.start?.href) currentHref = location.start.href
       if (location.start?.href) activeTocHref.value = location.start.href
+      scheduleReadingProgressSave()
     })
 
-    await displayReaderAnchor(anchor)
+    await displayReaderAnchor(savedAnchor)
     if (!isCurrentRun(runId)) return
     loading.value = false
     isReaderBusy.value = false
@@ -602,6 +717,7 @@ onUnmounted(() => {
   isUnmounted = true
   loadRunId += 1
   ui.showNavbar = true
+  saveCurrentBookReadingProgress()
   cleanupReader()
 })
 </script>
@@ -989,7 +1105,6 @@ onUnmounted(() => {
   left: clamp(1rem, 3vw, 3rem);
   bottom: 4.4rem;
   z-index: 34;
-  display: none;
   width: min(18.5rem, calc(100vw - 2rem));
   min-height: 0;
   overflow: auto;
@@ -1004,8 +1119,17 @@ onUnmounted(() => {
     0 18px 44px rgba(85, 109, 124, 0.16);
 }
 
-.toc-panel-open {
-  display: block;
+.toc-slide-enter-active,
+.toc-slide-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.toc-slide-enter-from,
+.toc-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .toc-head {
@@ -1269,11 +1393,13 @@ onUnmounted(() => {
 
   .toc-panel {
     position: fixed;
-    top: 10.7rem;
+    top: calc(12.5rem + env(safe-area-inset-top));
     left: 0.75rem;
     right: 0.75rem;
     width: auto;
-    bottom: 4.6rem;
+    bottom: calc(4.6rem + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .reader-toolbar {
@@ -1319,7 +1445,7 @@ onUnmounted(() => {
   }
 
   .toc-panel {
-    top: 4rem;
+    top: calc(12.5rem + env(safe-area-inset-top));
   }
 }
 
@@ -1333,7 +1459,7 @@ onUnmounted(() => {
   }
 
   .toc-panel {
-    top: 4rem;
+    top: calc(12.5rem + env(safe-area-inset-top));
   }
 
   .paper-shell {

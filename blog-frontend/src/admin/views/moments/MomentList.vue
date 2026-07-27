@@ -4,7 +4,7 @@
  * 展示所有说说，支持新建、删除
  */
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
@@ -21,6 +21,15 @@ interface MomentItem {
   likes: number
 }
 
+/** 说说评论项。 */
+interface MomentComment {
+  id: number
+  nickname: string
+  content: string
+  date: string
+  likes: number
+}
+
 /** 新建说说的表单数据 */
 const showCreateDialog = ref(false)
 const createForm = ref({
@@ -31,6 +40,10 @@ const createForm = ref({
 })
 const creating = ref(false)
 const showImagePicker = ref(false)
+const showCommentsDialog = ref(false)
+const commentsLoading = ref(false)
+const comments = ref<MomentComment[]>([])
+const selectedMoment = ref<MomentItem | null>(null)
 
 const { loading, data, pagination, loadData, handlePageChange, handleSizeChange, handleDelete } =
   useAdminTable<MomentItem>({
@@ -51,6 +64,44 @@ const { loading, data, pagination, loadData, handlePageChange, handleSizeChange,
 function openCreate() {
   createForm.value = { content: '', mood: '', tags: '', images: '' }
   showCreateDialog.value = true
+}
+
+/** 打开指定说说的评论列表。 */
+async function openComments(moment: MomentItem) {
+  selectedMoment.value = moment
+  showCommentsDialog.value = true
+  commentsLoading.value = true
+  try {
+    comments.value = await api.get<MomentComment[]>(`/api/v1/moments/${moment.id}/comments`, true)
+  } catch (err: unknown) {
+    comments.value = []
+    ElMessage.error(err instanceof Error ? err.message : '加载评论失败')
+  } finally {
+    commentsLoading.value = false
+  }
+}
+
+/** 删除指定说说评论。 */
+async function removeComment(comment: MomentComment) {
+  if (!selectedMoment.value) return
+  try {
+    await ElMessageBox.confirm('确定删除这条评论吗？此操作不可恢复。', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await api.delete(`/api/v1/moments/${selectedMoment.value.id}/comments/${comment.id}`, true)
+    comments.value = comments.value.filter((item) => item.id !== comment.id)
+    ElMessage.success('评论已删除')
+  } catch {
+    // 用户取消或删除失败
+  }
+}
+
+/** Element Plus 未能从动态表格数据推导评论行类型，统一在边界处收窄。 */
+function removeCommentRow(row: unknown) {
+  const comment = row as MomentComment
+  void removeComment(comment)
 }
 
 /** 将图库选择的图片追加到说说图片列表。 */
@@ -156,8 +207,11 @@ onMounted(() => loadData())
             {{ row.date.replace('T', ' ').slice(0, 16) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }: { row: any }">
+            <el-button type="primary" link size="small" @click="openComments(row)">
+              评论
+            </el-button>
             <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')"
               >删除</el-button
             >
@@ -198,7 +252,9 @@ onMounted(() => loadData())
         </el-form-item>
         <el-form-item label="图片 URL（每行一个）">
           <div class="image-picker-actions">
-            <el-button type="primary" plain @click="showImagePicker = true">从图库选择或上传</el-button>
+            <el-button type="primary" plain @click="showImagePicker = true"
+              >从图库选择或上传</el-button
+            >
             <span class="image-count">
               {{ createForm.images.split('\n').filter((url) => url.trim()).length }} 张已选择
             </span>
@@ -217,13 +273,39 @@ onMounted(() => loadData())
       </template>
     </el-dialog>
 
+    <!-- 评论管理弹窗 -->
+    <el-dialog
+      v-model="showCommentsDialog"
+      :title="selectedMoment ? `「${selectedMoment.content.slice(0, 20)}」的评论` : '评论管理'"
+      width="620px"
+    >
+      <el-table v-loading="commentsLoading" :data="comments" stripe>
+        <el-table-column label="评论者" width="130">
+          <template #default="{ row }">{{ row.nickname }}</template>
+        </el-table-column>
+        <el-table-column label="内容" min-width="240">
+          <template #default="{ row }">{{ row.content }}</template>
+        </el-table-column>
+        <el-table-column label="时间" width="165">
+          <template #default="{ row }">{{ row.date.replace('T', ' ').slice(0, 16) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="removeCommentRow(row)"
+              >删除</el-button
+            >
+          </template>
+        </el-table-column>
+        <template #empty>暂无评论</template>
+      </el-table>
+    </el-dialog>
+
     <ImagePickerDialog
       v-model="showImagePicker"
       title="选择说说图片"
       multiple
       @select-many="handleImagesSelected"
     />
-
   </div>
 </template>
 
@@ -265,7 +347,6 @@ onMounted(() => loadData())
   color: var(--admin-text-secondary, #909399);
   font-size: 12px;
 }
-
 
 .pagination-wrap {
   display: flex;

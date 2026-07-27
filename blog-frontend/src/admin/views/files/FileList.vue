@@ -265,7 +265,11 @@ async function extendArchive(job: BookDownloadJob) {
   }).catch(() => null)
   if (!value) return
   try {
-    await api.patch(`/api/v1/books/download-jobs/${job.id}/expires`, { expires_on: value.value }, true)
+    await api.patch(
+      `/api/v1/books/download-jobs/${job.id}/expires`,
+      { expires_on: value.value },
+      true,
+    )
     ElMessage.success('归档到期时间已更新')
     await loadArchives()
   } catch (err: unknown) {
@@ -306,9 +310,11 @@ onMounted(loadFiles)
         <p>统一管理普通文件和图床图片，数据库仍保持分表。</p>
       </div>
       <div class="upload-actions">
-            <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
+        <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
         <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="6" />
-        <span v-if="downloading" class="upload-status">{{ downloadStatus }} {{ downloadProgress }}%</span>
+        <span v-if="downloading" class="upload-status"
+          >{{ downloadStatus }} {{ downloadProgress }}%</span
+        >
         <el-progress v-if="downloading" :percentage="downloadProgress" :stroke-width="6" />
         <el-button
           type="primary"

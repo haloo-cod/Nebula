@@ -34,7 +34,9 @@
           <p class="message-hint">点开一只旧酒瓶,看看卡片背面藏着什么。</p>
         </div>
 
-        <div v-if="tavernPosts.length === 0" class="tavern-empty">今晚的酒瓶还在漂流中，还没有人留下故事。</div>
+        <div v-if="tavernPosts.length === 0" class="tavern-empty">
+          今晚的酒瓶还在漂流中，还没有人留下故事。
+        </div>
         <div v-else class="bottle-grid">
           <div v-for="post in tavernPosts" :key="post.id" class="bottle-item">
             <button
