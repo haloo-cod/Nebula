@@ -66,6 +66,9 @@ class Settings(BaseSettings):
 
     # ===== CORS =====
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # 开发期放开跨域:反射任意 Origin(含局域网 IP),便于手机通过 IP 访问后端。
+    # 生产环境务必设为 false,只允许 CORS_ORIGINS 白名单。
+    CORS_ALLOW_ALL: bool = False
 
     # ===== 管理员初始账户 =====
     ADMIN_USERNAME: str = "admin"
