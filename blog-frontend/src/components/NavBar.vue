@@ -158,18 +158,17 @@
                   :aria-pressed="ui.backgroundBlurEnabled"
                   @click="ui.setBackgroundBlurEnabled(!ui.backgroundBlurEnabled)"
                 >
-                  <span class="settings-toggle-thumb"></span>
+                  <GlassKnob :size="18" shape="circle" :theme="ui.theme" />
                 </button>
               </div>
-              <input
-                class="settings-slider"
-                type="range"
-                min="0"
-                max="24"
-                step="1"
-                :value="ui.backgroundBlur"
+              <GlassSlider
+                :model-value="ui.backgroundBlur"
+                :min="0"
+                :max="24"
+                :step="1"
                 :disabled="!ui.backgroundBlurEnabled"
-                @input="onBackgroundBlurInput"
+                :theme="ui.theme"
+                @update:model-value="ui.setBackgroundBlur"
               />
             </div>
 
@@ -185,22 +184,21 @@
                   :aria-pressed="ui.liquidGlassEnabled"
                   @click="ui.setLiquidGlassEnabled(!ui.liquidGlassEnabled)"
                 >
-                  <span class="settings-toggle-thumb"></span>
+                  <GlassKnob :size="18" shape="circle" :theme="ui.theme" />
                 </button>
               </div>
               <div class="settings-head settings-head--compact">
                 <span class="settings-subtitle">玻璃模糊</span>
                 <span class="settings-value">{{ ui.liquidGlassBlur }}px</span>
               </div>
-              <input
-                class="settings-slider"
-                type="range"
-                min="0"
-                max="12"
-                step="1"
-                :value="ui.liquidGlassBlur"
+              <GlassSlider
+                :model-value="ui.liquidGlassBlur"
+                :min="0"
+                :max="12"
+                :step="1"
                 :disabled="!ui.liquidGlassEnabled"
-                @input="onLiquidGlassBlurInput"
+                :theme="ui.theme"
+                @update:model-value="ui.setLiquidGlassBlur"
               />
             </div>
 
@@ -216,7 +214,7 @@
                   :aria-pressed="ui.rainEnabled"
                   @click="ui.setRainEnabled(!ui.rainEnabled)"
                 >
-                  <span class="settings-toggle-thumb"></span>
+                  <GlassKnob :size="18" shape="circle" :theme="ui.theme" />
                 </button>
               </div>
               <div v-if="ui.rainEnabled" class="rain-btns">
@@ -314,6 +312,8 @@ import { languages } from '@/i18n/languages'
 import { getCurrentLang, setLang, getLangLabel } from '@/i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
+import GlassKnob from '@/components/liquid-glass/GlassKnob.vue'
+import GlassSlider from '@/components/liquid-glass/GlassSlider.vue'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 
@@ -535,15 +535,7 @@ function switchLang(code: string) {
   langOpen.value = false
 }
 
-function onBackgroundBlurInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
-  ui.setBackgroundBlur(value)
-}
-
-function onLiquidGlassBlurInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
-  ui.setLiquidGlassBlur(value)
-}
+// onBackgroundBlurInput / onLiquidGlassBlurInput 已由 GlassSlider v-model 替代,已删除
 
 function onDocumentClick(e: MouseEvent) {
   if (langOpen.value && translateRef.value && !translateRef.value.contains(e.target as Node)) {
@@ -1365,65 +1357,32 @@ onUnmounted(() => {
   );
 }
 
-/* ——— 玻璃珠 thumb ——— */
-.settings-toggle-thumb {
+/* ——— 玻璃珠 thumb(GlassKnob 组件) ——— */
+/* GlassKnob 根元素 .glass-knob 在 toggle 内绝对定位 */
+.settings-toggle :deep(.glass-knob) {
   position: absolute;
   top: 3px;
   left: 3px;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-
-  /* 玻璃珠基底:白色半透明 */
-  background: rgba(255, 255, 255, 0.92);
-
-  /* 径向高光:珠面顶部亮斑,模拟折射 */
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 70%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(230, 240, 255, 0.96) 0%,
-      rgba(200, 220, 255, 0.88) 100%
-    );
-
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.28),      /* 外投影 */
-    0 2px 6px rgba(0, 0, 0, 0.18),      /* 扩散阴影 */
-    inset 0 -1px 2px rgba(0, 0, 0, 0.12), /* 底部内阴影,增加厚度感 */
-    inset 0 1px 1px rgba(255, 255, 255, 0.6); /* 顶部内高光 */
-
-  /* 欠阻尼弹簧曲线 — cubic-bezier(0.34, 1.56, 0.64, 1) 对应 Kyant spring(0.6, 250) */
+  /* 欠阻尼弹簧曲线 — cubic-bezier(0.34, 1.56, 0.64, 1) 对应 Kyant spring(0.6,250) */
   transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
 }
 
-/* on 态 thumb 右移 + 轻微高光变化 */
-.settings-toggle--on .settings-toggle-thumb {
+/* on 态 thumb 右移 */
+.settings-toggle--on :deep(.glass-knob) {
   transform: translateX(20px);
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 70%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.92) 100%
-    );
 }
 
-/* 按压态:整体轻微压扁(模拟 Kyant 的 scaleY 按压) */
-.settings-toggle:active .settings-toggle-thumb {
+/* 按压态:整体轻微压扁 */
+.settings-toggle:active :deep(.glass-knob) {
   transform: scaleX(1.12) scaleY(0.92);
   transition: transform 0.12s cubic-bezier(0.4, 0, 0.6, 1);
 }
 
-.settings-toggle--on:active .settings-toggle-thumb {
+.settings-toggle--on:active :deep(.glass-knob) {
   transform: translateX(20px) scaleX(1.12) scaleY(0.92);
 }
 
@@ -1433,144 +1392,7 @@ onUnmounted(() => {
   outline-offset: 2px;
 }
 
-/* ============================================
-   液态玻璃滑块 — 玻璃轨道 + 玻璃珠 thumb
-   完全自定义,覆盖 accent-color 默认样式
-   ============================================ */
-.settings-slider {
-  /* 重置为自定义样式 */
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 20px;         /* 可点击高度区域 */
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  margin: 0;
-}
-
-.settings-slider:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ——— 轨道(track) ——— */
-.settings-slider::-webkit-slider-runnable-track {
-  height: 5px;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      to right,
-      rgba(96, 165, 250, 0.5) 0%,   /* 已填充段:蓝色玻璃 */
-      rgba(96, 165, 250, 0.5) var(--slider-progress, 50%),
-      rgba(255, 255, 255, 0.1) var(--slider-progress, 50%),  /* 未填充段:暗玻璃槽 */
-      rgba(255, 255, 255, 0.1) 100%
-    );
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.settings-slider::-moz-range-track {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Firefox 已填充段 */
-.settings-slider::-moz-range-progress {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(96, 165, 250, 0.5);
-}
-
-/* ——— thumb(拖拽珠) ——— */
-.settings-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  margin-top: -6px;   /* 垂直居中对齐 track */
-
-  /* 玻璃珠:径向高光 + 外投影 */
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.90) 100%
-    );
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-  border: none;
-
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  will-change: transform;
-  cursor: grab;
-}
-
-.settings-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: none;
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.90) 100%
-    );
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-  cursor: grab;
-}
-
-/* 拖拽/按压时玻璃珠放大 + 光标变 grabbing */
-.settings-slider:active::-webkit-slider-thumb {
-  transform: scale(1.2);
-  cursor: grabbing;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(96, 165, 250, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-}
-
-.settings-slider:active::-moz-range-thumb {
-  transform: scale(1.2);
-  cursor: grabbing;
-}
-
-/* disabled 态保持样式但降透明 */
-.settings-slider:disabled::-webkit-slider-thumb {
-  cursor: not-allowed;
-}
-
-.settings-slider:disabled::-moz-range-thumb {
-  cursor: not-allowed;
-}
-
-/* focus 可访问性 */
-.settings-slider:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid rgba(147, 197, 253, 0.7);
-  outline-offset: 2px;
-}
+/* settings-slider 样式已移至 GlassSlider.vue scoped */
 
 .settings-drop-enter-active,
 .settings-drop-leave-active {
@@ -2007,64 +1829,5 @@ onUnmounted(() => {
     inset 0 1px 1px rgba(255, 255, 255, 0.9);
 }
 
-/* 亮色轨道 */
-[data-theme='light'] .settings-slider::-webkit-slider-runnable-track {
-  background:
-    linear-gradient(
-      to right,
-      rgba(50, 100, 220, 0.55) 0%,
-      rgba(50, 100, 220, 0.55) var(--slider-progress, 50%),
-      rgba(0, 0, 0, 0.1) var(--slider-progress, 50%),
-      rgba(0, 0, 0, 0.1) 100%
-    );
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-progress {
-  background: rgba(50, 100, 220, 0.55);
-}
-
-/* 亮色 thumb */
-[data-theme='light'] .settings-slider::-webkit-slider-thumb {
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(240, 248, 255, 0.99) 0%,
-      rgba(200, 225, 255, 0.94) 100%
-    );
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.08),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-thumb {
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(240, 248, 255, 0.99) 0%,
-      rgba(200, 225, 255, 0.94) 100%
-    );
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
-}
+/* settings-slider 亮色样式已移至 GlassSlider.vue scoped */
 </style>
