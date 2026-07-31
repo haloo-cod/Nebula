@@ -58,7 +58,9 @@ function formatSize(size: number): string {
 
 function formatDateTime(value: string | null): string {
   if (!value) return '--'
-  const date = new Date(value)
+  // 后端时间均为 UTC，若字符串不带时区信息则补 Z
+  const normalized = /[+\-]\d{2}:\d{2}$/.test(value) || value.endsWith('Z') ? value : value + 'Z'
+  const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return value.replace('T', ' ').slice(0, 19)
   return date.toLocaleString()
 }

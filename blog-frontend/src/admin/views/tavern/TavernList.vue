@@ -59,6 +59,13 @@ async function saveBg() {
   }
 }
 
+/** 格式化后端 UTC 时间为本地时间 */
+function formatDateTime(value: string): string {
+  const normalized = /[+\-]\d{2}:\d{2}$/.test(value) || value.endsWith('Z') ? value : value + 'Z'
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? value.replace('T', ' ').slice(0, 19) : date.toLocaleString()
+}
+
 /** 切换帖子可见性 */
 async function toggleVisibility(post: TavernPost) {
   try {
@@ -130,7 +137,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column prop="created_at" label="发布时间" width="170">
           <template #default="{ row }: { row: any }">
-            {{ row.created_at?.replace('T', ' ').slice(0, 16) }}
+            {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
