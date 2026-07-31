@@ -15,6 +15,12 @@
 // 常量
 // ============================================================================
 
+import {
+  buildStaticUniformKey,
+  countActiveTrailPoints,
+  shouldBlurBackground,
+} from './rendererMetrics'
+
 const MAX_TRAIL_POINTS = 12
 
 // ============================================================================
@@ -44,6 +50,23 @@ export interface GlassUniforms {
   trailStrength: number
 }
 
+/** 开发期渲染指标快照。 */
+export interface RendererMetrics {
+  frameCount: number
+  renderedInstances: number
+  drawCalls: number
+  copyCalls: number
+  textureUploads: number
+  canvasResizes: number
+  lastFrameDuration: number
+  /** 本帧 WebGL 绘制(uniform 上传 + drawArrays)耗时 ms */
+  lastDrawDuration: number
+  /** 本帧 2D drawImage 拷贝耗时 ms */
+  lastCopyDuration: number
+  /** 实测渲染循环 FPS(渲染器自身,含跳帧节流) */
+  renderFps: number
+}
+
 /** 注册实例所需的信息 */
 export interface GlassInstance {
   /** 实例唯一 ID */
@@ -62,6 +85,8 @@ export interface GlassInstance {
   onFirstRender: (() => void) | null
   /** 是否已执行过首次渲染回调 */
   hasRenderedOnce: boolean
+  /** 当前实例静态 uniform 的缓存键。 */
+  staticUniformKey: string
 }
 
 // ============================================================================
@@ -156,6 +181,22 @@ let renderScale = 1.0
 
 // 帧率节流：无 trail 活跃时降为 30fps（每 2 帧渲染 1 次）
 let frameCount = 0
+const metrics: RendererMetrics = {
+  frameCount: 0,
+  renderedInstances: 0,
+  drawCalls: 0,
+  copyCalls: 0,
+  textureUploads: 0,
+  canvasResizes: 0,
+  lastFrameDuration: 0,
+  lastDrawDuration: 0,
+  lastCopyDuration: 0,
+  renderFps: 0,
+}
+
+// 渲染循环 FPS 统计(渲染器实际执行帧数,受跳帧节流影响)
+let renderFpsFrames = 0
+let renderFpsWindowStart = 0
 
 // 滚动感知：滚动期间保持 60fps，停止后 200ms 缓冲再退回 30fps
 let lastScrollTime = 0
@@ -265,6 +306,7 @@ const fsSource = `
     }
 
     float getTrailDent(vec2 p_pixel_space) {
+        if (u_trailStrength <= 0.0) return 0.0;
         float dent = 0.0;
         for (int i = 0; i < ${MAX_TRAIL_POINTS}; i++) {
             vec4 point = u_trailPoints[i];
@@ -335,20 +377,24 @@ const fsSource = `
         vec2 refractedTexCoord = v_screenTexCoord + offset;
         refractedTexCoord = clamp(refractedTexCoord, 0.001, 0.999);
 
-        vec4 blurredColor = vec4(0.0);
-        vec2 texelSize = 1.0 / u_resolution;
-        float blurPixelRadius = u_blurRadius;
-
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0, -1.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0, -1.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0, -1.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  0.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  0.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  0.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  1.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  1.0) * blurPixelRadius * texelSize);
-        blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  1.0) * blurPixelRadius * texelSize);
-        blurredColor /= 9.0;
+        vec4 blurredColor;
+        if (u_blurRadius <= 0.0) {
+            blurredColor = texture2D(u_backgroundTexture, refractedTexCoord);
+        } else {
+            vec2 texelSize = 1.0 / u_resolution;
+            float blurPixelRadius = u_blurRadius;
+            blurredColor = vec4(0.0);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor /= 9.0;
+        }
 
         float height_val = getCombinedHeight(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
         vec4 finalColor = mix(blurredColor, u_overlayColor, height_val * 0.15);
@@ -408,6 +454,9 @@ function initGL(): boolean {
     console.warn('[LiquidGlassRenderer] WebGL 不可用')
     return false
   }
+
+  // 新 WebGL context 中 uniform 状态为空,所有实例需要重新上传静态参数。
+  for (const inst of instances.values()) inst.staticUniformKey = ''
 
   // 编译 shader
   const vs = createShader(gl, gl.VERTEX_SHADER, vsSource)
@@ -525,39 +574,87 @@ function handleContextRestored() {
 // 纹理管理
 // ============================================================================
 
-/** 图片缓存（避免重复加载） */
-const imageCache = new Map<string, Promise<HTMLImageElement>>()
+/** 可上传到 WebGL texImage2D 的图片源类型 */
+type ImageSource = HTMLImageElement | ImageBitmap
 
-/** 加载并缓存图片 */
-export function loadImage(url: string): Promise<HTMLImageElement> {
+/** 图片缓存（避免重复加载） */
+const imageCache = new Map<string, Promise<ImageSource>>()
+
+/**
+ * Image() 回退路径：onload → img.decode() 延迟解码,避免同步光栅化阻塞主线程。
+ * url 应已带 _cors=1 后缀。
+ */
+function loadImageFallback(corsUrl: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      // decode() 把解码推到空闲期,减少主线程阻塞
+      void image
+        .decode()
+        .then(() => resolve(image))
+        .catch(() => resolve(image)) // decode 失败也继续,不卡住渲染
+    }
+    image.onerror = () => reject(new Error(`Failed to load image: ${corsUrl}`))
+    image.src = corsUrl
+  })
+}
+
+/**
+ * 加载并缓存图片。
+ *
+ * 优先用 createImageBitmap(fetch blob):解码在浏览器内部线程完成,不阻塞主线程。
+ * 不支持 createImageBitmap 或 fetch 失败时回退到 Image + decode()。
+ *
+ * 加 _cors=1 query 参数使 URL 与 CSS background-image 缓存 key 不同,
+ * 避免浏览器用无 CORS 头的缓存响应导致 crossOrigin 请求失败。
+ */
+export function loadImage(url: string): Promise<ImageSource> {
   const cached = imageCache.get(url)
   if (cached) return cached
 
-  const loader = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image()
-    image.crossOrigin = 'anonymous'
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error(`Failed to load image: ${url}`))
-    // 加 query 参数使 URL 与 CSS background-image 的缓存 key 不同
-    // 避免浏览器用无 CORS 头的缓存响应导致 crossOrigin 请求失败（CORS 缓存污染问题）
-    image.src = url + (url.includes('?') ? '&' : '?') + '_cors=1'
-  })
+  const corsUrl = url + (url.includes('?') ? '&' : '?') + '_cors=1'
+
+  let loader: Promise<ImageSource>
+
+  if (typeof createImageBitmap !== 'undefined') {
+    // createImageBitmap 路径：fetch → blob → 后台线程解码
+    // 指定 imageOrientation:'flipY' 让 bitmap 上下翻转,
+    // 这样 uploadTexture 时对 ImageBitmap 不设 UNPACK_FLIP_Y 就能得到正确的 WebGL 纹理朝向。
+    loader = fetch(corsUrl, { mode: 'cors' })
+      .then((res) => res.blob())
+      .then((blob) => createImageBitmap(blob, { imageOrientation: 'flipY' }))
+      .catch(() => loadImageFallback(corsUrl)) // 任意环节失败则回退
+  } else {
+    loader = loadImageFallback(corsUrl)
+  }
 
   imageCache.set(url, loader)
   return loader
 }
 
-/** 上传纹理到 GPU（如果已缓存则直接返回） */
-export function uploadTexture(url: string, image: HTMLImageElement): boolean {
+/**
+ * 上传纹理到 GPU（如果已缓存则直接返回）。
+ * 接受 HTMLImageElement 和 ImageBitmap 两种图片源。
+ */
+export function uploadTexture(url: string, image: ImageSource): boolean {
   if (!gl || contextLost) return false
   if (textureMap.has(url)) return true
 
   const texture = gl.createTexture()
   if (!texture) return false
 
+  // 取图片实际尺寸（两种类型的属性名不同）
+  const srcW = 'naturalWidth' in image ? image.naturalWidth : image.width
+  const srcH = 'naturalHeight' in image ? image.naturalHeight : image.height
+
   gl.bindTexture(gl.TEXTURE_2D, texture)
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+  // HTMLImageElement 需要 FLIP_Y 翻转(原点左上→左下);
+  // ImageBitmap 已在 createImageBitmap 时指定 imageOrientation:'flipY' 处理,
+  // 这里统一设 true 即可(如果 ImageBitmap 未翻转,则在创建时已处理)。
+  const isImageBitmap = typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, isImageBitmap ? false : true)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image as TexImageSource)
 
   // Non-power-of-2 纹理参数
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -565,7 +662,8 @@ export function uploadTexture(url: string, image: HTMLImageElement): boolean {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
-  textureMap.set(url, { texture, aspect: image.naturalWidth / (image.naturalHeight || 1) })
+  textureMap.set(url, { texture, aspect: srcW / (srcH || 1) })
+  metrics.textureUploads++
 
   // 通知纹理就绪
   for (const cb of textureReadyCallbacks) cb()
@@ -634,8 +732,40 @@ export function registerInstance(
     ready: false,
     onFirstRender,
     hasRenderedOnce: false,
+    staticUniformKey: '',
   })
   return id
+}
+
+/** 获取开发期指标副本,生产环境也可安全调用。 */
+export function getRendererMetrics(): RendererMetrics {
+  return { ...metrics }
+}
+
+/** 实例统计快照（性能面板用） */
+export interface InstanceStats {
+  /** 已注册实例总数 */
+  total: number
+  /** 就绪(可渲染)实例数 */
+  ready: number
+  /** 当前渲染缩放比 */
+  renderScale: number
+  /** 已缓存纹理数 */
+  textures: number
+}
+
+/** 获取实例统计快照,性能面板轮询用。 */
+export function getInstanceStats(): InstanceStats {
+  let ready = 0
+  for (const inst of instances.values()) {
+    if (inst.ready) ready++
+  }
+  return {
+    total: instances.size,
+    ready,
+    renderScale,
+    textures: textureMap.size,
+  }
 }
 
 /** 注销实例 */
@@ -721,18 +851,28 @@ function renderInstance(inst: GlassInstance): boolean {
   const w = Math.ceil(gw)
   const h = Math.ceil(gh)
 
-  // 每个实例渲染前把 offscreen 调整为该实例尺寸,
-  // 确保 WebGL 渲染填满整个 offscreen,drawImage 直接拷贝整个 offscreen 即可
-  if (offscreenWidth !== w || offscreenHeight !== h) {
-    offscreenCanvas!.width = w
-    offscreenCanvas!.height = h
-    offscreenWidth = w
-    offscreenHeight = h
+  // offscreen 尺寸"只增不减":避免每帧在不同尺寸实例间反复 resize,
+  // 消除 GPU 显存重分配 stall(移动端主要开销)。
+  // 渲染通过 viewport + scissor 限制到左下角 w×h 子区域。
+  const needResize = w > offscreenWidth || h > offscreenHeight
+  if (needResize) {
+    const newW = Math.max(w, offscreenWidth)
+    const newH = Math.max(h, offscreenHeight)
+    offscreenCanvas!.width = newW
+    offscreenCanvas!.height = newH
+    offscreenWidth = newW
+    offscreenHeight = newH
+    metrics.canvasResizes++
   }
 
+  // viewport 放在左下角 w×h 区域
   gl.viewport(0, 0, w, h)
+  // scissor 限制 clear 只清除 viewport 区域,不影响 offscreen 其余部分
+  gl.enable(gl.SCISSOR_TEST)
+  gl.scissor(0, 0, w, h)
   gl.clearColor(0, 0, 0, 0)
   gl.clear(gl.COLOR_BUFFER_BIT)
+  gl.disable(gl.SCISSOR_TEST)
 
   gl.useProgram(program)
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
@@ -744,26 +884,46 @@ function renderInstance(inst: GlassInstance): boolean {
   gl.uniform2fv(locs.mousePos!, uniforms.mousePos)
   gl.uniform2fv(locs.glassSize!, uniforms.glassSize)
   gl.uniform2fv(locs.canvasOffset!, uniforms.canvasOffset)
-  gl.uniform1f(locs.texAspect!, uniforms.texAspect)
-  gl.uniform1f(locs.cornerRadius!, uniforms.cornerRadius)
-  gl.uniform1f(locs.ior!, uniforms.ior)
-  gl.uniform1f(locs.glassThickness!, uniforms.glassThickness)
-  gl.uniform1f(locs.normalStrength!, uniforms.normalStrength)
-  gl.uniform1f(locs.displacementScale!, uniforms.displacementScale)
-  gl.uniform1f(locs.heightTransitionWidth!, uniforms.heightTransitionWidth)
-  gl.uniform1f(locs.sminSmoothing!, uniforms.sminSmoothing)
-  gl.uniform1i(locs.showNormals!, uniforms.showNormals)
-  gl.uniform1f(locs.blurRadius!, uniforms.blurRadius)
-  gl.uniform4fv(locs.overlayColor!, uniforms.overlayColor)
-  gl.uniform1f(locs.highlightWidth!, uniforms.highlightWidth)
+  const staticKey = buildStaticUniformKey([
+    uniforms.texAspect,
+    uniforms.cornerRadius,
+    uniforms.ior,
+    uniforms.glassThickness,
+    uniforms.normalStrength,
+    uniforms.displacementScale,
+    uniforms.heightTransitionWidth,
+    uniforms.sminSmoothing,
+    uniforms.showNormals,
+    shouldBlurBackground(uniforms.blurRadius),
+    uniforms.blurRadius,
+    uniforms.overlayColor,
+    uniforms.highlightWidth,
+  ])
+  if (inst.staticUniformKey !== staticKey) {
+    gl.uniform1f(locs.texAspect!, uniforms.texAspect)
+    gl.uniform1f(locs.cornerRadius!, uniforms.cornerRadius)
+    gl.uniform1f(locs.ior!, uniforms.ior)
+    gl.uniform1f(locs.glassThickness!, uniforms.glassThickness)
+    gl.uniform1f(locs.normalStrength!, uniforms.normalStrength)
+    gl.uniform1f(locs.displacementScale!, uniforms.displacementScale)
+    gl.uniform1f(locs.heightTransitionWidth!, uniforms.heightTransitionWidth)
+    gl.uniform1f(locs.sminSmoothing!, uniforms.sminSmoothing)
+    gl.uniform1i(locs.showNormals!, uniforms.showNormals)
+    gl.uniform1f(locs.blurRadius!, uniforms.blurRadius)
+    gl.uniform4fv(locs.overlayColor!, uniforms.overlayColor)
+    gl.uniform1f(locs.highlightWidth!, uniforms.highlightWidth)
+    inst.staticUniformKey = staticKey
+  }
   gl.uniform1f(locs.trailRadius!, uniforms.trailRadius)
   gl.uniform1f(locs.trailStrength!, uniforms.trailStrength)
   gl.uniform1i(locs.backgroundTexture!, 0)
 
-  // Trail points
-  for (let i = 0; i < MAX_TRAIL_POINTS; i++) {
-    const loc = locs.trailPoints[i]
-    if (loc) gl.uniform4fv(loc, uniforms.trailPoints[i])
+  // 涟漪关闭时跳过 12 个 trail uniform 的上传。
+  if (uniforms.trailStrength > 0) {
+    for (let i = 0; i < MAX_TRAIL_POINTS; i++) {
+      const loc = locs.trailPoints[i]
+      if (loc) gl.uniform4fv(loc, uniforms.trailPoints[i])
+    }
   }
 
   // 绑定纹理
@@ -774,6 +934,7 @@ function renderInstance(inst: GlassInstance): boolean {
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
   gl.drawArrays(gl.TRIANGLES, 0, 6)
+  metrics.drawCalls++
   gl.disable(gl.BLEND)
 
   return true
@@ -783,10 +944,7 @@ function renderInstance(inst: GlassInstance): boolean {
 function hasActiveTrails(): boolean {
   for (const inst of instances.values()) {
     if (!inst.ready) continue
-    // trailPoints 中 age < 1 的表示仍在动画中
-    for (const tp of inst.uniforms.trailPoints) {
-      if (tp[3] > 0 && tp[2] < 1) return true
-    }
+    if (countActiveTrailPoints(inst.uniforms.trailPoints) > 0) return true
   }
   return false
 }
@@ -797,7 +955,9 @@ function renderLoop() {
 
   if (contextLost || !gl || !program) return
 
+  const frameStart = performance.now()
   frameCount++
+  metrics.frameCount = frameCount
 
   // 帧率节流：无 trail/无滚动时降为 30fps（跳帧）,减轻集显负载
   // 首次渲染回调未完成的实例不受节流影响（确保淡入不延迟）
@@ -811,25 +971,70 @@ function renderLoop() {
   const needsFullFps = hasTrail || hasPendingFirstRender || scrollActive
   if (!needsFullFps && frameCount % 2 !== 0) return
 
+  let renderedInstances = 0
+  let drawDuration = 0
+  let copyDuration = 0
+
+  // 视口剔除边距(px):实例 bbox 完全在视口外超过此边距才跳过,
+  // 避免刚滚入视口时出现空白闪烁。
+  const CULL_MARGIN = 100
+  const vpW = window.innerWidth * (window.devicePixelRatio || 1) * renderScale
+  const vpH = window.innerHeight * (window.devicePixelRatio || 1) * renderScale
+
   for (const inst of instances.values()) {
     if (!inst.ready) continue
 
-    // 渲染到 offscreen
+    // 视口剔除:如果实例 bbox 完全在屏幕外(含边距),跳过渲染
+    const [ox, oy] = inst.uniforms.canvasOffset
+    const [gw, gh] = inst.uniforms.glassSize
+    if (
+      ox + gw < -CULL_MARGIN ||
+      oy + gh < -CULL_MARGIN ||
+      ox > vpW + CULL_MARGIN ||
+      oy > vpH + CULL_MARGIN
+    ) {
+      continue
+    }
+
+    // 渲染到 offscreen(WebGL 绘制耗时)
+    const drawStart = performance.now()
     const success = renderInstance(inst)
     if (!success) continue
+    drawDuration += performance.now() - drawStart
+    renderedInstances++
 
-    // 拷贝到实例的 2D canvas
-    // canvas.width/height 已经是像素尺寸（乘过 dpr * renderScale）,2D context 操作使用像素坐标
+    // 拷贝到实例的 2D canvas(drawImage 耗时)
+    // WebGL viewport(0,0,w,h) 渲染在 offscreen 左下角;
+    // 2D canvas drawImage 坐标系原点在左上角,所以源 Y 起点 = offscreenHeight - h。
     const { canvas, ctx2d } = inst
+    const [instW, instH] = inst.uniforms.glassSize
+    const srcW = Math.ceil(instW)
+    const srcH = Math.ceil(instH)
+    const srcY = offscreenHeight - srcH
 
+    const copyStart = performance.now()
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)
-    ctx2d.drawImage(offscreenCanvas!, 0, 0, canvas.width, canvas.height)
+    ctx2d.drawImage(offscreenCanvas!, 0, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height)
+    copyDuration += performance.now() - copyStart
+    metrics.copyCalls++
 
     // 首次渲染回调
     if (!inst.hasRenderedOnce && inst.onFirstRender) {
       inst.hasRenderedOnce = true
       inst.onFirstRender()
     }
+  }
+  metrics.renderedInstances = renderedInstances
+  metrics.lastDrawDuration = drawDuration
+  metrics.lastCopyDuration = copyDuration
+  metrics.lastFrameDuration = performance.now() - frameStart
+
+  // 渲染循环实测 FPS(每 500ms 汇总一次实际执行的帧数)
+  renderFpsFrames++
+  if (frameStart - renderFpsWindowStart >= 500) {
+    metrics.renderFps = Math.round((renderFpsFrames * 1000) / (frameStart - renderFpsWindowStart))
+    renderFpsFrames = 0
+    renderFpsWindowStart = frameStart
   }
 }
 

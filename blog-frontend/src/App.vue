@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
@@ -7,6 +7,7 @@ import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { preloadTexture } from '@/components/liquid-glass/liquidGlassRenderer'
 
 const ui = useUIStore()
 const auth = useAuthStore()
@@ -23,14 +24,31 @@ onMounted(() => {
     setTimeout(() => splash.remove(), 400)
   }
 
-  // 从后端加载背景图列表（替换静态 fallback）
-  ui.loadBackgrounds()
+  // 启动即预热当前背景纹理(静态 fallback URL),让下载+GPU 上传在玻璃出现之前完成,
+  // 避免首个 LiquidGlass 挂载时在主线程同步上传大图造成首帧卡顿。
+  if (ui.currentBgUrl) {
+    void preloadTexture(ui.currentBgUrl)
+  }
+
+  // 从后端加载背景图列表（替换静态 fallback），加载完成后预热新 URL
+  ui.loadBackgrounds().then(() => {
+    if (ui.currentBgUrl) void preloadTexture(ui.currentBgUrl)
+  })
+
   if (auth.token || route.meta.requiresAuth || route.path === '/auth/callback') {
     void auth.init()
   } else {
     auth.initialized = true
   }
 })
+
+// 主题切换或背景图手动切换时预热新纹理,下次玻璃刷新时直接命中缓存
+watch(
+  () => ui.currentBgUrl,
+  (url) => {
+    if (url) void preloadTexture(url)
+  },
+)
 </script>
 
 <template>
