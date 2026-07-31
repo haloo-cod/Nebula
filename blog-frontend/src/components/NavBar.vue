@@ -1300,276 +1300,51 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
-/* ============================================
-   液态玻璃开关 — track + 玻璃珠 thumb
-   参数参考 Kyant LiquidToggle.kt:
-     track: 64×28dp Capsule → 此处按比例缩放为 44×24px
-     knob:  40×24dp → 此处 22×18px 保持 ~同比例
-     弹簧:  spring(0.6, 250) 欠阻尼 → cubic-bezier(0.34, 1.56, 0.64, 1)
-   ============================================ */
 .settings-toggle {
   position: relative;
-  width: 44px;
+  width: 42px;
   height: 24px;
   flex-shrink: 0;
   padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
-
-  /* track 背景:玻璃凹槽感 — 顶部内阴影模拟凹陷 */
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.22),   /* 凹槽内阴影 */
-    inset 0 1px 0 rgba(255, 255, 255, 0.0); /* 无顶部高光(off态) */
-
   transition:
-    background 0.22s ease,
-    border-color 0.22s ease,
-    box-shadow 0.22s ease;
+    background 0.18s ease,
+    border-color 0.18s ease;
 }
 
-/* track 顶部细高光线(off 态隐约可见) */
-.settings-toggle::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.08) 0%,
-    transparent 40%
-  );
-  pointer-events: none;
-}
-
-/* on 态:track 渐变到蓝色/绿色 accent,顶部高光增强 */
 .settings-toggle--on {
-  background: linear-gradient(
-    135deg,
-    rgba(80, 160, 255, 0.45) 0%,
-    rgba(60, 140, 245, 0.35) 100%
-  );
-  border-color: rgba(147, 197, 253, 0.5);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.15),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-    0 0 8px rgba(96, 165, 250, 0.2);
+  background: rgba(96, 165, 250, 0.3);
+  border-color: rgba(147, 197, 253, 0.45);
 }
 
-.settings-toggle--on::before {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.18) 0%,
-    transparent 50%
-  );
-}
-
-/* ——— 玻璃珠 thumb ——— */
 .settings-toggle-thumb {
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 2px;
+  left: 2px;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-
-  /* 玻璃珠基底:白色半透明 */
-  background: rgba(255, 255, 255, 0.92);
-
-  /* 径向高光:珠面顶部亮斑,模拟折射 */
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 70%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(230, 240, 255, 0.96) 0%,
-      rgba(200, 220, 255, 0.88) 100%
-    );
-
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.28),      /* 外投影 */
-    0 2px 6px rgba(0, 0, 0, 0.18),      /* 扩散阴影 */
-    inset 0 -1px 2px rgba(0, 0, 0, 0.12), /* 底部内阴影,增加厚度感 */
-    inset 0 1px 1px rgba(255, 255, 255, 0.6); /* 顶部内高光 */
-
-  /* 欠阻尼弹簧曲线 — cubic-bezier(0.34, 1.56, 0.64, 1) 对应 Kyant spring(0.6, 250) */
-  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-  will-change: transform;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  transition: transform 0.18s ease;
 }
 
-/* on 态 thumb 右移 + 轻微高光变化 */
 .settings-toggle--on .settings-toggle-thumb {
-  transform: translateX(20px);
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 70%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.92) 100%
-    );
+  transform: translateX(18px);
 }
 
-/* 按压态:整体轻微压扁(模拟 Kyant 的 scaleY 按压) */
-.settings-toggle:active .settings-toggle-thumb {
-  transform: scaleX(1.12) scaleY(0.92);
-  transition: transform 0.12s cubic-bezier(0.4, 0, 0.6, 1);
-}
-
-.settings-toggle--on:active .settings-toggle-thumb {
-  transform: translateX(20px) scaleX(1.12) scaleY(0.92);
-}
-
-/* focus 可访问性 */
-.settings-toggle:focus-visible {
-  outline: 2px solid rgba(147, 197, 253, 0.7);
-  outline-offset: 2px;
-}
-
-/* ============================================
-   液态玻璃滑块 — 玻璃轨道 + 玻璃珠 thumb
-   完全自定义,覆盖 accent-color 默认样式
-   ============================================ */
 .settings-slider {
-  /* 重置为自定义样式 */
-  -webkit-appearance: none;
-  appearance: none;
   width: 100%;
-  height: 20px;         /* 可点击高度区域 */
-  background: transparent;
+  accent-color: #93c5fd;
   cursor: pointer;
-  padding: 0;
-  margin: 0;
 }
 
 .settings-slider:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
-}
-
-/* ——— 轨道(track) ——— */
-.settings-slider::-webkit-slider-runnable-track {
-  height: 5px;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      to right,
-      rgba(96, 165, 250, 0.5) 0%,   /* 已填充段:蓝色玻璃 */
-      rgba(96, 165, 250, 0.5) var(--slider-progress, 50%),
-      rgba(255, 255, 255, 0.1) var(--slider-progress, 50%),  /* 未填充段:暗玻璃槽 */
-      rgba(255, 255, 255, 0.1) 100%
-    );
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.settings-slider::-moz-range-track {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Firefox 已填充段 */
-.settings-slider::-moz-range-progress {
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(96, 165, 250, 0.5);
-}
-
-/* ——— thumb(拖拽珠) ——— */
-.settings-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  margin-top: -6px;   /* 垂直居中对齐 track */
-
-  /* 玻璃珠:径向高光 + 外投影 */
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.90) 100%
-    );
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-  border: none;
-
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  will-change: transform;
-  cursor: grab;
-}
-
-.settings-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: none;
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(220, 235, 255, 0.98) 0%,
-      rgba(180, 210, 255, 0.90) 100%
-    );
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-  cursor: grab;
-}
-
-/* 拖拽/按压时玻璃珠放大 + 光标变 grabbing */
-.settings-slider:active::-webkit-slider-thumb {
-  transform: scale(1.2);
-  cursor: grabbing;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(96, 165, 250, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.65);
-}
-
-.settings-slider:active::-moz-range-thumb {
-  transform: scale(1.2);
-  cursor: grabbing;
-}
-
-/* disabled 态保持样式但降透明 */
-.settings-slider:disabled::-webkit-slider-thumb {
-  cursor: not-allowed;
-}
-
-.settings-slider:disabled::-moz-range-thumb {
-  cursor: not-allowed;
-}
-
-/* focus 可访问性 */
-.settings-slider:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid rgba(147, 197, 253, 0.7);
-  outline-offset: 2px;
 }
 
 .settings-drop-enter-active,
@@ -1947,124 +1722,22 @@ onUnmounted(() => {
   border-top-color: rgba(0, 0, 0, 0.08);
 }
 
-/* ============================================
-   亮色主题覆盖 — 液态玻璃开关/滑块
-   亮色背景下降低白色高光对比,改用深色内阴影
-   ============================================ */
 [data-theme='light'] .settings-toggle {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-[data-theme='light'] .settings-toggle::before {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.4) 0%,
-    transparent 50%
-  );
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.15);
 }
 
 [data-theme='light'] .settings-toggle--on {
-  background: linear-gradient(
-    135deg,
-    rgba(50, 100, 220, 0.5) 0%,
-    rgba(40, 85, 200, 0.38) 100%
-  );
-  border-color: rgba(50, 100, 220, 0.55);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.1),
-    0 0 8px rgba(50, 100, 220, 0.18);
+  background: rgba(50, 100, 220, 0.4);
+  border-color: rgba(50, 100, 220, 0.5);
 }
 
-[data-theme='light'] .settings-toggle--on::before {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.35) 0%,
-    transparent 50%
-  );
+[data-theme='light'] .settings-slider {
+  background: linear-gradient(to right, rgba(50, 100, 220, 0.4), rgba(0, 0, 0, 0.06));
 }
 
-/* 亮色下 thumb 偏暖白,高光更清晰 */
-[data-theme='light'] .settings-toggle-thumb {
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 70%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(250, 252, 255, 0.99) 0%,
-      rgba(225, 235, 255, 0.94) 100%
-    );
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.18),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.08),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
-}
-
-/* 亮色轨道 */
-[data-theme='light'] .settings-slider::-webkit-slider-runnable-track {
-  background:
-    linear-gradient(
-      to right,
-      rgba(50, 100, 220, 0.55) 0%,
-      rgba(50, 100, 220, 0.55) var(--slider-progress, 50%),
-      rgba(0, 0, 0, 0.1) var(--slider-progress, 50%),
-      rgba(0, 0, 0, 0.1) 100%
-    );
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-progress {
-  background: rgba(50, 100, 220, 0.55);
-}
-
-/* 亮色 thumb */
 [data-theme='light'] .settings-slider::-webkit-slider-thumb {
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(240, 248, 255, 0.99) 0%,
-      rgba(200, 225, 255, 0.94) 100%
-    );
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.08),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
-}
-
-[data-theme='light'] .settings-slider::-moz-range-thumb {
-  background:
-    radial-gradient(
-      ellipse 55% 45% at 38% 30%,
-      rgba(255, 255, 255, 1.0) 0%,
-      rgba(255, 255, 255, 0.0) 68%
-    ),
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(240, 248, 255, 0.99) 0%,
-      rgba(200, 225, 255, 0.94) 100%
-    );
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  background: rgba(50, 100, 220, 0.85);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 </style>
