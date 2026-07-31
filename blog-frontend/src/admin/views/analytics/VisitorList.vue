@@ -42,7 +42,9 @@ function eventLabel(value: string): string {
 }
 
 function formatDateTime(value: string): string {
-  const date = new Date(value)
+  // 后端时间均为 UTC，若字符串不带时区信息则补 Z
+  const normalized = /[+\-]\d{2}:\d{2}$/.test(value) || value.endsWith('Z') ? value : value + 'Z'
+  const date = new Date(normalized)
   return Number.isNaN(date.getTime()) ? value.replace('T', ' ').slice(0, 19) : date.toLocaleString()
 }
 

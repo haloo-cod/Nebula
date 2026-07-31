@@ -19,8 +19,12 @@ export function waitForNextTextureUploadSettled(timeoutMs = 1200): Promise<void>
   // 由于调用方无法传入具体 URL,我们等待两个纹理都就绪（它们通常已经预加载好了）
   return Promise.race([
     Promise.all([
-      darkBgUrl && !hasTexture(darkBgUrl) ? waitForTexture(darkBgUrl, timeoutMs) : Promise.resolve(),
-      lightBgUrl && !hasTexture(lightBgUrl) ? waitForTexture(lightBgUrl, timeoutMs) : Promise.resolve(),
+      darkBgUrl && !hasTexture(darkBgUrl)
+        ? waitForTexture(darkBgUrl, timeoutMs)
+        : Promise.resolve(),
+      lightBgUrl && !hasTexture(lightBgUrl)
+        ? waitForTexture(lightBgUrl, timeoutMs)
+        : Promise.resolve(),
     ]).then(() => {}),
     new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
   ])

@@ -546,7 +546,7 @@ onMounted(() => loadData())
 
 <template>
   <div class="book-list-page">
-      <div class="page-header">
+    <div class="page-header">
       <div class="book-list-filters">
         <el-input
           v-model="keyword"

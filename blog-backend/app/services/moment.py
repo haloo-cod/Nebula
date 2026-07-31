@@ -153,9 +153,27 @@ def add_moment_comment(moment_id: int, nickname: str, content: str) -> dict | No
     return None
 
 
-def get_moment_comments(moment_id: int) -> list[dict]:
-    """获取说说评论"""
+def get_moment_comments(moment_id: int) -> list[dict] | None:
+    """获取说说评论；说说不存在时返回 None。"""
     for m in _read_all():
         if m.get("id") == moment_id:
             return m.get("comments", [])
-    return []
+    return None
+
+
+def delete_moment_comment(moment_id: int, comment_id: int) -> bool | None:
+    """删除指定说说中的评论；说说不存在时返回 None。"""
+    lock = FileLock(str(LOCK_FILE))
+    with lock:
+        data = _read_all()
+        for moment in data:
+            if moment.get("id") != moment_id:
+                continue
+            comments = moment.setdefault("comments", [])
+            for index, comment in enumerate(comments):
+                if comment.get("id") == comment_id:
+                    comments.pop(index)
+                    _write_all(data)
+                    return True
+            return False
+    return None

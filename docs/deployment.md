@@ -30,7 +30,8 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 # 安装依赖
 pip install -r requirements.txt
 
-# 初始化数据库（自动创建表 + 默认管理员）
+# 可选：导入或初始化内容数据
+# 应用首次启动会自动创建数据库表和默认管理员
 python -m scripts.init_posts
 python -m scripts.init_gallery
 python -m scripts.init_books
@@ -82,6 +83,14 @@ DATABASE_URL=sqlite+aiosqlite:///./blog.db
 # 管理员账户
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<至少 12 位的强密码>
+
+# 前台用户与 OAuth
+FRONTEND_URL=http://localhost:5173
+REQUIRE_EMAIL_VERIFICATION=false
+# 启用 GitHub 登录时填写以下配置
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_CALLBACK_URL=http://localhost:8000/api/v1/auth/github/callback
 
 # CORS 允许来源（逗号分隔）
 CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173"]

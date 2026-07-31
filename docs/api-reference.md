@@ -6,25 +6,72 @@
 |------|---|
 | Base URL | `http://localhost:8000` |
 | API 前缀 | `/api/v1` |
-| 认证方式 | Bearer Token（JWT） |
+| 认证方式 | 短期 Bearer Token（JWT）+ HttpOnly Refresh Cookie |
 | 自动文档 | Swagger UI: `/docs`，ReDoc: `/redoc` |
 | 静态文件 | `/uploads/*`（图片/EPUB/资源文件） |
 
 ## 认证
 
-### 登录获取 Token
+### 用户注册、登录与会话
+
+前台账户支持用户名/邮箱密码注册、登录、刷新和退出。刷新令牌不返回到 JavaScript，而是由后端写入限定在 `/api/v1/auth` 路径下的 HttpOnly Cookie。
+
+#### 注册
+
+```
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "starlit",
+  "email": "user@example.com",
+  "password": "<password>"
+}
+
+→ 201 { "access_token": "eyJ...", "token_type": "bearer" }
+```
+
+#### 登录获取 Token
 
 ```
 POST /api/v1/auth/login
 Content-Type: application/json
 
 {
-  "username": "<ADMIN_USERNAME>",
-  "password": "<ADMIN_PASSWORD>"
+  "username": "用户名或邮箱",
+  "password": "<password>"
 }
 
 → 200 { "access_token": "eyJ...", "token_type": "bearer" }
 ```
+
+#### 刷新和退出
+
+```
+POST /api/v1/auth/refresh
+POST /api/v1/auth/logout
+```
+
+浏览器请求需要携带 Cookie。刷新接口会轮换旧会话，退出接口会撤销当前刷新会话并清除 Cookie。
+
+#### 当前用户与邮箱验证
+
+```
+GET  /api/v1/auth/me
+POST /api/v1/auth/email-verification/send
+GET  /api/v1/auth/email-verification/confirm?token=<token>
+```
+
+邮箱验证是否强制由后端配置决定。
+
+#### GitHub OAuth
+
+```
+GET /api/v1/auth/github?redirect=/target
+GET /api/v1/auth/github/callback
+```
+
+GitHub 回调成功后，后端创建或恢复账户并写入 Refresh Cookie，再跳转到前端 `/auth/callback` 页面。
 
 ### 使用 Token
 
@@ -37,7 +84,8 @@ Authorization: Bearer eyJ...
 ### 权限标记说明
 
 - **公开** — 无需认证
-- **管理员** — 需要 Bearer Token + `is_admin = true`
+- **已登录用户** — 需要有效 Bearer Token
+- **管理员** — 需要有效 Bearer Token + `is_admin = true`
 
 ---
 
@@ -379,6 +427,32 @@ Authorization: Bearer eyJ...
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
 | GET | `/about/content` | 公开 | 获取 about.md 内容 |
+
+---
+
+## 用户管理 (`/api/v1/users`)
+
+| 方法 | 路径 | 权限 | 说明 |
+|------|------|------|------|
+| GET | `/users` | 管理员 | 分页搜索用户 |
+| GET | `/users/{id}` | 管理员 | 获取用户详情 |
+| PUT | `/users/{id}` | 管理员 | 修改资料、管理员权限和启用状态 |
+| POST | `/users/{id}/reset-password` | 管理员 | 重置密码并撤销旧会话 |
+| POST | `/users/{id}/revoke-sessions` | 管理员 | 撤销全部刷新会话 |
+| DELETE | `/users/{id}` | 管理员 | 删除用户 |
+
+用户管理接口会防止删除当前账户、取消自己的管理员权限，以及清空最后一个可用管理员。
+
+---
+
+## 统计与内容统计 (`/api/v1/analytics`、`/api/v1/content-stats`)
+
+| 模块 | 用途 |
+|------|------|
+| `/analytics` | 记录和查询公开访问、访客及访问趋势 |
+| `/content-stats` | 为管理后台提供文章、说说、评论、图书等内容统计 |
+
+前端路由在导航完成后自动记录公开页面访问，后台路由和认证页面不计入公开访问统计。
 
 ---
 

@@ -22,11 +22,32 @@
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | `id` | Integer | PK | — |
-| `username` | String(50) | unique | 用户名 |
+| `username` | String(100) | unique, index | 用户名 |
 | `password_hash` | String(200) | — | bcrypt 哈希 |
 | `is_admin` | Boolean | default=False | 是否管理员 |
+| `email` | String(320) | unique, nullable | 邮箱 |
+| `display_name` | String(100) | — | 显示名称 |
+| `avatar_url` | String(500) | — | 头像 URL |
+| `github_id` | String(100) | unique, nullable | GitHub 用户 ID |
+| `email_verified` | Boolean | default=False | 邮箱是否已验证 |
+| `is_active` | Boolean | default=True | 账户是否启用 |
+| `last_login_at` | DateTime | nullable | 最近登录时间 |
 
-管理员账户由 `.env` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 配置；首次启动时创建。请不要在生产环境使用示例密码。
+管理员账户由 `.env` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 配置；应用启动时如果不存在则创建。普通用户可通过注册接口创建。请不要在生产环境使用示例密码。
+
+---
+
+## auth_sessions — 刷新会话
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | Integer | PK | — |
+| `user_id` | Integer | FK→users | 所属用户 |
+| `token_hash` | String(64) | unique, index | 刷新令牌哈希，不保存明文令牌 |
+| `expires_at` | DateTime | — | 到期时间 |
+| `revoked_at` | DateTime | nullable | 撤销时间 |
+
+刷新令牌通过 HttpOnly Cookie 传输；刷新时旧会话会被撤销并创建新的会话。
 
 ---
 
@@ -246,13 +267,27 @@
 
 ---
 
-## site_config — 站点配置（预留）
+## site_config — 站点配置
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | `id` | Integer | PK | — |
 | `key` | String(100) | unique | 配置键 |
 | `value` | Text | default="" | 配置值（JSON 或纯文本） |
+
+当前由管理后台提供配置编辑入口，具体配置项以接口和实现为准。
+
+---
+
+## analytics_events — 访问统计事件
+
+用于记录公开页面访问和相关请求元数据。原始 IP 不作为长期业务数据使用，系统会按配置的保留周期清理统计明细。
+
+---
+
+## rate_limit_hits — 限流记录
+
+用于注册、登录、深夜酒馆留言等操作的频率限制。IP 等信息以哈希形式保存，并在过期后清理。
 
 ---
 

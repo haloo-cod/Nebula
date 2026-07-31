@@ -36,7 +36,10 @@
     <!-- 评论区 -->
     <div class="detail-inner__comments">
       <h4 class="detail-inner__comments-title">评论 ({{ comments.length }})</h4>
-      <div v-if="comments.length === 0" class="detail-inner__comments-empty">暂无评论</div>
+      <div v-if="commentsLoading" class="detail-inner__comments-empty">正在加载评论...</div>
+      <div v-else-if="comments.length === 0" class="detail-inner__comments-empty">
+        {{ commentsError || '暂无评论，来留下第一条吧' }}
+      </div>
       <div v-else class="detail-inner__comments-list">
         <div v-for="c in comments" :key="c.id" class="detail-inner__comment-item">
           <span class="detail-inner__comment-nick">{{ c.nickname }}</span>
@@ -44,39 +47,76 @@
           <p class="detail-inner__comment-text">{{ c.content }}</p>
         </div>
       </div>
-      <div class="detail-inner__comment-input-wrap">
-        <input
-          type="text"
-          placeholder="登录后可评论..."
-          disabled
-          class="detail-inner__comment-input"
-        />
+      <div v-if="!auth.isLoggedIn" class="detail-inner__comment-login">
+        <span>登录后参与评论</span>
+        <RouterLink :to="loginLocation">登录</RouterLink>
+        <RouterLink :to="registerLocation">注册</RouterLink>
       </div>
+      <form v-else class="detail-inner__comment-form" @submit.prevent="submitComment">
+        <div class="detail-inner__comment-author">
+          以 {{ auth.user?.display_name || auth.user?.username || '当前账户' }} 的身份评论
+        </div>
+        <textarea
+          v-model="commentText"
+          class="detail-inner__comment-input detail-inner__comment-textarea"
+          maxlength="500"
+          rows="3"
+          placeholder="写下你的想法..."
+        ></textarea>
+        <div class="detail-inner__comment-form-footer">
+          <span class="detail-inner__comment-hint">已登录账户可发表评论</span>
+          <button
+            class="detail-inner__comment-submit"
+            type="submit"
+            :disabled="submitting || !commentText.trim()"
+          >
+            {{ submitting ? '发送中...' : '发表评论' }}
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import type { Moment, MomentComment } from '@/types'
 import ImageGrid from './ImageGrid.vue'
-import { likeMoment, fetchMomentComments } from '@/api/moments'
+import { likeMoment, fetchMomentComments, postMomentComment } from '@/api/moments'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   moment: Moment
 }>()
 
+const route = useRoute()
+const auth = useAuthStore()
+const loginLocation = computed(() => ({ path: '/login', query: { redirect: route.fullPath } }))
+const registerLocation = computed(() => ({
+  path: '/register',
+  query: { redirect: route.fullPath },
+}))
+
 // ============ 评论列表 ============
 
 const comments = ref<MomentComment[]>([])
+const commentText = ref('')
+const commentsLoading = ref(false)
+const commentsError = ref('')
+const submitting = ref(false)
 
 onMounted(async () => {
   isLiked.value = getLikedIds().has(props.moment.id)
   // 从 API 加载评论
+  commentsLoading.value = true
+  commentsError.value = ''
   try {
     comments.value = await fetchMomentComments(props.moment.id)
   } catch {
-    // 后端不可用时保持空
+    commentsError.value = '评论暂时无法加载'
+  } finally {
+    commentsLoading.value = false
   }
 })
 // ============ 点赞逻辑(与 MomentCard 共享 localStorage key) ============
@@ -120,6 +160,23 @@ function toggleLike() {
     likeMoment(props.moment.id).catch(() => {})
   }
   saveLikedIds(ids)
+}
+
+/** 提交说说评论，成功后插入当前列表顶部。 */
+async function submitComment() {
+  const text = commentText.value.trim()
+  if (!auth.isLoggedIn || !text || submitting.value) return
+
+  submitting.value = true
+  try {
+    const comment = await postMomentComment(props.moment.id, text)
+    comments.value = [comment, ...comments.value]
+    commentText.value = ''
+  } catch (err: unknown) {
+    commentsError.value = err instanceof Error ? err.message : '评论发送失败，请稍后重试'
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ============ 工具函数 ============
@@ -278,8 +335,30 @@ function moodEmoji(mood: string): string {
   padding: 1rem 0;
 }
 
-.detail-inner__comment-input-wrap {
+.detail-inner__comment-form {
   margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-inner__comment-login {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  color: var(--text-faint);
+  font-size: 0.76rem;
+}
+
+.detail-inner__comment-login a {
+  color: rgba(140, 205, 255, 0.82);
+  text-decoration: none;
+}
+
+.detail-inner__comment-author {
+  color: var(--text-faint);
+  font-size: 0.72rem;
 }
 
 .detail-inner__comment-input {
@@ -296,6 +375,52 @@ function moodEmoji(mood: string): string {
 .detail-inner__comment-input:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.detail-inner__comment-input:focus {
+  border-color: rgba(140, 200, 255, 0.38);
+}
+
+.detail-inner__comment-textarea {
+  resize: vertical;
+  min-height: 4.2rem;
+  font-family: inherit;
+}
+
+.detail-inner__comment-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.detail-inner__comment-hint {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+}
+
+.detail-inner__comment-submit {
+  padding: 0.42rem 0.78rem;
+  border: 1px solid rgba(140, 200, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(140, 200, 255, 0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.detail-inner__comment-submit:hover:not(:disabled) {
+  background: rgba(140, 200, 255, 0.18);
+  border-color: rgba(140, 200, 255, 0.38);
+}
+
+.detail-inner__comment-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .detail-inner__comments-list {
@@ -373,5 +498,11 @@ function moodEmoji(mood: string): string {
 [data-theme='light'] .detail-inner .detail-inner__comment-input {
   border-color: rgba(0, 0, 0, 0.12);
   background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='light'] .detail-inner .detail-inner__comment-submit {
+  border-color: rgba(30, 100, 180, 0.2);
+  background: rgba(30, 100, 180, 0.08);
+  color: rgba(30, 70, 110, 0.82);
 }
 </style>

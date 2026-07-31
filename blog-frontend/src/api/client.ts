@@ -5,13 +5,18 @@
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL
 
-/** API 根地址；同域生产部署使用空字符串，让请求交给当前域名。 */
+/**
+ * API 根地址。
+ *
+ * - 开发期(VITE_API_BASE_URL 留空):使用 '' 走同源请求,由 Vite 代理转发到后端。
+ *   手机通过局域网 IP 访问 Vite dev server 时,代理同样在服务端本地转发,
+ *   手机不需要能直连后端端口。
+ * - 生产或直连部署:在 .env 中填写完整的后端地址(如 https://api.example.com)。
+ */
 export const BASE_URL =
-  configuredBaseUrl !== undefined
+  configuredBaseUrl !== undefined && configuredBaseUrl !== ''
     ? configuredBaseUrl.replace(/\/+$/, '')
-    : import.meta.env.DEV
-      ? 'http://localhost:8000'
-      : ''
+    : ''
 const TOKEN_KEY = 'blog_admin_token'
 
 /**

@@ -32,7 +32,6 @@ class MomentCreate(BaseModel):
 
 
 class MomentCommentCreate(BaseModel):
-    nickname: str
     content: str
 
 

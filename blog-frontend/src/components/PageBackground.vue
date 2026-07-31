@@ -1,10 +1,7 @@
 <template>
   <div class="relative min-h-screen w-full">
     <!-- 背景层：fixed 定位，不使用 translateZ/will-change 以免阻断子元素 backdrop-filter 采样 -->
-    <div
-      class="bg-layer"
-      :style="bgLayerStyle"
-    ></div>
+    <div class="bg-layer" :style="bgLayerStyle"></div>
     <!-- 叠加层 -->
     <div class="overlay-layer" :style="{ background: `rgba(0,0,0,${overlay})` }"></div>
     <!-- 内容插槽 -->

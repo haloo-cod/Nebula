@@ -73,9 +73,13 @@ function handleSelectionChange(rows: unknown[]) {
 /** 下载单篇 Markdown。 */
 async function downloadPost(post: PostItem) {
   try {
-    await downloadWithProgress(`${BASE_URL}/api/v1/posts/${encodeURIComponent(post.slug)}/download`, `${post.slug}.md`, {
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-    })
+    await downloadWithProgress(
+      `${BASE_URL}/api/v1/posts/${encodeURIComponent(post.slug)}/download`,
+      `${post.slug}.md`,
+      {
+        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      },
+    )
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '下载失败')
   }
@@ -105,19 +109,27 @@ async function handleImport(event: Event) {
       const body = await previewResponse.json().catch(() => ({ detail: '预览失败' }))
       throw new Error(body.detail || '预览失败')
     }
-    const previews = (await previewResponse.json()) as Array<{ filename: string; title: string; slug: string }>
+    const previews = (await previewResponse.json()) as Array<{
+      filename: string
+      title: string
+      slug: string
+    }>
     await ElMessageBox.confirm(
       previews.map((item) => `${item.filename} -> ${item.title} (${item.slug})`).join('\n'),
       `确认导入 ${previews.length} 篇 Markdown？`,
       { confirmButtonText: '继续', cancelButtonText: '取消', type: 'info' },
     )
-    const conflict = await ElMessageBox.prompt('slug 冲突处理：skip / overwrite / rename', '导入选项', {
-      inputValue: 'skip',
-      inputPattern: /^(skip|overwrite|rename)$/,
-      inputErrorMessage: '请输入 skip、overwrite 或 rename',
-      confirmButtonText: '开始导入',
-      cancelButtonText: '取消',
-    })
+    const conflict = await ElMessageBox.prompt(
+      'slug 冲突处理：skip / overwrite / rename',
+      '导入选项',
+      {
+        inputValue: 'skip',
+        inputPattern: /^(skip|overwrite|rename)$/,
+        inputErrorMessage: '请输入 skip、overwrite 或 rename',
+        confirmButtonText: '开始导入',
+        cancelButtonText: '取消',
+      },
+    )
     const formData = new FormData()
     files.forEach((file) => formData.append('files', file))
     formData.append('conflict', conflict.value)
@@ -134,7 +146,8 @@ async function handleImport(event: Event) {
     ElMessage.success('Markdown 导入完成，文章已保存为草稿')
     await loadData()
   } catch (err: unknown) {
-    if (err !== 'cancel' && err !== 'close') ElMessage.error(err instanceof Error ? err.message : '导入失败')
+    if (err !== 'cancel' && err !== 'close')
+      ElMessage.error(err instanceof Error ? err.message : '导入失败')
   } finally {
     importing.value = false
     input.value = ''
@@ -204,7 +217,14 @@ onMounted(() => loadData())
         @keyup.enter="handleSearch"
       />
       <div class="header-actions">
-        <input ref="fileInputRef" type="file" accept=".md,text/markdown" multiple hidden @change="handleImport" />
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".md,text/markdown"
+          multiple
+          hidden
+          @change="handleImport"
+        />
         <el-button :loading="importing" @click="openImport">
           <el-icon><Upload /></el-icon>导入 Markdown
         </el-button>
@@ -218,11 +238,21 @@ onMounted(() => loadData())
     <el-card shadow="never" class="table-card">
       <div class="table-toolbar">
         <span>已选择 {{ selectedPosts.length }} 篇</span>
-        <el-button :disabled="selectedPosts.length === 0" :loading="downloading" @click="downloadSelectedZip">
+        <el-button
+          :disabled="selectedPosts.length === 0"
+          :loading="downloading"
+          @click="downloadSelectedZip"
+        >
           <el-icon><Download /></el-icon>打包下载
         </el-button>
       </div>
-      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%" @selection-change="handleSelectionChange">
+      <el-table
+        :data="data as any"
+        v-loading="loading"
+        stripe
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
         <el-table-column type="selection" width="48" />
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">

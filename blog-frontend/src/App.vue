@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
+import PerfMonitor from './components/liquid-glass/PerfMonitor.vue'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { preloadTexture } from '@/components/liquid-glass/liquidGlassRenderer'
 
 const ui = useUIStore()
 const auth = useAuthStore()
@@ -14,7 +16,19 @@ const route = useRoute()
 const hideChrome = computed(() => route.meta.hideChrome === true)
 const hideRain = computed(() => route.meta.hideRain === true)
 
+// 临时性能监控面板:默认常驻显示,Ctrl+Shift+P 可切换隐藏
+const showPerf = ref(false)
+
+/** Ctrl+Shift+P 切换性能面板 */
+function handlePerfHotkey(e: KeyboardEvent) {
+  if (e.ctrlKey && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+    e.preventDefault()
+    showPerf.value = !showPerf.value
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', handlePerfHotkey)
   const splash = document.getElementById('splash')
   const app = document.getElementById('app')
   if (app) app.style.opacity = '1'
@@ -23,13 +37,34 @@ onMounted(() => {
     setTimeout(() => splash.remove(), 400)
   }
 
-  // 从后端加载背景图列表（替换静态 fallback）
-  ui.loadBackgrounds()
+  // 启动即预热当前背景纹理(静态 fallback URL),让下载+GPU 上传在玻璃出现之前完成,
+  // 避免首个 LiquidGlass 挂载时在主线程同步上传大图造成首帧卡顿。
+  if (ui.currentBgUrl) {
+    void preloadTexture(ui.currentBgUrl)
+  }
+
+  // 从后端加载背景图列表（替换静态 fallback），加载完成后预热新 URL
+  ui.loadBackgrounds().then(() => {
+    if (ui.currentBgUrl) void preloadTexture(ui.currentBgUrl)
+  })
+
   if (auth.token || route.meta.requiresAuth || route.path === '/auth/callback') {
     void auth.init()
   } else {
     auth.initialized = true
   }
+})
+
+// 主题切换或背景图手动切换时预热新纹理,下次玻璃刷新时直接命中缓存
+watch(
+  () => ui.currentBgUrl,
+  (url) => {
+    if (url) void preloadTexture(url)
+  },
+)
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handlePerfHotkey)
 })
 </script>
 
@@ -45,6 +80,7 @@ onMounted(() => {
       class="theme-overlay"
       :class="{ 'theme-overlay--revealing': ui.themeTransitionRevealStarted }"
     ></div>
+    <PerfMonitor v-if="showPerf" />
   </div>
 </template>
 
@@ -102,7 +138,6 @@ html {
     inset 0 1px 0 var(--glass-highlight),
     var(--glass-shadow);
 }
-
 </style>
 
 <style scoped>

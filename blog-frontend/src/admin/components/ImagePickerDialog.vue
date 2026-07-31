@@ -187,7 +187,9 @@ watch(
 
     <template #footer>
       <el-button @click="close">取消</el-button>
-      <el-button type="primary" @click="confirm">确认选择{{ multiple ? `（${selectedIds.length}）` : '' }}</el-button>
+      <el-button type="primary" @click="confirm"
+        >确认选择{{ multiple ? `（${selectedIds.length}）` : '' }}</el-button
+      >
     </template>
   </el-dialog>
 </template>

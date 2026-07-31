@@ -279,7 +279,10 @@ onBeforeUnmount(() => {
           <el-input v-model="form.title" placeholder="文章标题" />
         </el-form-item>
         <el-form-item label="Slug">
-          <el-input :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'" disabled />
+          <el-input
+            :model-value="isEdit ? form.slug : previewSlug(form.title) || '保存后自动生成'"
+            disabled
+          />
         </el-form-item>
         <el-form-item label="分类">
           <el-input v-model="form.category" placeholder="如：技术、生活" />

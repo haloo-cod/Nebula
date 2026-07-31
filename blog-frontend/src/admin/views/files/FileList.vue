@@ -58,7 +58,9 @@ function formatSize(size: number): string {
 
 function formatDateTime(value: string | null): string {
   if (!value) return '--'
-  const date = new Date(value)
+  // 后端时间均为 UTC，若字符串不带时区信息则补 Z
+  const normalized = /[+\-]\d{2}:\d{2}$/.test(value) || value.endsWith('Z') ? value : value + 'Z'
+  const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return value.replace('T', ' ').slice(0, 19)
   return date.toLocaleString()
 }
@@ -265,7 +267,11 @@ async function extendArchive(job: BookDownloadJob) {
   }).catch(() => null)
   if (!value) return
   try {
-    await api.patch(`/api/v1/books/download-jobs/${job.id}/expires`, { expires_on: value.value }, true)
+    await api.patch(
+      `/api/v1/books/download-jobs/${job.id}/expires`,
+      { expires_on: value.value },
+      true,
+    )
     ElMessage.success('归档到期时间已更新')
     await loadArchives()
   } catch (err: unknown) {
@@ -306,9 +312,11 @@ onMounted(loadFiles)
         <p>统一管理普通文件和图床图片，数据库仍保持分表。</p>
       </div>
       <div class="upload-actions">
-            <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
+        <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
         <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="6" />
-        <span v-if="downloading" class="upload-status">{{ downloadStatus }} {{ downloadProgress }}%</span>
+        <span v-if="downloading" class="upload-status"
+          >{{ downloadStatus }} {{ downloadProgress }}%</span
+        >
         <el-progress v-if="downloading" :percentage="downloadProgress" :stroke-width="6" />
         <el-button
           type="primary"

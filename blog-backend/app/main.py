@@ -95,6 +95,9 @@ static_images = CORSMiddleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+# 局域网开发需要开放图片跨域时,可将 allow_origins 改为 [] 并恢复:
+# allow_origin_regex=".*" if settings.CORS_ALLOW_ALL else None,
+# 生产环境不要启用任意 Origin + credentials。
 app.mount("/uploads/images", static_images, name="uploaded-images")
 
 # API 路由
