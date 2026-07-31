@@ -89,14 +89,15 @@ app = FastAPI(
 setup_cors(app)
 
 # 仅公开图片目录；普通文件、EPUB 和 ZIP 必须通过鉴权 API 访问。
-# 开发期 CORS_ALLOW_ALL 时反射任意 Origin,便于手机通过局域网 IP 加载图片。
 static_images = CORSMiddleware(
     app=StaticFiles(directory=str(settings.UPLOAD_DIR / "images")),
-    allow_origin_regex=".*" if settings.CORS_ALLOW_ALL else None,
-    allow_origins=[] if settings.CORS_ALLOW_ALL else settings.CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+# 局域网开发需要开放图片跨域时,可将 allow_origins 改为 [] 并恢复:
+# allow_origin_regex=".*" if settings.CORS_ALLOW_ALL else None,
+# 生产环境不要启用任意 Origin + credentials。
 app.mount("/uploads/images", static_images, name="uploaded-images")
 
 # API 路由

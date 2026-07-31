@@ -17,7 +17,7 @@ const hideChrome = computed(() => route.meta.hideChrome === true)
 const hideRain = computed(() => route.meta.hideRain === true)
 
 // 临时性能监控面板:默认常驻显示,Ctrl+Shift+P 可切换隐藏
-const showPerf = ref(true)
+const showPerf = ref(false)
 
 /** Ctrl+Shift+P 切换性能面板 */
 function handlePerfHotkey(e: KeyboardEvent) {

@@ -12,18 +12,11 @@ export default defineConfig({
   base: './',
   server: {
     host: true,
-    // 开发期代理：所有 /api 和 /uploads 请求经 Vite 5173 端口转发到后端。
-    // 手机只需访问 5173，不再需要后端 8000 端口对外开放，也不需要 CORS。
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/uploads': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-    },
+    // 局域网开发代理(同域 Nginx 生产部署不需要):
+    // proxy: {
+    //   '/api': { target: 'http://localhost:8000', changeOrigin: true },
+    //   '/uploads': { target: 'http://localhost:8000', changeOrigin: true },
+    // },
   },
   plugins: [
     vue(),
