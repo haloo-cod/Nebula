@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
+import PerfMonitor from './components/liquid-glass/PerfMonitor.vue'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { preloadTexture } from '@/components/liquid-glass/liquidGlassRenderer'
@@ -15,7 +16,19 @@ const route = useRoute()
 const hideChrome = computed(() => route.meta.hideChrome === true)
 const hideRain = computed(() => route.meta.hideRain === true)
 
+// 临时性能监控面板:默认常驻显示,Ctrl+Shift+P 可切换隐藏
+const showPerf = ref(true)
+
+/** Ctrl+Shift+P 切换性能面板 */
+function handlePerfHotkey(e: KeyboardEvent) {
+  if (e.ctrlKey && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+    e.preventDefault()
+    showPerf.value = !showPerf.value
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', handlePerfHotkey)
   const splash = document.getElementById('splash')
   const app = document.getElementById('app')
   if (app) app.style.opacity = '1'
@@ -49,6 +62,10 @@ watch(
     if (url) void preloadTexture(url)
   },
 )
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handlePerfHotkey)
+})
 </script>
 
 <template>
@@ -63,6 +80,7 @@ watch(
       class="theme-overlay"
       :class="{ 'theme-overlay--revealing': ui.themeTransitionRevealStarted }"
     ></div>
+    <PerfMonitor v-if="showPerf" />
   </div>
 </template>
 
