@@ -30,6 +30,8 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@playwright/mcp": "^0.0.78",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^25.9.3",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vitejs/plugin-vue-jsx": "^5.1.5",

@@ -3,12 +3,16 @@
 """
 
 import json
+import mimetypes
 import re
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from posixpath import normpath
+from urllib.parse import unquote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,6 +78,94 @@ def _book_path(book: Book):
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书文件不存在")
     return path
+
+
+def _epub_resource_name(resource_path: str) -> str:
+    """规范化 EPUB 内部资源路径，并拒绝越界路径。"""
+    decoded = unquote(resource_path).replace("\\", "/")
+    normalized = normpath(decoded).lstrip("/")
+    if not normalized or normalized == "." or normalized == ".." or normalized.startswith("../"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="EPUB 资源路径无效")
+    return normalized
+
+
+def _epub_resource_response(book: Book, resource_path: str) -> StreamingResponse:
+    """从 EPUB ZIP 中流式读取单个内部资源，避免一次性解压整本书。"""
+    archive = _book_path(book)
+    member_name = _epub_resource_name(resource_path)
+    try:
+        with zipfile.ZipFile(archive) as epub:
+            try:
+                info = epub.getinfo(member_name)
+            except KeyError:
+                # 少数 EPUB 在 CSS 中把文件名 URL 编码后又写入 ZIP 原名，
+                # 浏览器请求会先解码一次；按大小写和 URL 解码后的名字回退匹配。
+                normalized = member_name.casefold()
+                info = next(
+                    item
+                    for item in epub.infolist()
+                    if unquote(item.filename).replace("\\", "/").casefold() == normalized
+                )
+    except (KeyError, StopIteration, zipfile.BadZipFile):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="EPUB 资源不存在")
+
+    media_type = mimetypes.guess_type(member_name)[0] or "application/octet-stream"
+    if member_name.lower().endswith((".xhtml", ".html", ".htm")):
+        media_type = "application/xhtml+xml"
+
+    def iter_resource():
+        with zipfile.ZipFile(archive) as epub, epub.open(info) as resource:
+            while chunk := resource.read(64 * 1024):
+                yield chunk
+
+    return StreamingResponse(
+        iter_resource(),
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Content-Length": str(info.file_size),
+        },
+    )
+
+
+def _validate_epub_archive(path: Path) -> None:
+    """上传后检查 ZIP 完整性，并明确拒绝 EPUB DRM 加密资源。"""
+    try:
+        with zipfile.ZipFile(path) as epub:
+            encryption_name = next(
+                (name for name in epub.namelist() if name.lower() == "meta-inf/encryption.xml"),
+                None,
+            )
+            if encryption_name:
+                encryption_xml = epub.read(encryption_name).decode("utf-8", "replace")
+                algorithms = set(re.findall(r"algorithm\s*=\s*[\"']([^\"']+)", encryption_xml, re.I))
+                # IDPF/Adobe 字体混淆只影响字体显示，允许上传；内容加密/DRM 则无法由 epub.js 解密。
+                font_obfuscation = {
+                    "http://www.idpf.org/2008/embedding",
+                    "http://ns.adobe.com/pdf/enc#rc",
+                }
+                if not algorithms or any(
+                    algorithm.lower() not in font_obfuscation for algorithm in algorithms
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="该 EPUB 含有 DRM/加密资源，当前阅读器无法解密，请上传无 DRM 版本",
+                    )
+            if any(name.lower() == "meta-inf/rights.xml" for name in epub.namelist()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="该 EPUB 含有 DRM/加密资源，当前阅读器无法解密，请上传无 DRM 版本",
+                )
+            corrupted = epub.testzip()
+            if corrupted:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"EPUB 压缩资源损坏: {corrupted}",
+                )
+    except HTTPException:
+        raise
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="EPUB 文件损坏或格式无效") from exc
 
 
 @router.post("/download-jobs", response_model=BookDownloadJobResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -326,6 +418,16 @@ async def read_book(slug: str, request: Request, db: AsyncSession = Depends(get_
     return FileResponse(_book_path(book), media_type="application/epub+zip", content_disposition_type="inline")
 
 
+@router.get("/{slug}/read-resource/{resource_path:path}")
+async def read_book_resource(slug: str, resource_path: str, db: AsyncSession = Depends(get_db)):
+    """按 EPUB 内部路径流式返回阅读资源，供 epub.js 懒加载。"""
+    result = await db.execute(select(Book).where(Book.slug == slug))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
+    return _epub_resource_response(book, resource_path)
+
+
 @router.get("", response_model=BookListResponse)
 async def list_books(
     page: int = Query(1, ge=1),
@@ -415,6 +517,7 @@ async def create_book(
     await save_epub_upload(file, filename)
 
     try:
+        _validate_epub_archive(BOOKS_DIR / filename)
         # 提取元数据
         meta = read_epub_metadata(internal_path)
         book_title = title or meta.get("title") or slug

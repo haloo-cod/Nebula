@@ -21,9 +21,17 @@ def setup_cors(app: FastAPI) -> None:
     #     )
     #     return
 
+    origins = list(settings.CORS_ORIGINS)
+    # 本地开发常用 localhost 与 127.0.0.1 交替访问；两者是不同 Origin。
+    # 仅在开发环境补充回环地址，生产仍严格使用配置白名单。
+    if settings.ENVIRONMENT.lower() not in {"production", "prod"}:
+        for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+            if origin not in origins:
+                origins.append(origin)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
