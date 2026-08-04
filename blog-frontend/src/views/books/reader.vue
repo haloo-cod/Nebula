@@ -167,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchBook } from '@/api/books'
 import { BASE_URL, resolveUrl } from '@/api/client'
@@ -206,6 +206,11 @@ interface TocEntry {
 
 interface ReaderAnchor {
   cfi?: string
+  href?: string
+}
+
+/** epub.js spine 中用于目录定位的最小章节结构。 */
+interface SpineSectionLookup {
   href?: string
 }
 
@@ -252,8 +257,8 @@ let loadRunId = 0
 let isUnmounted = false
 let currentCfi: string | undefined
 let currentHref: string | undefined
-let scrollAutoLoadUnlisten: (() => void) | null = null
 let readingProgressSaveTimer: number | null = null
+let pageNavigationPromise: Promise<void> | null = null
 
 function isReadingMode(value: unknown): value is ReadingMode {
   return value === 'paginated' || value === 'scrolled'
@@ -437,6 +442,8 @@ function getRenditionOptions() {
     return {
       width: '100%',
       height: '100%',
+      // continuous manager 已经负责滚动上下边界的章节追加、预加载和位置补偿。
+      // 不再叠加外层 scroll + next/prev，避免章节切换时跳跃或向上回跳。
       manager: 'continuous',
       flow: 'scrolled-doc',
       spread: 'none',
@@ -463,17 +470,203 @@ function applyReaderTheme() {
   rendition.value.themes.override('font-family', '"Noto Serif SC", "Songti SC", serif')
 }
 
+/**
+ * 修正部分杜康 EPUB 的图片容器高度异常。
+ * 这类书把插图容器设为 flex + 90vh，epub.js continuous manager 在图片
+ * 尚未完成布局时会把高度放大到 32MB 上限，导致滚动跳跃。图片实际尺寸
+ * 已由 max-width/max-height 约束，因此只需把异常容器恢复为自动高度。
+ */
+function repairEpubLayout(contents: { document?: Document }) {
+  const document = contents.document
+  if (!document) return
+
+  const resizeScrolledFrame = () => {
+    if (readingMode.value !== 'scrolled' || !document.body) return
+    const frame = document.defaultView?.frameElement as HTMLElement | null
+    if (!frame) return
+    const contentHeight = Math.ceil(
+      Math.max(document.body.scrollHeight, document.body.getBoundingClientRect().height),
+    )
+    if (contentHeight > 0 && frame.getBoundingClientRect().height < contentHeight) {
+      frame.style.height = `${contentHeight}px`
+      if (frame.parentElement) frame.parentElement.style.height = `${contentHeight}px`
+    }
+  }
+
+  // 部分杜康 EPUB 使用 vertical-rl 竖排排版；epub.js 的 continuous + scrolled-doc
+  // 会把竖排章节错误地按横向列宽计算，导致 iframe 只有约 319px 高、正文被截断。
+  // 滚动阅读优先保证章节可以连续向下阅读，因此仅在滚动模式将其转换为横排。
+  if (readingMode.value === 'scrolled') {
+    const root = document.documentElement
+    const writingMode = document.defaultView?.getComputedStyle(root).writingMode || ''
+    if (writingMode.startsWith('vertical')) {
+      root.style.writingMode = 'horizontal-tb'
+      root.style.direction = 'ltr'
+      if (document.body) {
+        document.body.style.writingMode = 'horizontal-tb'
+        document.body.style.direction = 'ltr'
+        document.body.style.width = 'auto'
+        document.body.style.height = 'auto'
+      }
+    }
+  }
+
+  if (readingMode.value === 'scrolled' && !document.getElementById('starlit-epub-layout-fix')) {
+    const style = document.createElement('style')
+    style.id = 'starlit-epub-layout-fix'
+    style.textContent = `
+      .illus, .cover, .kuchie {
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      .illus img, .cover img, .kuchie img {
+        max-height: none !important;
+      }
+    `
+    document.head.appendChild(style)
+  }
+  for (const element of Array.from(document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'))) {
+    if (readingMode.value === 'scrolled' || element.getBoundingClientRect().height > 100000) {
+      element.style.height = 'auto'
+      element.style.minHeight = '0'
+    }
+  }
+  window.setTimeout(() => {
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'))) {
+      if (readingMode.value === 'scrolled' || element.getBoundingClientRect().height > 100000) {
+        element.style.height = 'auto'
+        element.style.minHeight = '0'
+      }
+    }
+    resizeScrolledFrame()
+  }, 0)
+  window.setTimeout(resizeScrolledFrame, 80)
+  window.setTimeout(resizeScrolledFrame, 300)
+}
+
+/** 将 EPUB 内部路径解码、消除 . / ..，统一成可比较的 POSIX 路径。 */
+function canonicalEpubPath(value: string): string {
+  let decoded = value
+  try {
+    // 目录中常见 %20、中文等 URL 编码，最多解码两次以兼容双重编码文件名。
+    for (let index = 0; index < 2; index += 1) {
+      const next = decodeURIComponent(decoded)
+      if (next === decoded) break
+      decoded = next
+    }
+  } catch {
+    // 非法百分号编码不影响后续按原始路径尝试。
+  }
+
+  const segments: string[] = []
+  for (const segment of decoded.replace(/\\/g, '/').split('/')) {
+    if (!segment || segment === '.') continue
+    if (segment === '..') {
+      segments.pop()
+      continue
+    }
+    segments.push(segment)
+  }
+  return segments.join('/')
+}
+
+function tocPathAndFragment(href: string): { path: string; fragment: string } {
+  const separator = href.indexOf('#')
+  const rawPath = separator >= 0 ? href.slice(0, separator) : href
+  const rawFragment = separator >= 0 ? href.slice(separator + 1) : ''
+  let fragment = rawFragment
+  try {
+    fragment = decodeURIComponent(rawFragment)
+  } catch {
+    // 非法片段编码按原值交给 epub.js，避免目录项整体失效。
+  }
+  return {
+    path: rawPath.split('?')[0],
+    fragment: separator >= 0 ? `#${fragment}` : '',
+  }
+}
+
+function pathDirectory(path: string): string {
+  const separator = path.lastIndexOf('/')
+  return separator >= 0 ? path.slice(0, separator) : ''
+}
+
+function joinEpubPath(directory: string, path: string): string {
+  return canonicalEpubPath(directory ? `${directory}/${path}` : path)
+}
+
+/**
+ * 生成目录 href 的所有合理解释。
+ * EPUB 规范允许 href 相对 nav 文件，也有不少书籍直接写成相对 OPF 路径。
+ */
+function getTocPathCandidates(path: string): string[] {
+  const candidates = new Set<string>()
+  const raw = canonicalEpubPath(path)
+  if (raw) candidates.add(raw)
+
+  const navPath = epubBook?.packaging?.navPath || epubBook?.packaging?.ncxPath || ''
+  const navDirectory = pathDirectory(canonicalEpubPath(navPath))
+  if (raw && navDirectory) candidates.add(joinEpubPath(navDirectory, path))
+
+  return [...candidates]
+}
+
+/** 查找与目录路径最接近的 spine 章节，兼容不同 EPUB 的根目录写法。 */
+function findSpineSection(pathCandidates: string[]): SpineSectionLookup | null {
+  if (!epubBook) return null
+
+  for (const candidate of pathCandidates) {
+    const section = epubBook.spine.get(candidate)
+    if (section) return section
+  }
+
+  // spineItems 未在 epub.js 类型声明中公开，但运行时是稳定的数组；这里只读取 href 做兼容匹配。
+  const spineItems = (epubBook.spine as unknown as { spineItems?: SpineSectionLookup[] }).spineItems
+  if (!spineItems) return null
+  const canonicalCandidates = pathCandidates.map(canonicalEpubPath)
+  return (
+    spineItems.find((section) => {
+      const sectionPath = canonicalEpubPath(section.href || '')
+      return canonicalCandidates.some(
+        (candidate) =>
+          sectionPath === candidate ||
+          sectionPath.endsWith(`/${candidate}`) ||
+          candidate.endsWith(`/${sectionPath}`),
+      )
+    }) || null
+  )
+}
+
+function normalizeTocTarget(href: string): string {
+  const { path, fragment } = tocPathAndFragment(href)
+  const candidates = getTocPathCandidates(path)
+  const section = findSpineSection(candidates)
+  if (section?.href) return `${section.href}${fragment}`
+
+  console.warn('[books] EPUB 目录路径未匹配 spine:', {
+    href,
+    navPath: epubBook?.packaging?.navPath,
+    ncxPath: epubBook?.packaging?.ncxPath,
+    candidates,
+  })
+  return `${candidates[0] || path}${fragment}`
+}
+
 function flattenToc(items: NavItem[], depth = 0): TocEntry[] {
   return items.flatMap((item) => {
-    const current = item.href && item.label ? [{ label: item.label, href: item.href, depth }] : []
+    const current =
+      item.href && item.label
+        ? [{ label: item.label, href: normalizeTocTarget(item.href), depth }]
+        : []
     const children = item.subitems ? flattenToc(item.subitems, depth + 1) : []
     return [...current, ...children]
   })
 }
 
 function cleanupReader() {
-  cleanupScrollAutoLoad()
   cleanupReadingProgressSave()
+  pageNavigationPromise = null
   if (rendition.value) {
     rendition.value.destroy()
     rendition.value = null
@@ -502,11 +695,16 @@ async function displayReaderAnchor(anchor?: ReaderAnchor) {
   }
 
   if (anchor.href) {
+    const targetHref = normalizeTocTarget(anchor.href)
     try {
-      await rendition.value.display(anchor.href)
+      await rendition.value.display(targetHref)
       return
     } catch (err) {
-      console.warn('[books] EPUB 章节定位失败,保持当前位置:', err)
+      console.warn('[books] EPUB 章节定位失败,保持当前位置:', {
+        href: anchor.href,
+        targetHref,
+        error: err,
+      })
       return
     }
   }
@@ -517,15 +715,40 @@ function goBack() {
 }
 
 async function prevPage() {
-  if (!rendition.value) return
+  if (!rendition.value || pageNavigationPromise) return
   currentCfi = getCurrentLocationCfi()
-  await rendition.value.prev()
+  pageNavigationPromise = rendition.value.prev()
+  try {
+    await pageNavigationPromise
+  } finally {
+    pageNavigationPromise = null
+  }
 }
 
 async function nextPage() {
-  if (!rendition.value) return
+  if (!rendition.value || pageNavigationPromise) return
   currentCfi = getCurrentLocationCfi()
-  await rendition.value.next()
+  pageNavigationPromise = rendition.value.next()
+  try {
+    await pageNavigationPromise
+  } finally {
+    pageNavigationPromise = null
+  }
+}
+
+/**
+ * 连续滚动模式首次进入时轻量走一页再返回，触发 epub.js 填充相邻章节。
+ * 这比手动监听滚动并调用 next 更安全：章节追加、位置补偿和节流仍由 continuous manager 统一处理。
+ */
+async function warmContinuousReader() {
+  if (readingMode.value !== 'scrolled' || !rendition.value) return
+  try {
+    await nextPage()
+    await prevPage()
+  } catch (err) {
+    // 预热失败不应阻塞正文阅读；用户滚动到底部时 continuous manager 仍会重试填充。
+    console.warn('[books] EPUB 连续滚动预热失败:', err)
+  }
 }
 
 async function changeReadingMode(mode: ReadingMode) {
@@ -558,13 +781,14 @@ function toggleToolbar() {
 }
 
 function normalizeTocHref(href: string): string {
-  return href.split('#')[0]
+  return canonicalEpubPath(tocPathAndFragment(href).path)
 }
 
 function isTocItemActive(href: string): boolean {
   if (!activeTocHref.value) return false
   return (
-    activeTocHref.value === href || normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
+    activeTocHref.value === href ||
+    normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
   )
 }
 
@@ -572,45 +796,24 @@ async function displayTocItem(href: string) {
   if (!rendition.value || isReaderBusy.value) return
   isReaderBusy.value = true
   try {
-    activeTocHref.value = href
+    const targetHref = normalizeTocTarget(href)
+    activeTocHref.value = targetHref
     tocOpen.value = false
+    // continuous manager 在已有章节视图中跳转时可能只更新内部位置，
+    // 但不会清理旧 view，表现为目录点击后仍停留在序章。滚动模式改为
+    // 以目标 href 重建 rendition，确保目标章节从首屏开始加载。
+    if (readingMode.value === 'scrolled') {
+      await loadReader({ href: targetHref })
+      return
+    }
     await nextTick()
-    await displayReaderAnchor({ href })
+    await displayReaderAnchor({ href: targetHref })
     currentCfi = getCurrentLocationCfi()
   } catch (err) {
     console.warn('[books] 目录跳转失败:', err)
   } finally {
     isReaderBusy.value = false
   }
-}
-
-/** 滚动模式：监听 epub-container 滚动，到底时自动加载下一章 */
-function setupScrollAutoLoad() {
-  cleanupScrollAutoLoad()
-  if (readingMode.value !== 'scrolled') return
-  const container = viewerRef.value?.querySelector('.epub-container') as HTMLElement | null
-  if (!container) return
-
-  let isLoadingNext = false
-  const onScroll = () => {
-    if (isLoadingNext || !rendition.value) return
-    const { scrollTop, scrollHeight, clientHeight } = container
-    if (scrollTop + clientHeight >= scrollHeight - 40) {
-      isLoadingNext = true
-      nextPage()
-      // 加载完成后重置标志
-      window.setTimeout(() => {
-        isLoadingNext = false
-      }, 400)
-    }
-  }
-  container.addEventListener('scroll', onScroll, { passive: true })
-  scrollAutoLoadUnlisten = () => container.removeEventListener('scroll', onScroll)
-}
-
-function cleanupScrollAutoLoad() {
-  scrollAutoLoadUnlisten?.()
-  scrollAutoLoadUnlisten = null
 }
 
 function decreaseFontSize() {
@@ -646,6 +849,14 @@ async function loadReader(anchor?: ReaderAnchor) {
   }
 
   if (!currentBook) {
+    // 路由复用时若新 slug 不存在，必须清理旧 rendition，避免上一本文本残留在页面上。
+    cleanupReader()
+    book.value = null
+    tocItems.value = []
+    tocOpen.value = false
+    currentCfi = undefined
+    currentHref = undefined
+    activeTocHref.value = ''
     error.value = '图书不存在'
     loading.value = false
     isReaderBusy.value = false
@@ -668,36 +879,45 @@ async function loadReader(anchor?: ReaderAnchor) {
     const { default: ePub } = await import('epubjs')
     if (!isCurrentRun(runId)) return
 
-    const epubResponse = await fetch(`${BASE_URL}/api/v1/books/${encodeURIComponent(slug)}/read`)
-    if (!epubResponse.ok) throw new Error('图书阅读内容加载失败')
-    const epubBuffer = await epubResponse.arrayBuffer()
-    epubBook = ePub(epubBuffer)
+    // 使用目录型 EPUB 入口，让 epub.js 按需读取章节、样式和图片。
+    // 直接下载 ArrayBuffer 会在生产环境的大 EPUB 上一次性解压全部资源，
+    // 容易造成内存峰值和图片/文本加载中断。
+    const epubRootUrl = `${BASE_URL}/api/v1/books/${encodeURIComponent(slug)}/read-resource/`
+    epubBook = ePub(epubRootUrl)
     const navigation = await epubBook.loaded.navigation
     tocItems.value = flattenToc(navigation.toc)
+    // 在 epub.js 计算 view 尺寸前修正竖排 EPUB，避免 continuous manager 锁定错误高度。
+    epubBook.spine.hooks.content.register(repairEpubLayout)
     rendition.value = epubBook.renderTo(viewerRef.value, getRenditionOptions())
     applyReaderTheme()
+    // 在 epub.js 计算章节尺寸后立即清理异常的插图容器高度。
+    rendition.value.hooks.content.register(repairEpubLayout)
+
+    rendition.value.on('loaderror', (loadError: unknown) => {
+      // epub.js 默认只在控制台报告 section 错误；保留章节 href 便于定位具体 EPUB 资源。
+      console.warn('[books] EPUB 章节资源加载失败:', {
+        href: currentHref,
+        error: loadError,
+      })
+    })
 
     rendition.value.on('relocated', (location: ReaderLocation) => {
       if (location.start?.cfi) currentCfi = location.start.cfi
       if (location.start?.href) currentHref = location.start.href
-      if (location.start?.href) activeTocHref.value = location.start.href
+      if (location.start?.href) activeTocHref.value = normalizeTocTarget(location.start.href)
       scheduleReadingProgressSave()
     })
 
     await displayReaderAnchor(savedAnchor)
     if (!isCurrentRun(runId)) return
     loading.value = false
+
+    // 部分长章节首次渲染时不会主动创建相邻 view，预热一次可避免初始滚动容器没有后续内容。
+    await nextTick()
+    await warmContinuousReader()
+    if (!isCurrentRun(runId)) return
     isReaderBusy.value = false
 
-    // 滚动模式下设置自动加载下一章监听
-    await nextTick()
-    setupScrollAutoLoad()
-
-    // 滚动模式下首次加载封面后预热下一章，避免必须点一次按钮才出现内容
-    if (readingMode.value === 'scrolled') {
-      await nextPage()
-      await prevPage()
-    }
   } catch (err) {
     if (!isCurrentRun(runId)) return
     console.warn('[books] EPUB 阅读器加载失败:', err)
@@ -712,6 +932,21 @@ onMounted(() => {
   ui.showNavbar = false
   void loadReader()
 })
+
+// 阅读器路由组件会被 Vue Router 复用；切换书籍时必须显式重建 EPUB 实例，
+// 否则 URL 已变化但页面仍会显示上一本文本和目录。
+watch(
+  () => route.params.slug,
+  (slug, previousSlug) => {
+    if (!slug || slug === previousSlug) return
+    currentCfi = undefined
+    currentHref = undefined
+    activeTocHref.value = ''
+    tocItems.value = []
+    tocOpen.value = false
+    void loadReader()
+  },
+)
 
 onUnmounted(() => {
   isUnmounted = true
@@ -1277,7 +1512,10 @@ onUnmounted(() => {
 
 .reader-page--scrolled .reader-viewer {
   overflow: hidden;
-  /* 防止 epub.js 滚动模式下章节边界处的滚动锚定回弹 */
+}
+
+.reader-page--scrolled .reader-viewer :deep(.epub-container) {
+  /* 防止章节增删时浏览器滚动锚定与 epub.js 的位置补偿叠加 */
   overflow-anchor: none;
 }
 
