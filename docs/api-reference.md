@@ -504,3 +504,13 @@ GET /uploads/images/albums/album-01.png        — 相册图片
 GET /uploads/images/book-covers/xxx_cover.jpg  — 图书封面
 GET /uploads/books/xxx.epub                    — EPUB 文件
 ```
+## 视频背景补充
+
+管理员可通过 `POST /api/v1/backgrounds/video-upload` 上传视频，字段为
+`multipart/form-data` 的 `file`。支持 MIME 与扩展名匹配的 `video/mp4`（`.mp4`）、
+`video/webm`（`.webm`）和 `video/quicktime`（`.mov`）。接口返回的 URL 可用于创建
+`media_type=video` 的背景。
+
+后台也可以选择文件管理中的视频，使用 URL `/api/v1/files/{file_id}/media`。该公开媒体接口
+只允许当前被视频背景引用的 `video/*` 文件；未引用返回 `404`，非视频返回 `415`。删除仍被
+背景引用的文件返回 `409`，请先解除背景引用。

@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <main class="project-page">
       <RouterLink to="/gallery" class="back-link">返回展览</RouterLink>
 
@@ -23,13 +22,11 @@
         <p>这个项目文档可能还在整理中,可以先返回展览页查看其他项目。</p>
       </section>
     </main>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import { getGalleryProject, renderGalleryProject } from '@/data/gallery'
 import { fetchGalleryProject } from '@/api/gallery'
 import { renderMarkdown } from '@/data/posts'

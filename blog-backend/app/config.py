@@ -66,7 +66,7 @@ class Settings(BaseSettings):
 
     # ===== CORS =====
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
-    # 开发期局域网预览可临时启用,生产环境不要打开:
+    # 开发期局域网预览可临时启用，生产环境不要打开：
     # CORS_ALLOW_ALL: bool = False
 
     # ===== 管理员初始账户 =====

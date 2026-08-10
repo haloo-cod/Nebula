@@ -238,10 +238,17 @@ async def list_posts(
     page_size: int = Query(12, ge=1, le=500),
     category: str = Query("", description="按分类筛选"),
     db: AsyncSession = Depends(get_db),
+    include_drafts: bool = Query(False),
+    user: User | None = Depends(get_optional_current_user),
 ):
     """获取博文列表（分页 + 分类筛选），草稿不返回"""
-    query = select(Post).where(Post.is_draft == False)  # noqa: E712
-    count_query = select(func.count(Post.id)).where(Post.is_draft == False)  # noqa: E712
+    if include_drafts and (user is None or not user.is_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="闇€瑕佺鐞嗗憳鏉冮檺")
+    query = select(Post)
+    count_query = select(func.count(Post.id))
+    if not include_drafts:
+        query = query.where(Post.is_draft == False)  # noqa: E712
+        count_query = count_query.where(Post.is_draft == False)  # noqa: E712
 
     if category:
         query = query.where(Post.category == category)

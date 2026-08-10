@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_admin
 from app.database import get_db
+from app.models.background import Background
 from app.models.file import UploadedFile
 from app.models.treasure import Treasure
 from app.models.user import User
@@ -141,6 +142,43 @@ async def download_file(
     )
 
 
+@router.get("/{file_id}/media", response_class=DownloadResponse)
+async def stream_file_media(
+    file_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """公开以内联方式提供已选作背景媒体的文件；文件管理仍负责其生命周期。"""
+    result = await db.execute(select(UploadedFile).where(UploadedFile.id == file_id))
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
+    media_url = f"/api/v1/files/{file_id}/media"
+    reference = await db.execute(
+        select(Background.id)
+        .where(
+            Background.media_url == media_url,
+            Background.media_type == "video",
+        )
+        .limit(1)
+    )
+    if reference.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件未被背景媒体引用")
+    if not (record.mime_type or "").lower().startswith("video/"):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="仅允许播放视频文件",
+        )
+    path = get_file_path(record.filename)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件已丢失")
+    return DownloadResponse(
+        path=path,
+        filename=record.original_name,
+        media_type=record.mime_type or "application/octet-stream",
+        content_disposition_type="inline",
+    )
+
+
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_file(
     file_id: int,
@@ -153,6 +191,16 @@ async def remove_file(
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
+
+    media_url = f"/api/v1/files/{file_id}/media"
+    reference = await db.execute(
+        select(Background.id).where(Background.media_url == media_url).limit(1)
+    )
+    if reference.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="文件正在作为背景媒体使用，请先解除背景引用",
+        )
 
     delete_file(record.filename)
     await db.delete(record)

@@ -2,11 +2,29 @@
 背景图 service — CRUD + 排序
 """
 
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.background import Background
 from app.models.image import UploadedImage
+from app.config import settings
+from app.services.analytics import utc_now
+
+
+def _local_background_path(media_url: str) -> Path | None:
+    """Return a local uploaded video path only for our generated URL format."""
+    prefixes = ("/uploads/backgrounds/", "/api/v1/backgrounds/media/")
+    prefix = next((item for item in prefixes if media_url.startswith(item)), None)
+    if prefix is None:
+        return None
+    name = media_url.removeprefix(prefix)
+    if not name or Path(name).name != name:
+        return None
+    path = (settings.UPLOAD_DIR / "backgrounds" / name).resolve()
+    root = (settings.UPLOAD_DIR / "backgrounds").resolve()
+    return path if path.parent == root else None
 
 
 async def list_backgrounds(
@@ -18,7 +36,7 @@ async def list_backgrounds(
     获取背景图列表，可按 theme/device 过滤
     返回带 url 的字典列表（join uploaded_images 取 url）
     """
-    stmt = select(Background, UploadedImage.url).join(
+    stmt = select(Background, UploadedImage.url).outerjoin(
         UploadedImage, Background.image_id == UploadedImage.id
     )
     if theme:
@@ -33,7 +51,11 @@ async def list_backgrounds(
     return [
         {
             "id": bg.id,
-            "url": url,
+            "url": bg.media_url or url or "",
+            "media_type": bg.media_type,
+            "poster_url": bg.poster_url,
+            "mime_type": bg.mime_type,
+            "file_size": bg.file_size,
             "theme": bg.theme,
             "device": bg.device,
             "sort_order": bg.sort_order,
@@ -45,28 +67,46 @@ async def list_backgrounds(
 
 async def create_background(
     db: AsyncSession,
-    image_id: int,
+    image_id: int | None,
     theme: str,
     device: str,
     sort_order: int = 0,
+    media_type: str = "image",
+    media_url: str = "",
+    poster_url: str = "",
+    mime_type: str = "",
+    file_size: int = 0,
 ) -> dict:
     """
     创建背景图记录
     验证 image_id 存在后插入 backgrounds 表
     """
     # 验证图片存在
-    img_result = await db.execute(
-        select(UploadedImage).where(UploadedImage.id == image_id)
-    )
-    image = img_result.scalar_one_or_none()
-    if not image:
-        raise ValueError(f"图片 ID {image_id} 不存在")
+    if media_type == "video" and (not media_url or image_id is not None):
+        raise ValueError("video background requires media_url")
+    if media_type == "image" and bool(image_id) == bool(media_url):
+        raise ValueError("image background requires image_id or media_url")
+    image = None
+    if image_id is not None:
+        img_result = await db.execute(
+            select(UploadedImage).where(UploadedImage.id == image_id)
+        )
+        image = img_result.scalar_one_or_none()
+        if image is None:
+            raise ValueError(f"图片 ID {image_id} 不存在")
 
     bg = Background(
         image_id=image_id,
+        media_type=media_type,
+        media_url=media_url,
+        poster_url=poster_url,
+        mime_type=mime_type,
+        file_size=file_size,
         theme=theme,
         device=device,
         sort_order=sort_order,
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
     db.add(bg)
     await db.commit()
@@ -74,7 +114,11 @@ async def create_background(
 
     return {
         "id": bg.id,
-        "url": image.url,
+        "url": media_url or (image.url if image else ""),
+        "media_type": media_type,
+        "poster_url": poster_url,
+        "mime_type": mime_type,
+        "file_size": file_size,
         "theme": bg.theme,
         "device": bg.device,
         "sort_order": bg.sort_order,
@@ -94,8 +138,14 @@ async def delete_background(db: AsyncSession, bg_id: int) -> bool:
     if not bg:
         return False
 
+    local_path = _local_background_path(bg.media_url) if bg.media_type == "video" else None
     await db.delete(bg)
     await db.commit()
+    if local_path:
+        # A single uploaded asset may be referenced by several background rows.
+        refs = await db.execute(select(Background.id).where(Background.media_url == str(bg.media_url)))
+        if refs.first() is None:
+            local_path.unlink(missing_ok=True)
     return True
 
 

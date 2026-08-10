@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <main class="blog-page">
       <div class="blog-header">
         <p class="blog-kicker">{{ siteText.blog.kicker }}</p>
@@ -109,13 +108,11 @@
         </button>
       </div>
     </main>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'

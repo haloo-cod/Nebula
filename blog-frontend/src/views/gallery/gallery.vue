@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <main class="gallery-page">
       <section id="gallery-projects" class="gallery-section">
         <div class="section-heading">
@@ -18,12 +17,10 @@
         </div>
       </section>
     </main>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import GlassProjectLink from '@/components/gallery/GlassProjectLink.vue'
 import { getGalleryProjects } from '@/data/gallery'
 import { fetchGalleryProjects, toFrontendGalleryProject } from '@/api/gallery'

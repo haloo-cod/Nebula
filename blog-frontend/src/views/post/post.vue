@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="post-page">
       <GlassPanel class="post-panel">
         <div class="post-rise-inner">
@@ -42,13 +41,11 @@
         </div>
       </GlassPanel>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import { getPost, renderPost, renderMarkdown } from '@/data/posts'
 import { fetchPost } from '@/api/posts'

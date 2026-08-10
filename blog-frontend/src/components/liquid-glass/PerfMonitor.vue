@@ -80,6 +80,24 @@
         <span class="perf-value">{{ copyCallsPerSec }}/s</span>
       </div>
       <div class="perf-row">
+        <span class="perf-label">Video uploads</span>
+        <span class="perf-value">{{ videoUploadsPerSec }}/s</span>
+      </div>
+      <div class="perf-row">
+        <span class="perf-label">Watchdog uploads</span>
+        <span class="perf-value">{{ videoWatchdogUploadsPerSec }}/s</span>
+      </div>
+      <div class="perf-row">
+        <span class="perf-label">Video failures</span>
+        <span class="perf-value" :class="{ 'perf-value--warn': videoUploadFailuresPerSec > 0 }">
+          {{ videoUploadFailuresPerSec }}/s
+        </span>
+      </div>
+      <div class="perf-row perf-row--wrap">
+        <span class="perf-label">Video state</span>
+        <span class="perf-value perf-value--url">{{ videoState }}</span>
+      </div>
+      <div class="perf-row">
         <span class="perf-label">Canvas resize</span>
         <span class="perf-value" :class="{ 'perf-value--warn': resizesPerSec > 5 }">
           {{ resizesPerSec }}/s
@@ -144,6 +162,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   getRendererMetrics,
   getInstanceStats,
+  getVideoTextureStats,
   type RendererMetrics,
   type InstanceStats,
 } from '@/components/liquid-glass/liquidGlassRenderer'
@@ -256,6 +275,10 @@ const metrics = ref<RendererMetrics>(getRendererMetrics())
 const stats = ref<InstanceStats>(getInstanceStats())
 const drawCallsPerSec = ref(0)
 const copyCallsPerSec = ref(0)
+const videoUploadsPerSec = ref(0)
+const videoWatchdogUploadsPerSec = ref(0)
+const videoUploadFailuresPerSec = ref(0)
+const videoState = ref('none')
 const resizesPerSec = ref(0)
 
 let pollId = 0
@@ -270,10 +293,21 @@ function pollMetrics() {
 
   drawCallsPerSec.value = Math.round((m.drawCalls - prevMetrics.drawCalls) / dt)
   copyCallsPerSec.value = Math.round((m.copyCalls - prevMetrics.copyCalls) / dt)
+  videoUploadsPerSec.value = Math.round((m.videoFrameUploads - prevMetrics.videoFrameUploads) / dt)
+  videoWatchdogUploadsPerSec.value = Math.round(
+    (m.videoWatchdogUploads - prevMetrics.videoWatchdogUploads) / dt,
+  )
+  videoUploadFailuresPerSec.value = Math.round(
+    (m.videoUploadFailures - prevMetrics.videoUploadFailures) / dt,
+  )
   resizesPerSec.value = Math.round((m.canvasResizes - prevMetrics.canvasResizes) / dt)
 
   metrics.value = m
   stats.value = getInstanceStats()
+  const videos = getVideoTextureStats()
+  videoState.value = videos.length
+    ? videos.map((v) => `${v.readyState}/${v.paused ? 'paused' : 'playing'} ${v.width}x${v.height}`).join(' · ')
+    : 'none'
   prevMetrics = m
   prevPollTime = now
 }

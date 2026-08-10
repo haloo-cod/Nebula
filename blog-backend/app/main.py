@@ -24,6 +24,9 @@ from app.services.book_download import cleanup_expired_book_archives
 from app.services.post_download import cleanup_expired_post_archives
 from app.services.analytics import utc_now
 
+for _upload_subdir in ("images", "books", "files", "backgrounds"):
+    (settings.UPLOAD_DIR / _upload_subdir).mkdir(parents=True, exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +37,7 @@ async def lifespan(app: FastAPI):
     (settings.UPLOAD_DIR / "images").mkdir(exist_ok=True)
     (settings.UPLOAD_DIR / "books").mkdir(exist_ok=True)
     (settings.UPLOAD_DIR / "files").mkdir(exist_ok=True)
+    (settings.UPLOAD_DIR / "backgrounds").mkdir(exist_ok=True)
     settings.BOOK_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     settings.CONTENT_DIR.mkdir(parents=True, exist_ok=True)
     (settings.CONTENT_DIR / "posts").mkdir(exist_ok=True)
@@ -95,10 +99,11 @@ static_images = CORSMiddleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
-# 局域网开发需要开放图片跨域时,可将 allow_origins 改为 [] 并恢复:
+# 局域网开发需要开放图片跨域时，可将 allow_origins 改为 [] 并恢复：
 # allow_origin_regex=".*" if settings.CORS_ALLOW_ALL else None,
 # 生产环境不要启用任意 Origin + credentials。
 app.mount("/uploads/images", static_images, name="uploaded-images")
+app.mount("/uploads/backgrounds", StaticFiles(directory=str(settings.UPLOAD_DIR / "backgrounds")), name="uploaded-backgrounds")
 
 # API 路由
 app.include_router(v1_router)

@@ -1,5 +1,4 @@
 <template>
-  <PageBackground :overlay="0.14">
     <div class="archive-tree-page">
       <div class="archive-tree-stage" :style="{ height: `${stageHeight}px` }">
         <svg
@@ -93,13 +92,11 @@
         </div>
       </div>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import { getPosts } from '@/data/posts'
 import type { Post } from '@/types'
 

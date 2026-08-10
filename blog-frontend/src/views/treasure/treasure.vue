@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="treasure-page">
       <!-- 页面头部 -->
       <header class="treasure-header">
@@ -103,12 +102,10 @@
         </button>
       </div>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import TreasureCardContent from './TreasureCardContent.vue'

@@ -8,7 +8,12 @@ from pydantic import BaseModel, field_validator
 
 class BackgroundCreate(BaseModel):
     """创建背景图记录（管理员）"""
-    image_id: int
+    image_id: int | None = None
+    media_type: str = "image"
+    media_url: str = ""
+    poster_url: str = ""
+    mime_type: str = ""
+    file_size: int = 0
     theme: str  # 'dark' | 'light'
     device: str  # 'desktop' | 'mobile'
     sort_order: int = 0
@@ -27,10 +32,21 @@ class BackgroundCreate(BaseModel):
             raise ValueError("device 必须为 'desktop' 或 'mobile'")
         return v
 
+    @field_validator("media_type")
+    @classmethod
+    def validate_media_type(cls, v: str) -> str:
+        if v not in ("image", "video"):
+            raise ValueError("media_type must be image or video")
+        return v
+
 
 class BackgroundResponse(BaseModel):
     """背景图响应"""
     id: int
+    media_type: str = "image"
+    poster_url: str = ""
+    mime_type: str = ""
+    file_size: int = 0
     url: str  # 图片访问路径（如 /uploads/images/backgrounds/dark-desktop-01.jpg）
     theme: str
     device: str

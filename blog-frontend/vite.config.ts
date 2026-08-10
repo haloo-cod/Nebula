@@ -10,14 +10,14 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 // Vite 构建配置
 export default defineConfig({
   base: './',
-  server: {
-    host: true,
-    // 局域网开发代理(同域 Nginx 生产部署不需要):
-    // proxy: {
-    //   '/api': { target: 'http://localhost:8000', changeOrigin: true },
-    //   '/uploads': { target: 'http://localhost:8000', changeOrigin: true },
-    // },
-  },
+  // 局域网开发预览时可恢复下面配置（生产部署不需要）：
+  // server: {
+  //   host: true,
+  //   proxy: {
+  //     '/api': { target: 'http://localhost:8000', changeOrigin: true },
+  //     '/uploads': { target: 'http://localhost:8000', changeOrigin: true },
+  //   },
+  // },
   plugins: [
     vue(),
     tailwindcss(),

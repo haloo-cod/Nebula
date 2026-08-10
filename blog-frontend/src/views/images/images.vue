@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <main class="gallery-images-page">
       <!-- 概览:相册网格 -->
       <template v-if="!currentAlbum">
@@ -118,13 +117,11 @@
         <div v-if="currentPhoto.caption" class="lightbox__caption">{{ currentPhoto.caption }}</div>
       </div>
     </Teleport>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import AlbumCard from './AlbumCard.vue'
 import { fetchAlbums, fetchAlbumDetail } from '@/api/albums'
 import { siteText } from '@/data/site-text'

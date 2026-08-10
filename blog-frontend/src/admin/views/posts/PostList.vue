@@ -44,7 +44,11 @@ const {
   handleDelete,
 } = useAdminTable<PostItem>({
   fetchData: async ({ page, pageSize, keyword: kw }) => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+      include_drafts: 'true',
+    })
     if (kw) params.set('category', kw)
     const res = await api.get<{ items: PostItem[]; total: number }>(`/api/v1/posts?${params}`, true)
     return res

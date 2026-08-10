@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="books-page">
       <div class="books-header">
         <p class="books-kicker">{{ siteText.books.kicker }}</p>
@@ -103,13 +102,11 @@
         />
       </div>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import { getBooks } from '@/data/books'

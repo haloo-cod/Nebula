@@ -11,6 +11,7 @@ import {
   mobileLightBackgrounds as defaultMobileLightBgs,
 } from '@/data/backgrounds'
 import type { BackgroundItem } from '@/data/backgrounds'
+import { isVideoBackground } from '@/data/backgrounds'
 import { fetchBackgrounds } from '@/api/backgrounds'
 
 /** 站点主题:dark=暗色(默认),light=亮色 */
@@ -155,6 +156,15 @@ export const useUIStore = defineStore('ui', () => {
           ? mobileLightBgIndex.value
           : lightBgIndex.value
     return group[Math.min(idx, group.length - 1)]?.src ?? ''
+  })
+  const currentBackground = computed(() => {
+    const group = theme.value === 'dark'
+      ? (isMobile.value ? mobileDarkBgs.value : darkBgs.value)
+      : (isMobile.value ? mobileLightBgs.value : lightBgs.value)
+    const idx = theme.value === 'dark'
+      ? (isMobile.value ? mobileDarkBgIndex.value : darkBgIndex.value)
+      : (isMobile.value ? mobileLightBgIndex.value : lightBgIndex.value)
+    return group[Math.min(idx, Math.max(0, group.length - 1))] ?? { src: '', mediaType: 'image' as const }
   })
 
   // 视口变化时更新 isMobile
@@ -311,6 +321,7 @@ export const useUIStore = defineStore('ui', () => {
   async function toggleTheme() {
     if (themeTransitioning.value) return
 
+    const nextTheme: Theme = theme.value === 'dark' ? 'light' : 'dark'
     // 先拉起全屏主题遮罩,并等一帧让浏览器真正 paint 出遮罩。
     // 这样后续背景切换和 WebGL 纹理上传都发生在遮罩下面。
     themeTransitioning.value = true
@@ -318,7 +329,7 @@ export const useUIStore = defineStore('ui', () => {
     await waitForNextFrames(1)
 
     const firstTextureReady = liquidGlassEnabled.value ? waitForNextTextureUploadSettled() : null
-    theme.value = theme.value === 'dark' ? 'light' : 'dark'
+    theme.value = nextTheme
 
     if (!liquidGlassEnabled.value) {
       await waitForNextFrames(2)
@@ -354,17 +365,43 @@ export const useUIStore = defineStore('ui', () => {
         fetchBackgrounds('light', 'mobile'),
       ])
 
-      darkBgs.value = darkDesktop.map((i) => ({ src: i.url }))
-      lightBgs.value = lightDesktop.map((i) => ({ src: i.url }))
-      mobileDarkBgs.value = darkMobile.map((i) => ({ src: i.url }))
-      mobileLightBgs.value = lightMobile.map((i) => ({ src: i.url }))
+      // 保留媒体元数据；视频若被降级成 image，LiquidGlass 会错误地用 Image 加载并导致黑屏。
+      darkBgs.value = darkDesktop.map((i) => ({
+        src: i.url,
+        mediaType: isVideoBackground(i) ? 'video' : 'image',
+        posterUrl: i.posterUrl,
+        mimeType: i.mimeType,
+        fileSize: i.fileSize,
+      }))
+      lightBgs.value = lightDesktop.map((i) => ({
+        src: i.url,
+        mediaType: isVideoBackground(i) ? 'video' : 'image',
+        posterUrl: i.posterUrl,
+        mimeType: i.mimeType,
+        fileSize: i.fileSize,
+      }))
+      mobileDarkBgs.value = darkMobile.map((i) => ({
+        src: i.url,
+        mediaType: isVideoBackground(i) ? 'video' : 'image',
+        posterUrl: i.posterUrl,
+        mimeType: i.mimeType,
+        fileSize: i.fileSize,
+      }))
+      mobileLightBgs.value = lightMobile.map((i) => ({
+        src: i.url,
+        mediaType: isVideoBackground(i) ? 'video' : 'image',
+        posterUrl: i.posterUrl,
+        mimeType: i.mimeType,
+        fileSize: i.fileSize,
+      }))
 
       // 索引越界修正（API 返回的列表可能比 localStorage 存的索引短）
       if (darkBgIndex.value >= darkBgs.value.length) darkBgIndex.value = 0
       if (lightBgIndex.value >= lightBgs.value.length) lightBgIndex.value = 0
       if (mobileDarkBgIndex.value >= mobileDarkBgs.value.length) mobileDarkBgIndex.value = 0
       if (mobileLightBgIndex.value >= mobileLightBgs.value.length) mobileLightBgIndex.value = 0
-    } catch {
+    } catch (error) {
+      console.error('[UI] Failed to load backgrounds', error)
       // API 失败时保持 CSS 纯色背景，不依赖本地图片
     }
   }
@@ -386,6 +423,7 @@ export const useUIStore = defineStore('ui', () => {
     mobileLightBgs,
     isMobile,
     currentBgUrl,
+    currentBackground,
     themeTransitioning,
     themeTransitionRevealStarted,
     setBackgroundBlurEnabled,
