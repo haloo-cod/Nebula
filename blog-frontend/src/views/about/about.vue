@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="about-page">
       <LiquidGlass
         v-if="ui.liquidGlassEnabled"
@@ -65,12 +64,10 @@
         </div>
       </PanelFallbackGlass>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import AboutHero from './AboutHero.vue'

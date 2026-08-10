@@ -5,16 +5,22 @@ import NavBar from './components/NavBar.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
+import PageBackground from './components/PageBackground.vue'
 import PerfMonitor from './components/liquid-glass/PerfMonitor.vue'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { preloadTexture } from '@/components/liquid-glass/liquidGlassRenderer'
+import { preloadTexture, preloadVideoTexture } from '@/components/liquid-glass/liquidGlassRenderer'
+import { isVideoBackground } from '@/data/backgrounds'
 
 const ui = useUIStore()
 const auth = useAuthStore()
 const route = useRoute()
 const hideChrome = computed(() => route.meta.hideChrome === true)
 const hideRain = computed(() => route.meta.hideRain === true)
+const showBackground = computed(() => !hideChrome.value && route.meta.hideBackground !== true)
+const backgroundOverlay = computed(() =>
+  typeof route.meta.backgroundOverlay === 'number' ? route.meta.backgroundOverlay : 0.09,
+)
 
 // 临时性能监控面板:默认常驻显示,Ctrl+Shift+P 可切换隐藏
 const showPerf = ref(false)
@@ -39,13 +45,11 @@ onMounted(() => {
 
   // 启动即预热当前背景纹理(静态 fallback URL),让下载+GPU 上传在玻璃出现之前完成,
   // 避免首个 LiquidGlass 挂载时在主线程同步上传大图造成首帧卡顿。
-  if (ui.currentBgUrl) {
-    void preloadTexture(ui.currentBgUrl)
-  }
+  void preloadCurrentBackground()
 
   // 从后端加载背景图列表（替换静态 fallback），加载完成后预热新 URL
   ui.loadBackgrounds().then(() => {
-    if (ui.currentBgUrl) void preloadTexture(ui.currentBgUrl)
+    void preloadCurrentBackground()
   })
 
   if (auth.token || route.meta.requiresAuth || route.path === '/auth/callback') {
@@ -56,12 +60,14 @@ onMounted(() => {
 })
 
 // 主题切换或背景图手动切换时预热新纹理,下次玻璃刷新时直接命中缓存
-watch(
-  () => ui.currentBgUrl,
-  (url) => {
-    if (url) void preloadTexture(url)
-  },
-)
+async function preloadCurrentBackground() {
+  const background = ui.currentBackground
+  if (!background.src) return
+  if (isVideoBackground(background)) await preloadVideoTexture(background.src)
+  else await preloadTexture(background.src)
+}
+
+watch(() => ui.currentBackground, () => { void preloadCurrentBackground() }, { deep: true })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handlePerfHotkey)
@@ -70,11 +76,14 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
-    <NavBar v-if="ui.showNavbar && !hideChrome" />
-    <RouterView />
-    <BackToTop v-if="ui.showNavbar && !hideChrome" />
-    <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
-    <RainEffect v-if="!hideChrome && !hideRain" />
+    <PageBackground v-if="showBackground" :overlay="backgroundOverlay" />
+    <div class="app-content">
+      <NavBar v-if="ui.showNavbar && !hideChrome" />
+      <RouterView />
+      <BackToTop v-if="ui.showNavbar && !hideChrome" />
+      <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />
+      <RainEffect v-if="!hideChrome && !hideRain" />
+    </div>
     <div
       v-if="ui.themeTransitioning"
       class="theme-overlay"
@@ -142,6 +151,13 @@ html {
 
 <style scoped>
 .app-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.app-content {
+  position: relative;
+  z-index: 2;
   min-height: 100vh;
 }
 

@@ -37,12 +37,14 @@ import {
   isRendererAvailable,
   loadImage,
   uploadTexture,
+  preloadVideoTexture,
   hasTexture,
   getTextureAspect,
   getRenderScale,
   MAX_TRAIL_POINTS,
   type GlassUniforms,
 } from '@/components/liquid-glass/liquidGlassRenderer'
+import { isVideoBackground } from '@/data/backgrounds'
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -87,55 +89,94 @@ type LiquidGlassTheme = 'light' | 'dark'
 
 /** 当前主题对应的背景图 URL（从 store 读取用户选择） */
 const currentBgUl = computed(() => ui.currentBgUrl)
+const currentBackground = computed(() => ui.currentBackground)
 
 // 两套液态玻璃参数预设
 const glassPresets = {
   dark: {
-    glassThickness: 56,
-    ior: 1.15,
+    // 玻璃厚度：越大折射位移越明显；暗色桌面端适当降低，避免背景被拉扯过度。
+    glassThickness: 38,
+    // 折射率：1.0 接近无折射，数值越高边缘弯曲越强。
+    ior: 1.2,
+    // 高光边缘宽度（像素）：控制玻璃边缘亮边的宽窄。
     highlightWidth: 4.0,
+    // 额外背景模糊半径；0 表示不增加模糊。
     blurRadius: 0.0,
+    // 叠加色（RGB 0~1）：控制玻璃本身的染色，过高会让面板发灰发白。
     overlayColor: [0.2, 0.26, 0.32] as [number, number, number],
-    normalStrength: 8.0,
-    displacementScale: 1.0,
+    // 法线强度：越大立体高光越强，也会放大折射变化。
+    normalStrength: 6.5,
+    // 折射位移缩放：控制法线造成的 UV 偏移，暗色主题先收敛到 0.75。
+    displacementScale: 0.68,
+    // 边缘高度过渡宽度：越大边缘过渡越柔和。
     heightTransitionWidth: 10.0,
+    // 圆角 SDF 平滑度：越大边缘越平滑，但细节会减少。
     sminSmoothing: 20.0,
   },
   light: {
-    glassThickness: 28,
-    ior: 1.05,
-    highlightWidth: 2.5,
+    // 亮色背景本身更容易把材质“冲白”，因此减少白色边缘和叠加色，
+    // 同时提高折射/法线强度，让面板仍然保留清晰的体积感。
+    // 玻璃厚度：控制整体折射深度。
+    glassThickness: 40,
+    // 折射率：亮色背景使用较低值，减少泛白和边缘变形。
+    ior: 1.1,
+    // 高光边缘宽度（像素）。
+    highlightWidth: 3.0,
+    // 额外背景模糊半径。
     blurRadius: 0.5,
-    overlayColor: [0.6, 0.65, 0.75] as [number, number, number],
-    normalStrength: 5.0,
-    displacementScale: 0.8,
-    heightTransitionWidth: 6.0,
-    sminSmoothing: 15.0,
+    // 叠加色（RGB 0~1）：亮色主题建议保持低饱和，避免白底泛白。
+    overlayColor: [0.42, 0.5, 0.62] as [number, number, number],
+    // 法线强度：决定高光和立体感。
+    normalStrength: 8.0,
+    // 折射位移缩放：决定背景纹理偏移量。
+    displacementScale: 1.0,
+    // 边缘高度过渡宽度。
+    heightTransitionWidth: 8.0,
+    // 圆角 SDF 平滑度。
+    sminSmoothing: 20.0,
   },
 }
 
 // 移动端专属预设:小面板上折射/叠加色/法线强度增大,补偿面积缩小带来的"薄感"
 const mobileGlassPresets = {
   dark: {
-    glassThickness: 70,
-    ior: 1.2,
+    // 移动端面板较小，需要保留一定厚度，但比原值降低折射强度。
+    glassThickness: 60,
+    // 移动端暗色主题折射率。
+    ior: 1.16,
+    // 移动端边缘高光宽度（像素）。
     highlightWidth: 5.0,
+    // 额外背景模糊半径。
     blurRadius: 0.0,
+    // 叠加色（RGB 0~1）：移动端暗色面板的基础染色。
     overlayColor: [0.25, 0.32, 0.4] as [number, number, number],
-    normalStrength: 10.0,
-    displacementScale: 1.2,
+    // 移动端法线强度：保留小面板的体积感。
+    normalStrength: 8.5,
+    // 移动端折射位移缩放。
+    displacementScale: 0.95,
+    // 边缘高度过渡宽度。
     heightTransitionWidth: 10.0,
+    // 圆角 SDF 平滑度。
     sminSmoothing: 20.0,
   },
   light: {
+    // 移动端亮色主题玻璃厚度。
     glassThickness: 38,
+    // 移动端亮色主题折射率。
     ior: 1.1,
+    // 移动端边缘高光宽度（像素）。
     highlightWidth: 3.5,
+    // 额外背景模糊半径。
     blurRadius: 0.5,
+    // 叠加色（RGB 0~1）：移动端亮色面板的基础染色。
     overlayColor: [0.65, 0.7, 0.8] as [number, number, number],
+    // 法线强度。
     normalStrength: 7.0,
+    // 折射位移缩放。
     displacementScale: 1.0,
+    // 边缘高度过渡宽度。
     heightTransitionWidth: 6.0,
+    // 圆角 SDF 平滑度。
     sminSmoothing: 15.0,
   },
 }
@@ -152,6 +193,10 @@ function isMobileViewport(): boolean {
 let instanceId = 0
 let ctx2d: CanvasRenderingContext2D | null = null
 let resizeObserver: ResizeObserver | null = null
+let renderedBackgroundUrl = ''
+// 抽屉等组件可能先以 v-show 隐藏挂载，此时首次测量尺寸为 0。
+// 记录尺寸有效状态，首次变为可见时重新触发纹理就绪流程。
+let hasValidLayout = false
 
 // Trail points（鼠标涟漪轨迹）
 const TRAIL_MIN_DISTANCE = 14
@@ -272,6 +317,15 @@ function syncCanvasOffset() {
   uniforms.canvasOffset = [rect.left * dpr * scale, rect.top * dpr * scale]
 }
 
+function refreshRenderer() {
+  syncCanvasSize()
+  const [gw, gh] = uniforms.glassSize
+  if (gw >= 1 && gh >= 1) {
+    hasValidLayout = true
+    void syncBackgroundWithTheme(props.theme)
+  }
+}
+
 // ============================================================================
 // Trail Points（鼠标涟漪）
 // ============================================================================
@@ -330,9 +384,11 @@ function updateTrailUniforms() {
 
 async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   const url = currentBgUl.value
+  if (!url || !instanceId) return
 
   // 先隐藏 canvas（允许 reveal 时）
-  if (props.allowReveal || ui.themeTransitioning) {
+  const keepVisible = visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
+  if (ui.themeTransitioning && !keepVisible) {
     visible.value = false
     if (instanceId) {
       setInstanceFirstRenderCallback(instanceId, () => {
@@ -342,12 +398,21 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   }
 
   // 确保纹理已上传
-  if (!hasTexture(url)) {
+  let textureReady = hasTexture(url)
+  if (ui.themeTransitioning && !keepVisible) markInstanceReady(instanceId, false)
+  if (!textureReady) {
     try {
-      const image = await loadImage(url)
-      uploadTexture(url, image)
+      if (isVideoBackground(currentBackground.value)) {
+        textureReady = await preloadVideoTexture(url)
+      } else if (!isVideoBackground(currentBackground.value)) {
+        const image = await loadImage(url)
+        textureReady = uploadTexture(url, image)
+      }
     } catch (e) {
-      console.warn('[LiquidGlass] Failed to load background:', e)
+      console.warn('[LiquidGlass] Failed to load background:', e, {
+        url,
+        mediaType: currentBackground.value.mediaType,
+      })
     }
   }
 
@@ -356,9 +421,14 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
 
   // 更新实例的背景 URL
   if (instanceId) {
-    setInstanceBackground(instanceId, url)
     // 如果不需要 reveal 动画（纹理已就绪），直接标记 ready
-    markInstanceReady(instanceId, true)
+    if (textureReady && uniforms.glassSize[0] >= 1 && uniforms.glassSize[1] >= 1) {
+      setInstanceBackground(instanceId, url)
+      renderedBackgroundUrl = url
+      markInstanceReady(instanceId, true)
+    } else {
+      console.warn('[LiquidGlass] Background texture is not ready', { url, mediaType: currentBackground.value.mediaType })
+    }
   }
 }
 
@@ -407,6 +477,7 @@ onMounted(() => {
 
   // 注册到共享渲染器
   const bgUrl = currentBgUl.value
+  renderedBackgroundUrl = bgUrl
   instanceId = registerInstance(canvas, ctx2d, uniforms, bgUrl, () => {
     visible.value = true
   })
@@ -417,19 +488,28 @@ onMounted(() => {
 
   // 加载纹理并标记实例为就绪
   void (async () => {
-    if (!hasTexture(bgUrl)) {
+    let textureReady = hasTexture(bgUrl)
+    markInstanceReady(instanceId, false)
+    if (!textureReady) {
       try {
-        const image = await loadImage(bgUrl)
-        uploadTexture(bgUrl, image)
+        if (isVideoBackground(currentBackground.value)) {
+          textureReady = await preloadVideoTexture(bgUrl)
+        } else if (!isVideoBackground(currentBackground.value)) {
+          const image = await loadImage(bgUrl)
+          textureReady = uploadTexture(bgUrl, image)
+        }
       } catch (e) {
-        console.warn('[LiquidGlass] Failed to load background:', e)
+        console.warn('[LiquidGlass] Failed to load background:', e, {
+          url: bgUrl,
+          mediaType: currentBackground.value.mediaType,
+        })
       }
     }
     // 更新纹理宽高比(cover 模式 UV 校正用)
     uniforms.texAspect = getTextureAspect(bgUrl)
     // 确保 canvas 尺寸有效后标记为就绪
     const [gw, gh] = uniforms.glassSize
-    if (gw >= 1 && gh >= 1) {
+    if (textureReady && gw >= 1 && gh >= 1) {
       markInstanceReady(instanceId, true)
     }
   })()
@@ -437,10 +517,19 @@ onMounted(() => {
   // ResizeObserver：监听容器尺寸变化
   resizeObserver = new ResizeObserver(() => {
     syncCanvasSize()
-    // 尺寸有效后标记就绪
     const [gw, gh] = uniforms.glassSize
-    if (gw >= 1 && gh >= 1 && instanceId) {
-      markInstanceReady(instanceId, true)
+    const valid = gw >= 1 && gh >= 1
+    if (!valid) {
+      hasValidLayout = false
+      markInstanceReady(instanceId, false)
+      return
+    }
+
+    // v-show 从隐藏切换为显示后，补跑一次背景纹理同步；否则实例会
+    // 永远停留在“尺寸为 0 时未 ready”的状态，canvas 也就不会 reveal。
+    if (!hasValidLayout) {
+      hasValidLayout = true
+      void syncBackgroundWithTheme(props.theme)
     }
   })
   resizeObserver.observe(container)
@@ -454,13 +543,10 @@ onMounted(() => {
   container.addEventListener('pointerleave', resetTrailPoint)
 
   // 如果不需要 reveal 动画,且纹理已就绪,直接 skip firstRender 回调
-  if (!props.allowReveal && hasTexture(bgUrl)) {
-    visible.value = true
-  }
 })
 
 // 背景图切换时重新加载纹理
-watch(currentBgUl, (newUrl) => {
+watch([currentBgUl, () => currentBackground.value.mediaType], ([newUrl]) => {
   if (newUrl && instanceId) {
     void syncBackgroundWithTheme(props.theme)
   }
@@ -522,7 +608,7 @@ watch(
 )
 
 // 暴露 syncCanvasSize 供父组件在需要时手动触发(如 Transition 动画结束后)
-defineExpose({ syncCanvasSize })
+defineExpose({ syncCanvasSize, refreshRenderer })
 </script>
 
 <style scoped>
@@ -533,6 +619,7 @@ defineExpose({ syncCanvasSize })
   border-radius: 16px;
   overflow: hidden;
 }
+
 
 .liquid-glass-canvas {
   position: absolute;

@@ -1,5 +1,7 @@
 # Starlit Blog
 
+> 当前版本支持图片和 MP4/WebM/MOV 视频背景。视频可由后台上传，也可从文件管理中的视频选择；桌面端使用 WebGL 液态玻璃采样，移动端使用 CSS 毛玻璃。
+
 一个前后端分离的个人博客与内容管理系统，包含公开博客、图书阅读、相册、说说、藏宝阁、自习室、访问统计和管理后台。
 
 ## 特性
@@ -96,6 +98,11 @@ pnpm test:unit
 ## 当前状态
 
 项目仍在持续开发中，API 和管理后台可能发生变化。欢迎提交 Issue 或 Pull Request。
+
+文档补充：
+
+- `docs/background-media.md`：图片/视频背景、媒体访问和引用保护
+- `docs/production-update.md`：生产环境更新、备份和重启流程
 
 ## License
 

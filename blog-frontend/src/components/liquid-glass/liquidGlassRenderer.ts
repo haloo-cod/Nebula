@@ -57,6 +57,9 @@ export interface RendererMetrics {
   drawCalls: number
   copyCalls: number
   textureUploads: number
+  videoFrameUploads: number
+  videoWatchdogUploads: number
+  videoUploadFailures: number
   canvasResizes: number
   lastFrameDuration: number
   /** 本帧 WebGL 绘制(uniform 上传 + drawArrays)耗时 ms */
@@ -157,9 +160,17 @@ function createEmptyLocs(): UniformLocations {
 interface TextureEntry {
   texture: WebGLTexture
   aspect: number // 纹理原始宽高比(width/height)
+  video?: HTMLVideoElement
+  videoFrameReady?: boolean
+  videoUploadedFrame?: number
+  videoLastCallbackAt?: number
+  videoLastCallbackTime?: number
+  /** 用于忽略被替换 video 元素留下的旧帧回调。 */
+  videoCallbackGeneration?: number
 }
 
 const textureMap = new Map<string, TextureEntry>()
+const videoPreloadPromises = new Map<string, Promise<boolean>>()
 
 // 实例注册表
 const instances = new Map<number, GlassInstance>()
@@ -187,6 +198,9 @@ const metrics: RendererMetrics = {
   drawCalls: 0,
   copyCalls: 0,
   textureUploads: 0,
+  videoFrameUploads: 0,
+  videoWatchdogUploads: 0,
+  videoUploadFailures: 0,
   canvasResizes: 0,
   lastFrameDuration: 0,
   lastDrawDuration: 0,
@@ -672,6 +686,135 @@ export function uploadTexture(url: string, image: ImageSource): boolean {
   return true
 }
 
+export function uploadVideoTexture(url: string, video: HTMLVideoElement): boolean {
+  if (!gl || contextLost || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
+  const existing = textureMap.get(url)
+  if (existing) {
+    if (existing.video && existing.video !== video) video.pause()
+    if (existing.video && existing.video !== video) return true
+    existing.video = video
+    existing.videoFrameReady = true
+    existing.videoLastCallbackAt = performance.now()
+    existing.videoLastCallbackTime = video.currentTime
+    return true
+  }
+  const texture = gl.createTexture()
+  if (!texture) return false
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  // 与图片纹理保持一致：shader 会对屏幕坐标做 Y 轴校正，上传时统一翻转一次。
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  const entry: TextureEntry = {
+    texture,
+    aspect: video.videoWidth / (video.videoHeight || 1),
+    video,
+    videoFrameReady: true,
+    videoLastCallbackAt: performance.now(),
+    videoLastCallbackTime: video.currentTime,
+  }
+  textureMap.set(url, entry)
+  attachVideoFrameCallbacks(entry)
+  metrics.textureUploads++
+  return true
+}
+
+const VIDEO_CALLBACK_WATCHDOG_MS = 250
+
+/**
+ * 将纹理绑定到正在页面上显示的 video 元素。
+ * 预加载阶段可能先创建隐藏 video；背景层挂载后必须替换为可见元素，
+ * 否则两路 video 会独立解码并逐渐产生时间偏移。
+ */
+export function bindVideoElement(url: string, video: HTMLVideoElement): boolean {
+  if (!gl || contextLost || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
+  const existing = textureMap.get(url)
+  if (existing?.video === video) return true
+  if (existing?.video && existing.video !== video) existing.video.pause()
+  if (existing) {
+    existing.video = video
+    existing.aspect = video.videoWidth / (video.videoHeight || 1)
+    existing.videoFrameReady = true
+    existing.videoUploadedFrame = undefined
+    existing.videoLastCallbackAt = performance.now()
+    existing.videoLastCallbackTime = video.currentTime
+    attachVideoFrameCallbacks(existing)
+    return uploadCurrentVideoFrame(existing)
+  }
+  return uploadVideoTexture(url, video)
+}
+
+function attachVideoFrameCallbacks(entry: TextureEntry) {
+  const video = entry.video
+  if (!video) return
+  const generation = (entry.videoCallbackGeneration ?? 0) + 1
+  entry.videoCallbackGeneration = generation
+  const frameVideo = video as HTMLVideoElement & {
+    requestVideoFrameCallback?: (callback: (now: number, metadata: { mediaTime?: number }) => void) => number
+  }
+  if (typeof frameVideo.requestVideoFrameCallback !== 'function') return
+  const markFrame = (_now?: number, metadata?: { mediaTime?: number }) => {
+    // 背景切换后旧 video 的回调可能仍会到达，不能覆盖当前可见视频的纹理。
+    if (entry.video !== video || entry.videoCallbackGeneration !== generation) return
+    entry.videoFrameReady = true
+    entry.videoLastCallbackAt = performance.now()
+    entry.videoLastCallbackTime = metadata?.mediaTime ?? video.currentTime
+    // 在浏览器报告新帧的时机立即上传，避免 RAF 再晚一帧采样。
+    uploadCurrentVideoFrame(entry)
+    frameVideo.requestVideoFrameCallback?.(markFrame)
+  }
+  frameVideo.requestVideoFrameCallback(markFrame)
+}
+
+function uploadCurrentVideoFrame(entry: TextureEntry): boolean {
+  if (!gl || !entry.video || entry.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
+  const frame = Math.floor(entry.video.currentTime * 1000)
+  if (entry.videoUploadedFrame === frame) return true
+  try {
+    gl.bindTexture(gl.TEXTURE_2D, entry.texture)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, entry.video)
+  } catch {
+    metrics.videoUploadFailures++
+    return false
+  }
+  entry.videoUploadedFrame = frame
+  metrics.videoFrameUploads++
+  entry.videoFrameReady = false
+  return true
+}
+
+function updateVideoTexture(entry: TextureEntry) {
+  if (!gl || !entry.video || entry.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
+  const hasFrameCallback = 'requestVideoFrameCallback' in entry.video
+  const now = performance.now()
+  const currentTime = entry.video.currentTime
+  const callbackStalled = hasFrameCallback &&
+    entry.videoFrameReady === false &&
+    now - (entry.videoLastCallbackAt ?? 0) >= VIDEO_CALLBACK_WATCHDOG_MS &&
+    currentTime !== (entry.videoLastCallbackTime ?? currentTime)
+  if (hasFrameCallback && entry.videoFrameReady === false && !callbackStalled) return
+  const frame = Math.floor(entry.video.currentTime * 1000)
+  if (entry.videoUploadedFrame === frame) return
+  if (!uploadCurrentVideoFrame(entry)) return
+  if (callbackStalled) metrics.videoWatchdogUploads++
+}
+
+function syncVideoPlayback(shouldPlay: boolean) {
+  for (const entry of textureMap.values()) {
+    if (!entry.video) continue
+    if (shouldPlay) void entry.video.play().catch(() => undefined)
+    else entry.video.pause()
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => syncVideoPlayback(!document.hidden))
+}
+
 /** 检查纹理是否已就绪 */
 export function hasTexture(url: string): boolean {
   return textureMap.has(url)
@@ -683,10 +826,33 @@ export function getTextureAspect(url: string): number {
   return entry ? entry.aspect : 1
 }
 
+export interface VideoTextureStats {
+  url: string
+  readyState: number
+  paused: boolean
+  width: number
+  height: number
+  currentTime: number
+}
+
+export function getVideoTextureStats(): VideoTextureStats[] {
+  return [...textureMap.entries()]
+    .filter(([, entry]) => Boolean(entry.video))
+    .map(([url, entry]) => ({
+      url,
+      readyState: entry.video!.readyState,
+      paused: entry.video!.paused,
+      width: entry.video!.videoWidth,
+      height: entry.video!.videoHeight,
+      currentTime: entry.video!.currentTime,
+    }))
+}
+
 /** 删除指定 URL 的纹理（可选,用于内存清理） */
 export function deleteTexture(url: string): void {
   const entry = textureMap.get(url)
   if (entry && gl) {
+    entry.video?.pause()
     gl.deleteTexture(entry.texture)
     textureMap.delete(url)
   }
@@ -846,7 +1012,6 @@ function renderInstance(inst: GlassInstance): boolean {
   // 检查纹理是否就绪
   const texEntry = textureMap.get(backgroundUrl)
   if (!texEntry) return false
-
   // 设置 viewport 为实例尺寸
   const w = Math.ceil(gw)
   const h = Math.ceil(gh)
@@ -971,6 +1136,12 @@ function renderLoop() {
   const needsFullFps = hasTrail || hasPendingFirstRender || scrollActive
   if (!needsFullFps && frameCount % 2 !== 0) return
 
+  if (typeof document === 'undefined' || !document.hidden) {
+    for (const entry of textureMap.values()) {
+      if (entry.video) updateVideoTexture(entry)
+    }
+  }
+
   let renderedInstances = 0
   let drawDuration = 0
   let copyDuration = 0
@@ -1049,6 +1220,51 @@ export async function preloadTexture(url: string): Promise<boolean> {
     ensureInitialized()
     return uploadTexture(url, image)
   } catch {
+    return false
+  }
+}
+
+export async function preloadVideoTexture(url: string): Promise<boolean> {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return false
+  if (hasTexture(url)) return true
+  const pending = videoPreloadPromises.get(url)
+  if (pending) return pending
+  const promise = preloadVideoTextureInternal(url)
+  videoPreloadPromises.set(url, promise)
+  try {
+    return await promise
+  } finally {
+    videoPreloadPromises.delete(url)
+  }
+}
+
+async function preloadVideoTextureInternal(url: string): Promise<boolean> {
+  ensureInitialized()
+  const video = document.createElement('video')
+  // 背景媒体来自后端 8000 端口，前端 WebGL 上传前必须以 CORS 模式加载，
+  // 否则 video 虽然能播放，但 texImage2D/texSubImage2D 会被浏览器安全策略拒绝。
+  video.crossOrigin = 'anonymous'
+  video.muted = true
+  video.loop = true
+  video.playsInline = true
+  video.preload = 'auto'
+  video.src = url
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.addEventListener('loadeddata', () => resolve(), { once: true })
+      video.addEventListener('error', () => reject(new Error('video load failed')), { once: true })
+      video.load()
+    })
+    await video.play().catch(() => undefined)
+    return uploadVideoTexture(url, video)
+  } catch (error) {
+    console.warn('[LiquidGlassRenderer] Video texture upload failed', {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+      readyState: video.readyState,
+      width: video.videoWidth,
+      height: video.videoHeight,
+    })
     return false
   }
 }

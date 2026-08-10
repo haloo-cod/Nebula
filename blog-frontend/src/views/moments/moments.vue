@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="moments-page">
       <!-- 页头 -->
       <header class="moments-header post-rise-inner">
@@ -65,13 +64,11 @@
 
     <!-- 详情 overlay -->
     <MomentDetail :moment="selectedMoment" @close="closeDetail" />
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'

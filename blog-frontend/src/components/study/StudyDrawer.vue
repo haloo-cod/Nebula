@@ -4,7 +4,7 @@
       <div v-show="modelValue" class="drawer-overlay" @click="close"></div>
     </Transition>
 
-    <Transition :name="slideTransitionName">
+    <Transition :name="slideTransitionName" @after-enter="refreshGlass">
       <aside
         v-show="modelValue"
         class="study-drawer"
@@ -13,6 +13,7 @@
       >
         <LiquidGlass
           v-if="ui.liquidGlassEnabled"
+          ref="glassRef"
           class="drawer-glass"
           :theme="ui.theme"
           :corner-radius="24"
@@ -39,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import { useUIStore } from '@/stores/ui'
@@ -61,6 +62,18 @@ const emit = defineEmits<{
 }>()
 
 const ui = useUIStore()
+const glassRef = ref<{ refreshRenderer: () => void } | null>(null)
+
+function refreshGlass() {
+  void nextTick(() => {
+    glassRef.value?.refreshRenderer()
+    requestAnimationFrame(() => glassRef.value?.refreshRenderer())
+  })
+}
+
+watch(() => props.modelValue, (open) => {
+  if (open) refreshGlass()
+}, { immediate: true })
 
 const slideTransitionName = computed(() =>
   props.position === 'left' ? 'drawer-slide-left' : 'drawer-slide-right',

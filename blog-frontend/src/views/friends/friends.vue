@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <main class="friends-page">
       <!-- 页面标题 -->
       <header class="friends-header">
@@ -169,12 +168,10 @@
         </PanelFallbackGlass>
       </section>
     </main>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'

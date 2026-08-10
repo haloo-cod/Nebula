@@ -1,5 +1,4 @@
 ﻿<template>
-  <PageBackground>
     <div class="home-root" :class="{ 'home-locked': !showUIElements }">
       <!-- 面板区域（简介 + 占位） -->
       <div v-if="showUIElements" class="home-panels">
@@ -148,12 +147,10 @@
         </div>
       </div>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import HomeProfilePanel from '@/components/panels/HomeProfilePanel.vue'
 import DataDashboard from '@/components/panels/DataDashboard.vue'

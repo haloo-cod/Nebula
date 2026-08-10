@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="study-page">
       <!-- 左右抽屉开关 -->
       <button
@@ -89,12 +88,10 @@
         @toggle="toggleSchedule"
       />
     </StudyDrawer>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import PageBackground from '@/components/PageBackground.vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'

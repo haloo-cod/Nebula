@@ -8,10 +8,9 @@ const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL
 /**
  * API 根地址。
  *
- * - 开发期(VITE_API_BASE_URL 留空):使用 '' 走同源请求,由 Vite 代理转发到后端。
- *   手机通过局域网 IP 访问 Vite dev server 时,代理同样在服务端本地转发,
- *   手机不需要能直连后端端口。
- * - 生产或直连部署:在 .env 中填写完整的后端地址(如 https://api.example.com)。
+ * - 开发期默认直连 localhost:8000；如启用上面的 Vite 代理，可将
+ *   VITE_API_BASE_URL 设为空字符串，让请求走同源代理，方便局域网预览。
+ * - 生产或直连部署：在 .env 中填写完整的后端地址（如 https://api.example.com）。
  */
 export const BASE_URL =
   configuredBaseUrl !== undefined && configuredBaseUrl !== ''
@@ -117,7 +116,11 @@ async function request<T>(
     let detail = `请求失败 (${response.status})`
     try {
       const errBody = await response.json()
-      if (errBody.detail) detail = errBody.detail
+      if (errBody.detail) {
+        detail = typeof errBody.detail === 'string'
+          ? errBody.detail
+          : JSON.stringify(errBody.detail)
+      }
     } catch {
       // 忽略解析错误
     }

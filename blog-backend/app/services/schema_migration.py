@@ -8,6 +8,55 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
     """幂等补齐现有 SQLite 数据库中后续版本增加的字段。"""
 
     async with engine.begin() as conn:
+        bg_columns = await conn.run_sync(
+            lambda sync_conn: {column["name"] for column in inspect(sync_conn).get_columns("backgrounds")}
+        )
+        bg_image_nullable = await conn.run_sync(
+            lambda sync_conn: next(
+                (column["nullable"] for column in inspect(sync_conn).get_columns("backgrounds") if column["name"] == "image_id"),
+                True,
+            )
+        )
+        if not bg_image_nullable and conn.dialect.name == "sqlite":
+            await conn.execute(text("ALTER TABLE backgrounds RENAME TO backgrounds_legacy"))
+            await conn.execute(text("""
+                CREATE TABLE backgrounds (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    image_id INTEGER,
+                    media_type VARCHAR(10) NOT NULL DEFAULT 'image',
+                    media_url VARCHAR(1000) NOT NULL DEFAULT '',
+                    poster_url VARCHAR(1000) NOT NULL DEFAULT '',
+                    mime_type VARCHAR(100) NOT NULL DEFAULT '',
+                    file_size INTEGER NOT NULL DEFAULT 0,
+                    theme VARCHAR(10) NOT NULL,
+                    device VARCHAR(10) NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(image_id) REFERENCES uploaded_images (id),
+                    CONSTRAINT ck_background_single_media_source CHECK (
+                        (media_type = 'video' AND image_id IS NULL AND media_url <> '') OR
+                        (media_type = 'image' AND ((image_id IS NOT NULL AND media_url = '') OR
+                        (image_id IS NULL AND media_url <> '')))
+                    )
+                )
+            """))
+            await conn.execute(text("""
+                INSERT INTO backgrounds (id, image_id, theme, device, sort_order, created_at, updated_at)
+                SELECT id, image_id, theme, device, sort_order, created_at, updated_at FROM backgrounds_legacy
+            """))
+            await conn.execute(text("DROP TABLE backgrounds_legacy"))
+            bg_columns = {"id", "image_id", "media_type", "media_url", "poster_url", "mime_type", "file_size", "theme", "device", "sort_order", "created_at", "updated_at"}
+        for field, definition in {
+            "media_type": "VARCHAR(10) NOT NULL DEFAULT 'image'",
+            "media_url": "VARCHAR(1000) NOT NULL DEFAULT ''",
+            "poster_url": "VARCHAR(1000) NOT NULL DEFAULT ''",
+            "mime_type": "VARCHAR(100) NOT NULL DEFAULT ''",
+            "file_size": "INTEGER NOT NULL DEFAULT 0",
+        }.items():
+            if field not in bg_columns:
+                await conn.execute(text(f"ALTER TABLE backgrounds ADD COLUMN {field} {definition}"))
+        await conn.execute(text("UPDATE backgrounds SET media_type = 'image' WHERE media_type IS NULL OR media_type = ''"))
         columns = await conn.run_sync(
             lambda sync_conn: {column["name"] for column in inspect(sync_conn).get_columns("books")}
         )

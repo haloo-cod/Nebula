@@ -8,6 +8,13 @@ import { getToken } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { recordAnalyticsEvent } from '@/api/analytics'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    hideBackground?: boolean
+    backgroundOverlay?: number
+  }
+}
+
 // 路由表(未做懒加载拆分按需可加)
 const routes: RouteRecordRaw[] = [
   {
@@ -44,6 +51,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/archive/tree',
     name: 'archive-tree',
+    meta: { backgroundOverlay: 0.14 },
     component: () => import('../views/archive/ArchiveTreePoster.vue'),
   },
   {

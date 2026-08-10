@@ -1,5 +1,4 @@
 <template>
-  <PageBackground>
     <div class="page-wrap">
       <div class="timeline-wrap post-rise-inner">
         <div
@@ -106,13 +105,11 @@
         </div>
       </div>
     </div>
-  </PageBackground>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import PageBackground from '@/components/PageBackground.vue'
 import LazyLiquidGlass from '@/components/liquid-glass/LazyLiquidGlass.vue'
 import { getPosts } from '@/data/posts'
 import { fetchPosts, toFrontendPost } from '@/api/posts'
