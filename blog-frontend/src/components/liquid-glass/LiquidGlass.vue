@@ -285,8 +285,8 @@ function syncCanvasSize() {
 
   const dpr = window.devicePixelRatio || 1
   const scale = getRenderScale()
-  const pw = w * dpr * scale
-  const ph = h * dpr * scale
+  const pw = Math.max(1, Math.round(w * dpr * scale))
+  const ph = Math.max(1, Math.round(h * dpr * scale))
 
   canvas.width = pw
   canvas.height = ph
@@ -385,6 +385,7 @@ function updateTrailUniforms() {
 async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   const url = currentBgUl.value
   if (!url || !instanceId) return
+  const syncToken = ++backgroundSyncToken
 
   // 先隐藏 canvas（允许 reveal 时）
   const keepVisible = visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
@@ -416,6 +417,8 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
     }
   }
 
+  if (syncToken !== backgroundSyncToken || currentBgUl.value !== url) return
+
   // 更新纹理宽高比(cover 模式 UV 校正用)
   uniforms.texAspect = getTextureAspect(url)
 
@@ -438,6 +441,7 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
 
 // 每帧更新 offset 和 trail（通过 RAF 轮询,渲染器内部每帧读取 uniforms）
 let frameId = 0
+let backgroundSyncToken = 0
 function frameUpdate() {
   syncCanvasOffset()
   updateTrailUniforms()
@@ -488,6 +492,7 @@ onMounted(() => {
 
   // 加载纹理并标记实例为就绪
   void (async () => {
+    const initialSyncToken = ++backgroundSyncToken
     let textureReady = hasTexture(bgUrl)
     markInstanceReady(instanceId, false)
     if (!textureReady) {
@@ -506,6 +511,7 @@ onMounted(() => {
       }
     }
     // 更新纹理宽高比(cover 模式 UV 校正用)
+    if (initialSyncToken !== backgroundSyncToken || currentBgUl.value !== bgUrl) return
     uniforms.texAspect = getTextureAspect(bgUrl)
     // 确保 canvas 尺寸有效后标记为就绪
     const [gw, gh] = uniforms.glassSize
