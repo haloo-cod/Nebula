@@ -1085,6 +1085,10 @@ function renderInstance(inst: GlassInstance): boolean {
     gl.uniform1f(locs.highlightWidth!, uniforms.highlightWidth)
     inst.staticUniformKey = staticKey
   }
+  // WebGL uniforms belong to the shared program. Write this per-instance
+  // value on every draw so one LiquidGlass cannot leak its blur radius into
+  // the next instance rendered in the same frame.
+  gl.uniform1f(locs.blurRadius!, uniforms.blurRadius)
   gl.uniform1f(locs.trailRadius!, uniforms.trailRadius)
   gl.uniform1f(locs.trailStrength!, uniforms.trailStrength)
   gl.uniform1i(locs.backgroundTexture!, 0)
