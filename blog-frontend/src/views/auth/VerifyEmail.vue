@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /** 邮箱验证结果页。 */
 import { onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
-const auth = useAuthStore()
+const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 
@@ -15,7 +14,7 @@ onMounted(async () => {
   try {
     if (!token) throw new Error('邮箱验证链接不完整')
     await api.get(`/api/v1/auth/email-verification/confirm?token=${encodeURIComponent(token)}`)
-    await auth.fetchUser()
+    await router.replace('/login?verified=1')
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : '邮箱验证失败'
   } finally {
@@ -36,7 +35,7 @@ onMounted(async () => {
         ><h1>邮箱验证成功</h1>
         <p>现在可以使用完整的账户功能。</p></template
       >
-      <RouterLink to="/">返回博客</RouterLink>
+      <RouterLink :to="error ? '/' : '/login'">{{ error ? '返回博客' : '前往登录' }}</RouterLink>
     </section>
   </main>
 </template>

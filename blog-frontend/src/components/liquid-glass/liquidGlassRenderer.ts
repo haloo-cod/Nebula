@@ -61,6 +61,7 @@ export interface RendererMetrics {
   videoWatchdogUploads: number
   videoUploadFailures: number
   canvasResizes: number
+  copyBoundsErrors: number
   lastFrameDuration: number
   /** 本帧 WebGL 绘制(uniform 上传 + drawArrays)耗时 ms */
   lastDrawDuration: number
@@ -202,6 +203,7 @@ const metrics: RendererMetrics = {
   videoWatchdogUploads: 0,
   videoUploadFailures: 0,
   canvasResizes: 0,
+  copyBoundsErrors: 0,
   lastFrameDuration: 0,
   lastDrawDuration: 0,
   lastCopyDuration: 0,
@@ -733,7 +735,22 @@ export function bindVideoElement(url: string, video: HTMLVideoElement): boolean 
   if (!gl || contextLost || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
   const existing = textureMap.get(url)
   if (existing?.video === video) return true
-  if (existing?.video && existing.video !== video) existing.video.pause()
+  if (existing?.video && existing.video !== video) {
+    const previousTime = existing.video.currentTime
+    existing.video.pause()
+    // Keep the visible element on the same timeline as the preloaded texture
+    // video. Browsers may reject this until metadata is available, so the
+    // normal loadeddata path can retry without failing the switch.
+    if (Number.isFinite(previousTime) && previousTime > 0) {
+      try {
+        if (!Number.isFinite(video.duration) || previousTime < video.duration) {
+          video.currentTime = previousTime
+        }
+      } catch {
+        // The media element is not seekable yet.
+      }
+    }
+  }
   if (existing) {
     existing.video = video
     existing.aspect = video.videoWidth / (video.videoHeight || 1)
@@ -1013,23 +1030,12 @@ function renderInstance(inst: GlassInstance): boolean {
   const texEntry = textureMap.get(backgroundUrl)
   if (!texEntry) return false
   // 设置 viewport 为实例尺寸
-  const w = Math.ceil(gw)
-  const h = Math.ceil(gh)
+  const w = Math.max(1, Math.round(gw))
+  const h = Math.max(1, Math.round(gh))
 
   // offscreen 尺寸"只增不减":避免每帧在不同尺寸实例间反复 resize,
   // 消除 GPU 显存重分配 stall(移动端主要开销)。
   // 渲染通过 viewport + scissor 限制到左下角 w×h 子区域。
-  const needResize = w > offscreenWidth || h > offscreenHeight
-  if (needResize) {
-    const newW = Math.max(w, offscreenWidth)
-    const newH = Math.max(h, offscreenHeight)
-    offscreenCanvas!.width = newW
-    offscreenCanvas!.height = newH
-    offscreenWidth = newW
-    offscreenHeight = newH
-    metrics.canvasResizes++
-  }
-
   // viewport 放在左下角 w×h 区域
   gl.viewport(0, 0, w, h)
   // scissor 限制 clear 只清除 viewport 区域,不影响 offscreen 其余部分
@@ -1079,6 +1085,10 @@ function renderInstance(inst: GlassInstance): boolean {
     gl.uniform1f(locs.highlightWidth!, uniforms.highlightWidth)
     inst.staticUniformKey = staticKey
   }
+  // WebGL uniforms belong to the shared program. Write this per-instance
+  // value on every draw so one LiquidGlass cannot leak its blur radius into
+  // the next instance rendered in the same frame.
+  gl.uniform1f(locs.blurRadius!, uniforms.blurRadius)
   gl.uniform1f(locs.trailRadius!, uniforms.trailRadius)
   gl.uniform1f(locs.trailStrength!, uniforms.trailStrength)
   gl.uniform1i(locs.backgroundTexture!, 0)
@@ -1152,6 +1162,24 @@ function renderLoop() {
   const vpW = window.innerWidth * (window.devicePixelRatio || 1) * renderScale
   const vpH = window.innerHeight * (window.devicePixelRatio || 1) * renderScale
 
+  let requiredWidth = offscreenWidth
+  let requiredHeight = offscreenHeight
+  for (const inst of instances.values()) {
+    if (!inst.ready) continue
+    const [ox, oy] = inst.uniforms.canvasOffset
+    const [gw, gh] = inst.uniforms.glassSize
+    if (ox + gw < -CULL_MARGIN || oy + gh < -CULL_MARGIN || ox > vpW + CULL_MARGIN || oy > vpH + CULL_MARGIN) continue
+    requiredWidth = Math.max(requiredWidth, Math.round(gw))
+    requiredHeight = Math.max(requiredHeight, Math.round(gh))
+  }
+  if (offscreenCanvas && (requiredWidth > offscreenWidth || requiredHeight > offscreenHeight)) {
+    offscreenCanvas.width = requiredWidth
+    offscreenCanvas.height = requiredHeight
+    offscreenWidth = requiredWidth
+    offscreenHeight = requiredHeight
+    metrics.canvasResizes++
+  }
+
   for (const inst of instances.values()) {
     if (!inst.ready) continue
 
@@ -1179,9 +1207,20 @@ function renderLoop() {
     // 2D canvas drawImage 坐标系原点在左上角,所以源 Y 起点 = offscreenHeight - h。
     const { canvas, ctx2d } = inst
     const [instW, instH] = inst.uniforms.glassSize
-    const srcW = Math.ceil(instW)
-    const srcH = Math.ceil(instH)
+    const srcW = Math.round(instW)
+    const srcH = Math.round(instH)
     const srcY = offscreenHeight - srcH
+    const sourceValid = Boolean(
+      offscreenCanvas &&
+      srcW > 0 && srcH > 0 && srcY >= 0 &&
+      srcW <= offscreenCanvas.width &&
+      srcY + srcH <= offscreenCanvas.height &&
+      canvas.width > 0 && canvas.height > 0,
+    )
+    if (!sourceValid) {
+      metrics.copyBoundsErrors++
+      continue
+    }
 
     const copyStart = performance.now()
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)

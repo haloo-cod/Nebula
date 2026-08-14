@@ -103,6 +103,12 @@
           {{ resizesPerSec }}/s
         </span>
       </div>
+      <div class="perf-row">
+        <span class="perf-label">Copy bounds</span>
+        <span class="perf-value" :class="{ 'perf-value--warn': copyBoundsPerSec > 0 || metrics.copyBoundsErrors > 0 }">
+          {{ metrics.copyBoundsErrors }} ({{ copyBoundsPerSec }}/s)
+        </span>
+      </div>
 
       <div class="perf-divider"></div>
 
@@ -278,6 +284,7 @@ const copyCallsPerSec = ref(0)
 const videoUploadsPerSec = ref(0)
 const videoWatchdogUploadsPerSec = ref(0)
 const videoUploadFailuresPerSec = ref(0)
+const copyBoundsPerSec = ref(0)
 const videoState = ref('none')
 const resizesPerSec = ref(0)
 
@@ -301,6 +308,7 @@ function pollMetrics() {
     (m.videoUploadFailures - prevMetrics.videoUploadFailures) / dt,
   )
   resizesPerSec.value = Math.round((m.canvasResizes - prevMetrics.canvasResizes) / dt)
+  copyBoundsPerSec.value = Math.round((m.copyBoundsErrors - prevMetrics.copyBoundsErrors) / dt)
 
   metrics.value = m
   stats.value = getInstanceStats()

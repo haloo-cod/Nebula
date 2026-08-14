@@ -13,7 +13,7 @@ from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models.user import AuthSession, User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import LoginRequest, RegisterRequest, RegisterResponse, TokenResponse, UserResponse
 from app.services.email import send_verification_email
 from app.utils.security import (
     create_access_token,
@@ -83,7 +83,7 @@ async def _create_session(user: User, db: AsyncSession, response: Response) -> T
     return TokenResponse(access_token=create_access_token({"sub": str(user.id)}))
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterRequest,
     request: Request,
@@ -113,7 +113,13 @@ async def register(
         verification_token = create_email_verification_token(user.id, body.email)
         verification_url = f"{settings.FRONTEND_URL}/#/verify-email?token={verification_token}"
         await send_verification_email(body.email, verification_url)
-    return await _create_session(user, db, response)
+        await db.commit()
+        return RegisterResponse(
+            requires_email_verification=True,
+            email=body.email,
+        )
+    session = await _create_session(user, db, response)
+    return RegisterResponse(access_token=session.access_token, token_type=session.token_type)
 
 
 @router.post("/email-verification/send", status_code=status.HTTP_204_NO_CONTENT)
@@ -162,6 +168,8 @@ async def login(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名、邮箱或密码错误")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账户已被禁用")
+    if settings.REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="请先完成邮箱验证")
     return await _create_session(user, db, response)
 
 
@@ -185,6 +193,8 @@ async def refresh_session(
     user = await db.get(User, session.user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账户不可用")
+    if settings.REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="请先完成邮箱验证")
     session.revoked_at = now
     return await _create_session(user, db, response)
 

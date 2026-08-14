@@ -24,6 +24,14 @@ export interface TokenResponse {
   token_type: string
 }
 
+/** 注册响应；开启邮箱验证时不会返回登录令牌。 */
+export interface RegisterResponse {
+  access_token: string | null
+  token_type: string
+  requires_email_verification: boolean
+  email: string | null
+}
+
 /** 当前用户信息 */
 export interface UserInfo {
   id: number
@@ -41,8 +49,8 @@ export function login(data: LoginRequest): Promise<TokenResponse> {
 }
 
 /** 用户名、邮箱和密码注册 */
-export function register(data: RegisterRequest): Promise<TokenResponse> {
-  return api.post<TokenResponse>('/api/v1/auth/register', data)
+export function register(data: RegisterRequest): Promise<RegisterResponse> {
+  return api.post<RegisterResponse>('/api/v1/auth/register', data)
 }
 
 /** 使用 Refresh Cookie 恢复访问令牌 */

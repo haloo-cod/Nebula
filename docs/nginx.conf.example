@@ -1,11 +1,13 @@
 # Starlit Blog 的 Nginx 示例配置
 #
+# 本示例适用于 Cloudflare 负责公网 HTTPS、源站只监听 HTTP 80 端口的部署。
 # 使用前请替换：
 # - example.com：你的域名
 # - /var/www/example.com/blog-frontend/dist：前端 dist 实际路径
 # - /var/log/nginx/example.com：日志路径
 #
-# HTTPS 证书、HTTP -> HTTPS 跳转和证书续期配置请按你的部署环境补充。
+# 如果 HTTPS 由源站 Nginx 终止，请将 X-Forwarded-Proto https 改为 $scheme，
+# 并按实际环境补充 443、证书、HTTP -> HTTPS 跳转和证书续期配置。
 
 server {
     listen 80;
@@ -18,7 +20,7 @@ server {
     # 如果使用宝塔申请证书，可在这里加入面板生成的 well-known 配置。
     # include /www/server/panel/vhost/nginx/well-known/example.com.conf;
 
-    location ~ ^/(\.user.ini|\.htaccess|\.git|\.env|\.svn|\.project|LICENSE|README\.md) {
+    location ~ ^/(\.user\.ini|\.htaccess|\.git|\.env|\.svn|\.project|LICENSE|README\.md) {
         return 404;
     }
 
@@ -26,13 +28,59 @@ server {
         allow all;
     }
 
+    # 视频背景接口：支持 Range，关闭代理缓冲，浏览器缓存一天。
+    location ~ ^/api/v1/(files/[0-9]+/media|backgrounds/media/[^/]+)$ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Cloudflare 到源站走 HTTP，但访客访问的是 HTTPS。
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_set_header Range $http_range;
+        proxy_set_header If-Range $http_if_range;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "public, max-age=86400" always;
+    }
+
+    # FastAPI 图书列表实际注册为 /api/v1/books（不带结尾斜杠）。
+    # 精确匹配可避免 Nginx 自动 301 到 /api/v1/books/ 并产生错误协议地址。
+    location = /api/v1/books {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # 图书详情、EPUB 入口和 EPUB 内部图片/CSS 等懒加载资源。
+    location ^~ /api/v1/books/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # 其他 FastAPI API。不要使用 ^~，以便上面的媒体接口正则能正常匹配。
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
     }
@@ -45,14 +93,20 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Cache-Control "public, max-age=2592000" always;
+        expires 30d;
     }
 
-    # Vue Hash History SPA。
+    # Hash 路由只从根页面加载，未知路径直接返回 404。
+    location = / {
+        try_files /index.html =404;
+    }
+
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files $uri =404;
     }
 
     location ~* \.(gif|jpg|jpeg|png|bmp|swf|webp|ico)$ {
@@ -73,7 +127,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     access_log /var/log/nginx/example.com.access.log;

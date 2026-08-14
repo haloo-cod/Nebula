@@ -31,7 +31,7 @@ import { storeToRefs } from 'pinia'
 import { useUIStore } from '@/stores/ui'
 import { isVideoBackground } from '@/data/backgrounds'
 import type { BackgroundItem } from '@/data/backgrounds'
-import { bindVideoElement } from '@/components/liquid-glass/liquidGlassRenderer'
+import { bindVideoElement, preloadTexture, preloadVideoTexture } from '@/components/liquid-glass/liquidGlassRenderer'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
 withDefaults(defineProps<{ overlay?: number }>(), {
@@ -77,35 +77,10 @@ async function switchBackground(next: BackgroundItem) {
 
   // 先在后台确认资源可用，准备完成前继续显示旧背景，避免切换瞬间黑屏。
   if (isVideoBackground(next)) {
-    const probe = document.createElement('video')
-    probe.muted = true
-    probe.playsInline = true
-    probe.preload = 'metadata'
-    probe.src = next.src
-    const ready = await new Promise<boolean>((resolve) => {
-      const done = (ok: boolean) => {
-        probe.removeEventListener('canplay', onReady)
-        probe.removeEventListener('loadeddata', onReady)
-        probe.removeEventListener('error', onError)
-        resolve(ok)
-      }
-      const onReady = () => done(true)
-      const onError = () => done(false)
-      probe.addEventListener('canplay', onReady, { once: true })
-      probe.addEventListener('loadeddata', onReady, { once: true })
-      probe.addEventListener('error', onError, { once: true })
-      probe.load()
-    })
-    probe.removeAttribute('src')
-    probe.load()
+    const ready = await preloadVideoTexture(next.src)
     if (!ready || token !== switchToken) return
   } else {
-    const ready = await new Promise<boolean>((resolve) => {
-      const image = new Image()
-      image.onload = () => resolve(true)
-      image.onerror = () => resolve(false)
-      image.src = next.src
-    })
+    const ready = await preloadTexture(next.src)
     if (!ready || token !== switchToken) return
   }
 

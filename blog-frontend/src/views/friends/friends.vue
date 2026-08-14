@@ -56,6 +56,7 @@
               v-if="ui.liquidGlassEnabled"
               class="friend-card-glass"
               :theme="ui.theme"
+              :blur-radius="ui.liquidGlassBlur"
               :corner-radius="16"
               :ripple-trail="true"
             >
@@ -97,6 +98,7 @@
           v-if="ui.liquidGlassEnabled"
           class="exchange-glass"
           :theme="ui.theme"
+          :blur-radius="ui.liquidGlassBlur"
           :corner-radius="16"
           :ripple-trail="true"
         >
