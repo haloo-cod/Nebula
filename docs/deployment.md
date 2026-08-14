@@ -113,13 +113,13 @@ VITE_API_BASE_URL=
 
 ## 生产部署
 
-以下方案适用于在一台 Ubuntu 服务器上的同域部署：Nginx 对外提供 HTTPS 和前端静态文件，`/api/` 反向代理到仅监听本机的 FastAPI，SQLite 和上传目录保留在后端目录。
+以下方案适用于在一台 Ubuntu 服务器上的同域部署：Cloudflare 对外提供 HTTPS，源站 Nginx 监听 HTTP 80 并提供前端静态文件，`/api/` 反向代理到仅监听本机的 FastAPI，SQLite 和上传目录保留在后端目录。
 
 ### 方案一：Nginx 反向代理（推荐）
 
 完整的脱敏配置示例见 [`nginx.conf.example`](nginx.conf.example)。其中已将域名、服务器目录和日志路径替换为占位值。
 
-Nginx 负责提供前端 `dist/` 静态文件，并将 `/api/`、`/uploads/images/` 和 `/health` 转发给监听在 `127.0.0.1:8000` 的 FastAPI。前端生产构建时将 `VITE_API_BASE_URL` 留空，浏览器会通过当前域名访问这些路径。
+Nginx 负责提供前端 `dist/` 静态文件，并将 `/api/`、`/uploads/images/` 和 `/health` 转发给监听在 `127.0.0.1:8000` 的 FastAPI。前端生产构建时将 `VITE_API_BASE_URL` 留空，浏览器会通过当前域名访问这些路径。Cloudflare 到源站使用 HTTP 时，反向代理必须显式传递 `X-Forwarded-Proto https`，否则 FastAPI 的斜杠重定向可能生成 `http://` 地址并触发浏览器 Mixed Content。
 
 ```
 ┌─────────────┐      ┌─────────────┐
@@ -142,39 +142,13 @@ pnpm build
 
 #### 2. Nginx 配置
 
-```nginx
-server {
-    listen 80;
-    server_name example.com www.example.com;
+完整配置请直接参考 [`nginx.conf.example`](nginx.conf.example)。当前配置有几个不能省略的部署约束：
 
-    # 前端静态文件
-    root /var/www/example.com/blog-frontend/dist;
-    index index.html;
-
-    # SPA fallback（Hash 模式其实不需要，但保险起见）
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API 反向代理
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    # 只允许公开图片通过应用路由访问；EPUB、普通文件和 ZIP 必须经过 API 鉴权。
-    location /uploads/images/ {
-        proxy_pass http://127.0.0.1:8000;
-    }
-
-    # 禁止访问隐藏文件
-    location ~ /\. {
-        deny all;
-    }
-}
-```
+- Cloudflare 负责公网 HTTPS、源站只监听 HTTP 80 时，所有反向代理都要设置 `proxy_set_header X-Forwarded-Proto https`。
+- 图书列表实际路由是 `/api/v1/books`，需要使用 `location = /api/v1/books` 精确匹配，避免 Nginx 自动补斜杠并返回错误的 HTTP 重定向。
+- 图书详情、阅读入口和 EPUB 内部资源使用 `location ^~ /api/v1/books/`，确保 `.jpg`、`.css` 等资源不会被静态文件正则 location 截走。
+- Hash 路由不需要 SPA fallback；根页面使用 `location = /` 返回 `index.html`，其他不存在路径使用 `try_files $uri =404`。
+- 视频背景接口需要保留 Range、关闭代理缓冲，并设置 `Cache-Control: public, max-age=86400`。
 
 #### 3. 启动后端（生产模式）
 
@@ -246,7 +220,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-HTTPS 使用 Certbot：
+如果 HTTPS 由源站 Nginx 终止，可使用 Certbot：
 
 ```bash
 sudo certbot --nginx -d example.com -d www.example.com
@@ -306,7 +280,9 @@ pnpm dev
 
 ## HTTPS 配置
 
-推荐使用 Let's Encrypt + Certbot：
+当前 Cloudflare 部署由 Cloudflare 负责公网 HTTPS，源站 Nginx 只监听 HTTP 80。此模式下不需要在宝塔或源站配置 Certbot 证书；请在 Cloudflare 的 SSL/TLS 中按源站实际情况选择模式，并确保访问源站的反向代理显式传递 `X-Forwarded-Proto https`。
+
+如果改为由源站 Nginx 终止 HTTPS，再使用 Let's Encrypt + Certbot：
 
 ```bash
 sudo certbot --nginx -d your-domain.com

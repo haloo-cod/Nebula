@@ -14,6 +14,7 @@ import {
   register as registerApi,
   type LoginRequest,
   type RegisterRequest,
+  type RegisterResponse,
   type UserInfo,
 } from '@/api/auth'
 
@@ -44,11 +45,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** 注册并立即建立登录态 */
-  async function register(data: RegisterRequest): Promise<void> {
+  async function register(data: RegisterRequest): Promise<RegisterResponse> {
     const res = await registerApi(data)
+    if (res.requires_email_verification || !res.access_token) return res
     token.value = res.access_token
     setToken(res.access_token)
     await fetchUser()
+    return res
   }
 
   /** 拉取当前用户信息（用于页面刷新后恢复登录态） */

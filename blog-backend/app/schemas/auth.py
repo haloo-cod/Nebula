@@ -46,6 +46,15 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class RegisterResponse(BaseModel):
+    """注册结果；开启邮箱验证时不包含登录令牌。"""
+
+    access_token: str | None = None
+    token_type: str = "bearer"
+    requires_email_verification: bool = False
+    email: str | None = None
+
+
 class UserResponse(BaseModel):
     id: int
     username: str
