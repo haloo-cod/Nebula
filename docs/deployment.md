@@ -147,7 +147,7 @@ pnpm build
 - Cloudflare 负责公网 HTTPS、源站只监听 HTTP 80 时，所有反向代理都要设置 `proxy_set_header X-Forwarded-Proto https`。
 - 图书列表实际路由是 `/api/v1/books`，需要使用 `location = /api/v1/books` 精确匹配，避免 Nginx 自动补斜杠并返回错误的 HTTP 重定向。
 - 图书详情、阅读入口和 EPUB 内部资源使用 `location ^~ /api/v1/books/`，确保 `.jpg`、`.css` 等资源不会被静态文件正则 location 截走。
-- Hash 路由不需要 SPA fallback；根页面使用 `location = /` 返回 `index.html`，其他不存在路径使用 `try_files $uri =404`。
+- History 路由需要 SPA fallback：页面路径使用 `try_files $uri $uri/ /index.html`，API、上传和下载路径必须在此前单独代理，不能回退到前端页面。
 - 视频背景接口需要保留 Range、关闭代理缓冲，并设置 `Cache-Control: public, max-age=86400`。
 
 #### 3. 启动后端（生产模式）

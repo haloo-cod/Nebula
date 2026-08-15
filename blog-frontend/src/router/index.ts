@@ -1,6 +1,6 @@
 import {
   createRouter,
-  createWebHashHistory,
+  createWebHistory,
   type RouteLocationNormalized,
   type RouteRecordRaw,
 } from 'vue-router'
@@ -12,6 +12,8 @@ declare module 'vue-router' {
   interface RouteMeta {
     hideBackground?: boolean
     backgroundOverlay?: number
+    title?: string
+    description?: string
   }
 }
 
@@ -257,12 +259,45 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
 
+const publicSeo: Record<string, { title: string; description: string }> = {
+  index: { title: "首页 | Starlitn'blog", description: '分享技术、生活和思考的个人博客' },
+  blog: { title: "博文 | Starlitn'blog", description: '记录技术、生活与思考的文章' },
+  archive: { title: "归档 | Starlitn'blog", description: "按时间浏览 Starlitn'blog 的文章归档" },
+  books: { title: "图书 | Starlitn'blog", description: '阅读和收藏的图书资源' },
+  images: { title: "图片 | Starlitn'blog", description: '收集和分享的图片' },
+  gallery: { title: "展览 | Starlitn'blog", description: '记录正在构建和重构中的项目' },
+  friends: { title: "友链 | Starlitn'blog", description: '互联网大海里的有趣朋友们' },
+  treasure: { title: "藏宝阁 | Starlitn'blog", description: '开源项目、实用工具和资源下载' },
+  moments: { title: "说说 | Starlitn'blog", description: '一些碎碎念、心情和生活点滴' },
+  about: { title: "关于 | Starlitn'blog", description: "关于 Starlitn'blog 和站点作者" },
+}
+
 /** 记录前台成功导航，后台和认证页面不纳入公开访问统计。 */
 router.afterEach((to) => {
+  const seo = typeof to.name === 'string' ? publicSeo[to.name] : undefined
+  document.title = to.meta.title ?? seo?.title ?? "Starlitn'blog"
+  const description = to.meta.description ?? seo?.description
+  if (description) {
+    let descriptionTag = document.querySelector('meta[name="description"]')
+    if (!descriptionTag) {
+      descriptionTag = document.createElement('meta')
+      descriptionTag.setAttribute('name', 'description')
+      document.head.appendChild(descriptionTag)
+    }
+    descriptionTag.setAttribute('content', description)
+  }
+  let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
+  if (!canonical) {
+    canonical = document.createElement('link')
+    canonical.rel = 'canonical'
+    document.head.appendChild(canonical)
+  }
+  canonical.href = `${window.location.origin}${to.path}`
+
   if (
     to.path.startsWith('/admin') ||
     ['/login', '/register', '/auth/callback', '/verify-email'].includes(to.path)

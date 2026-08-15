@@ -71,8 +71,8 @@ Routes: `/` (index), `/archive`, `/archive/tree`, `/archive/post/:slug`, `/books
 
 ## Deployment quirks
 
-- Router uses **hash history** (`createWebHashHistory`), not HTML5 history mode — all URLs use `#` (e.g. `/index.html#/post/my-slug`).
-- Vite `base: './'` — assets use relative paths so the built output works from any subdirectory.
+- Router uses HTML5 history (`createWebHistory`) — public and admin URLs use standard paths (e.g. `/post/my-slug`).
+- Vite `base: '/'` — production is deployed at the domain root and Nginx provides SPA fallback for deep links.
 - Route `/midnight-tavern` has `meta: { hideChrome: true }` — NavBar and other chrome components check this to hide themselves.
 - Build auto-splits `vue`/`vue-router`/`pinia` into `vue-vendor` chunk and `marked` into its own chunk (see `vite.config.ts` `manualChunks`).
 
