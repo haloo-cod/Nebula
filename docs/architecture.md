@@ -156,7 +156,7 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 
 ### 4. 部署友好
 
-- 前端：Hash History 模式 + `base: './'`，build 产物可放在任意子目录
+- 前端：HTML5 History 模式 + `base: '/'`，由 Nginx SPA fallback 支持深层页面刷新
 - 后端：SQLite 零配置，上线只需部署单个 Python 进程
 - 未来可平滑迁移到 PostgreSQL（只改 `DATABASE_URL`）
 

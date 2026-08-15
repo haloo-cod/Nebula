@@ -100,13 +100,9 @@ server {
         expires 30d;
     }
 
-    # Hash 路由只从根页面加载，未知路径直接返回 404。
-    location = / {
-        try_files /index.html =404;
-    }
-
+    # History 路由：页面深层 URL 刷新时回退到 index.html；API/上传路径已在上方优先匹配。
     location / {
-        try_files $uri =404;
+        try_files $uri $uri/ /index.html;
     }
 
     location ~* \.(gif|jpg|jpeg|png|bmp|swf|webp|ico)$ {

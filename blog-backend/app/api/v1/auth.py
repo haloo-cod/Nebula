@@ -111,7 +111,7 @@ async def register(
     await db.flush()
     if settings.REQUIRE_EMAIL_VERIFICATION:
         verification_token = create_email_verification_token(user.id, body.email)
-        verification_url = f"{settings.FRONTEND_URL}/#/verify-email?token={verification_token}"
+        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
         await send_verification_email(body.email, verification_url)
         await db.commit()
         return RegisterResponse(
@@ -131,7 +131,7 @@ async def resend_email_verification(
     if user.email_verified or not user.email:
         return
     token = create_email_verification_token(user.id, user.email)
-    await send_verification_email(user.email, f"{settings.FRONTEND_URL}/#/verify-email?token={token}")
+    await send_verification_email(user.email, f"{settings.FRONTEND_URL}/verify-email?token={token}")
 
 
 @router.get("/email-verification/confirm")
@@ -344,7 +344,7 @@ async def github_callback(
         user.email_verified = user.email_verified or bool(email)
     redirect_path = _safe_redirect(state_payload.get("redirect"))
     redirect = RedirectResponse(
-        f"{settings.FRONTEND_URL}/#/auth/callback?redirect={urlencode({'': redirect_path})[1:]}",
+        f"{settings.FRONTEND_URL}/auth/callback?redirect={urlencode({'': redirect_path})[1:]}",
         status_code=status.HTTP_302_FOUND,
     )
     redirect.delete_cookie(OAUTH_STATE_COOKIE, path="/api/v1/auth/github/callback")
