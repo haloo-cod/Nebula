@@ -5,7 +5,15 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, Close, Download, Rank, RefreshRight, Upload } from '@element-plus/icons-vue'
+import {
+  ArrowDown,
+  Close,
+  Download,
+  MoreFilled,
+  Rank,
+  RefreshRight,
+  Upload,
+} from '@element-plus/icons-vue'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
 import type { BookSort } from '@/api/books'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
@@ -262,6 +270,14 @@ function statusText(task: BookUploadTask): string {
 function handleSelectionChange(rows: unknown[]) {
   // Element Plus 的表格泛型未从模板推断，这里将选择结果收窄为当前表格行类型。
   selectedBooks.value = rows as BookItem[]
+}
+
+/** 移动端卡片列表的“更多操作”命令分发。 */
+function handleMobileCommand(command: string, book: BookItem) {
+  if (command === 'edit') openEdit(book)
+  else if (command === 'download') void downloadBook(book)
+  else if (command === 'cover') void extractCover(book)
+  else if (command === 'delete') void handleDelete(book, `「${book.title}」`)
 }
 
 /** 下载单本 EPUB。 */
@@ -594,10 +610,43 @@ onMounted(() => loadData())
     </div>
 
     <el-card shadow="never" class="table-card">
+      <!-- 移动端卡片列表 -->
+      <div class="book-mobile-list">
+        <div v-for="row in data" :key="row.id" class="book-mobile-card">
+          <div class="book-mobile-head">
+            <img v-if="row.cover_url" :src="resolveUrl(row.cover_url)" class="book-cover" alt="" />
+            <div v-else class="book-cover-placeholder">无</div>
+            <div class="book-mobile-title-wrap">
+              <div class="book-mobile-title">{{ row.title }}</div>
+              <div class="book-mobile-author">{{ row.author || '未知作者' }}</div>
+            </div>
+            <el-dropdown trigger="click" @command="handleMobileCommand($event, row)">
+              <el-button circle :icon="MoreFilled" aria-label="更多操作" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                  <el-dropdown-item command="download">下载</el-dropdown-item>
+                  <el-dropdown-item command="cover">重提封面</el-dropdown-item>
+                  <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <p class="book-mobile-desc">{{ row.description || '暂无简介' }}</p>
+          <div class="book-mobile-meta">
+            <span>上传 {{ row.created_at?.slice(0, 10) || '--' }}</span>
+            <span>排序 {{ row.sort_order }}</span>
+          </div>
+        </div>
+        <el-empty v-if="data.length === 0" description="暂无图书" :image-size="72" />
+      </div>
+
+      <!-- 桌面端表格 -->
       <el-table
         :data="data as any"
         v-loading="loading"
         stripe
+        class="book-desktop-table"
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
@@ -979,6 +1028,69 @@ onMounted(() => loadData())
   color: var(--admin-text-secondary, var(--el-text-color-secondary));
   font-size: 12px;
 }
+
+/* 移动端卡片列表（默认隐藏，窄屏替换表格） */
+.book-mobile-list {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.book-mobile-card {
+  padding: 14px;
+  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border-radius: 12px;
+  background: var(--admin-panel-bg, #ffffff);
+}
+
+.book-mobile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.book-mobile-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-mobile-title {
+  overflow: hidden;
+  color: var(--admin-text-color, #303133);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-mobile-author {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-mobile-desc {
+  display: -webkit-box;
+  margin: 10px 0 0;
+  overflow: hidden;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.book-mobile-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 11px;
+}
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
@@ -1196,6 +1308,19 @@ onMounted(() => loadData())
 
   .header-actions > * {
     flex: 1;
+  }
+
+  /* 窄屏隐藏表格，改用卡片列表 */
+  .book-desktop-table {
+    display: none;
+  }
+
+  .book-mobile-list {
+    display: flex;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
   }
 }
 </style>

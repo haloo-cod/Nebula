@@ -1,27 +1,27 @@
 <template>
-    <main class="project-page">
-      <RouterLink to="/gallery" class="back-link">返回展览</RouterLink>
+  <main class="project-page">
+    <RouterLink to="/gallery" class="back-link">返回展览</RouterLink>
 
-      <article v-if="project" class="project-doc glass-strong">
-        <header class="project-header">
-          <span class="project-kicker">{{ project.year }} / {{ project.status }}</span>
-          <h1>{{ project.title }}</h1>
-          <p>{{ project.description }}</p>
-          <div class="project-tags">
-            <span v-for="tag in project.tags" :key="tag">{{ tag }}</span>
-          </div>
-        </header>
+    <article v-if="project" class="project-doc glass-strong">
+      <header class="project-header">
+        <span class="project-kicker">{{ project.year }} / {{ project.status }}</span>
+        <h1>{{ project.title }}</h1>
+        <p>{{ project.description }}</p>
+        <div class="project-tags">
+          <span v-for="tag in project.tags" :key="tag">{{ tag }}</span>
+        </div>
+      </header>
 
-        <div v-if="loading" class="doc-state">文档加载中...</div>
-        <div v-else class="markdown-body" v-html="html"></div>
-      </article>
+      <div v-if="loading" class="doc-state">文档加载中...</div>
+      <div v-else class="markdown-body" v-html="html"></div>
+    </article>
 
-      <section v-else class="project-doc glass-strong not-found">
-        <span class="project-kicker">Not Found</span>
-        <h1>项目不存在或尚未公开</h1>
-        <p>这个项目文档可能还在整理中,可以先返回展览页查看其他项目。</p>
-      </section>
-    </main>
+    <section v-else class="project-doc glass-strong not-found">
+      <span class="project-kicker">Not Found</span>
+      <h1>项目不存在或尚未公开</h1>
+      <p>这个项目文档可能还在整理中,可以先返回展览页查看其他项目。</p>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">

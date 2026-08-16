@@ -67,7 +67,13 @@ async function preloadCurrentBackground() {
   else await preloadTexture(background.src)
 }
 
-watch(() => ui.currentBackground, () => { void preloadCurrentBackground() }, { deep: true })
+watch(
+  () => ui.currentBackground,
+  () => {
+    void preloadCurrentBackground()
+  },
+  { deep: true },
+)
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handlePerfHotkey)

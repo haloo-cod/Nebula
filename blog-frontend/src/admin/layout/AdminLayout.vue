@@ -9,6 +9,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
+import '@/assets/admin.css'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
 
@@ -103,21 +104,23 @@ function applyDarkTheme() {
 <style scoped>
 /* ---------- CSS 变量：亮色主题 ---------- */
 .admin-layout {
-  --admin-primary-color: #409eff;
+  --admin-primary-color: #1f7a68;
   --admin-sidebar-bg: #ffffff;
-  --admin-topbar-bg: #ffffff;
-  --admin-content-bg: #f5f7fa;
+  --admin-topbar-bg: rgba(255, 255, 255, 0.92);
+  --admin-content-bg: #f4f6f8;
   --admin-panel-bg: #ffffff;
-  --admin-fill-bg: #f5f7fa;
-  --admin-text-color: #303133;
-  --admin-text-secondary: #909399;
-  --admin-border-color: #e4e7ed;
-  --admin-menu-active-bg: #ecf5ff;
-  --admin-menu-hover-bg: #f5f7fa;
+  --admin-fill-bg: #f7f8fa;
+  --admin-text-color: #18181b;
+  --admin-text-secondary: #71717a;
+  --admin-border-color: #e4e4e7;
+  --admin-menu-active-bg: #e6f4f0;
+  --admin-menu-hover-bg: #f1f5f4;
 
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  flex-direction: row;
+  height: 100dvh;
+  min-height: 100dvh;
+  width: 100%;
   overflow: hidden;
   color: var(--admin-text-color);
   background: var(--admin-content-bg);
@@ -134,24 +137,24 @@ function applyDarkTheme() {
 
 /* ---------- CSS 变量：暗色主题 ---------- */
 .admin-layout.admin-dark {
-  --admin-primary-color: #409eff;
-  --admin-sidebar-bg: #141414;
-  --admin-topbar-bg: #1d1d1d;
-  --admin-content-bg: #0a0a0a;
-  --admin-panel-bg: #1d1e1f;
-  --admin-fill-bg: #262727;
-  --admin-text-color: #e5eaf3;
-  --admin-text-secondary: #a3a6ad;
-  --admin-border-color: #303030;
-  --admin-menu-active-bg: #1d3043;
-  --admin-menu-hover-bg: #1a1a1a;
+  --admin-primary-color: #62c9ad;
+  --admin-sidebar-bg: #151918;
+  --admin-topbar-bg: rgba(23, 27, 25, 0.94);
+  --admin-content-bg: #101312;
+  --admin-panel-bg: #191d1b;
+  --admin-fill-bg: #202623;
+  --admin-text-color: #f4f7f5;
+  --admin-text-secondary: #a8b3ae;
+  --admin-border-color: #2b3531;
+  --admin-menu-active-bg: #203b33;
+  --admin-menu-hover-bg: #222a26;
 }
 
 /* ---------- 侧边栏 ---------- */
 .admin-layout-sidebar {
-  width: 220px;
+  width: 240px;
   flex-shrink: 0;
-  transition: width 0.3s ease;
+  transition: width 0.24s ease;
   overflow: hidden;
 }
 
@@ -164,18 +167,24 @@ function applyDarkTheme() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   min-width: 0;
+  min-height: 0;
 }
 
 .admin-layout-header {
+  height: 64px;
   flex-shrink: 0;
+  background: var(--admin-topbar-bg);
+  border-bottom: 1px solid var(--admin-border-color);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .admin-layout-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px clamp(16px, 3vw, 40px) 40px;
   background: var(--admin-content-bg);
 }
 
@@ -195,18 +204,26 @@ function applyDarkTheme() {
 }
 
 @media (max-width: 767px) {
+  .admin-layout-main {
+    min-height: 100dvh;
+  }
+
+  .admin-layout-content {
+    min-height: 0;
+  }
+
   .admin-layout-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
-    z-index: 1001;
-    width: min(82vw, 280px);
+    z-index: 30;
+    width: min(86vw, 300px);
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
+    transition: transform 0.24s ease;
+    box-shadow: 12px 0 32px rgba(0, 0, 0, 0.2);
   }
 
   .admin-layout-sidebar.is-collapsed {
-    width: min(82vw, 280px);
+    width: min(86vw, 300px);
   }
 
   .admin-layout.mobile-sidebar-open .admin-layout-sidebar {
@@ -216,87 +233,26 @@ function applyDarkTheme() {
   .admin-sidebar-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: 20;
     display: block;
+    width: 100%;
     border: 0;
-    background: rgba(0, 0, 0, 0.38);
+    background: rgba(9, 12, 11, 0.48);
     cursor: pointer;
   }
 
   .admin-layout-content {
-    padding: 12px;
+    min-height: 0;
+    padding: 20px 14px 28px;
   }
 }
-</style>
 
-<style>
-/* 后台弹窗挂载到 body，使用全局规则保证移动端尺寸不被各页面的 width 属性撑破。 */
-.admin-layout ~ .el-overlay .el-dialog,
-.el-overlay .el-dialog {
-  max-width: calc(100vw - 32px);
-  box-sizing: border-box;
-}
-
-.el-overlay .el-dialog__body {
-  max-height: min(70vh, 680px);
-  overflow-y: auto;
-}
-
-@media (max-width: 767px) {
-  .el-overlay .el-dialog {
-    width: calc(100vw - 24px) !important;
-    margin: 12px auto;
-    border-radius: 10px;
-  }
-
-  .el-overlay .el-dialog__header {
-    padding: 16px 16px 10px;
-  }
-
-  .el-overlay .el-dialog__title {
-    font-size: 16px;
-  }
-
-  .el-overlay .el-dialog__body {
-    max-height: calc(100vh - 180px);
-    padding: 12px 16px 16px;
-  }
-
-  .el-overlay .el-dialog__footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 10px 16px 16px;
-  }
-
-  .el-overlay .el-dialog__footer .el-button {
-    min-width: 76px;
-    margin-left: 0;
-  }
-
-  .el-overlay .el-form-item {
-    margin-bottom: 16px;
-  }
-
-  .el-overlay .el-form-item__label {
-    padding-bottom: 4px;
-  }
-
-  .el-overlay .el-form--inline .el-form-item {
-    display: flex;
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .el-overlay .el-form--inline .el-form-item__content,
-  .el-overlay .el-form--inline .el-input,
-  .el-overlay .el-form--inline .el-select {
-    width: 100% !important;
-  }
-
-  .el-overlay .el-upload-dragger {
-    width: 100%;
-    box-sizing: border-box;
+@media (prefers-reduced-motion: reduce) {
+  .admin-layout-sidebar,
+  .admin-layout-content,
+  .admin-fade-enter-active,
+  .admin-fade-leave-active {
+    transition: none;
   }
 }
 </style>

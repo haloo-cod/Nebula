@@ -1,69 +1,69 @@
 <template>
-    <div class="about-page">
-      <LiquidGlass
-        v-if="ui.liquidGlassEnabled"
-        class="about-glass"
-        :theme="ui.theme"
-        :corner-radius="32"
-        :blur-radius="ui.liquidGlassBlur"
-        :glass-thickness="42"
-        :highlight-width="3"
-        ripple-trail
-      >
-        <div class="about-inner">
-          <AboutHero />
-          <div class="about-toolbar">
-            <AboutTabs :active-tab="activeTab" @change="switchTab" />
-          </div>
-          <div class="about-divider"></div>
-          <!-- 高度过渡容器：用 inline style 绑定动态高度 -->
-          <div class="tab-panel" :style="{ height: panelHeight }">
-            <div
-              ref="introRef"
-              class="tab-pane"
-              :class="{ 'tab-pane--active': activeTab === 'intro' }"
-            >
-              <AboutIntro />
-            </div>
-            <div
-              ref="activityRef"
-              class="tab-pane"
-              :class="{ 'tab-pane--active': activeTab === 'activity' }"
-            >
-              <AboutActivity />
-            </div>
-          </div>
-          <AboutComments v-show="activeTab === 'intro'" />
+  <div class="about-page">
+    <LiquidGlass
+      v-if="ui.liquidGlassEnabled"
+      class="about-glass"
+      :theme="ui.theme"
+      :corner-radius="32"
+      :blur-radius="ui.liquidGlassBlur"
+      :glass-thickness="42"
+      :highlight-width="3"
+      ripple-trail
+    >
+      <div class="about-inner">
+        <AboutHero />
+        <div class="about-toolbar">
+          <AboutTabs :active-tab="activeTab" @change="switchTab" />
         </div>
-      </LiquidGlass>
+        <div class="about-divider"></div>
+        <!-- 高度过渡容器：用 inline style 绑定动态高度 -->
+        <div class="tab-panel" :style="{ height: panelHeight }">
+          <div
+            ref="introRef"
+            class="tab-pane"
+            :class="{ 'tab-pane--active': activeTab === 'intro' }"
+          >
+            <AboutIntro />
+          </div>
+          <div
+            ref="activityRef"
+            class="tab-pane"
+            :class="{ 'tab-pane--active': activeTab === 'activity' }"
+          >
+            <AboutActivity />
+          </div>
+        </div>
+        <AboutComments v-show="activeTab === 'intro'" />
+      </div>
+    </LiquidGlass>
 
-      <PanelFallbackGlass v-else tag="div" class="about-glass about-glass--fallback">
-        <div class="about-inner">
-          <AboutHero />
-          <div class="about-toolbar">
-            <AboutTabs :active-tab="activeTab" @change="switchTab" />
-          </div>
-          <div class="about-divider"></div>
-          <div class="tab-panel" :style="{ height: panelHeight }">
-            <div
-              ref="introRefFallback"
-              class="tab-pane"
-              :class="{ 'tab-pane--active': activeTab === 'intro' }"
-            >
-              <AboutIntro />
-            </div>
-            <div
-              ref="activityRefFallback"
-              class="tab-pane"
-              :class="{ 'tab-pane--active': activeTab === 'activity' }"
-            >
-              <AboutActivity />
-            </div>
-          </div>
-          <AboutComments v-show="activeTab === 'intro'" />
+    <PanelFallbackGlass v-else tag="div" class="about-glass about-glass--fallback">
+      <div class="about-inner">
+        <AboutHero />
+        <div class="about-toolbar">
+          <AboutTabs :active-tab="activeTab" @change="switchTab" />
         </div>
-      </PanelFallbackGlass>
-    </div>
+        <div class="about-divider"></div>
+        <div class="tab-panel" :style="{ height: panelHeight }">
+          <div
+            ref="introRefFallback"
+            class="tab-pane"
+            :class="{ 'tab-pane--active': activeTab === 'intro' }"
+          >
+            <AboutIntro />
+          </div>
+          <div
+            ref="activityRefFallback"
+            class="tab-pane"
+            :class="{ 'tab-pane--active': activeTab === 'activity' }"
+          >
+            <AboutActivity />
+          </div>
+        </div>
+        <AboutComments v-show="activeTab === 'intro'" />
+      </div>
+    </PanelFallbackGlass>
+  </div>
 </template>
 
 <script setup lang="ts">

@@ -117,9 +117,8 @@ async function request<T>(
     try {
       const errBody = await response.json()
       if (errBody.detail) {
-        detail = typeof errBody.detail === 'string'
-          ? errBody.detail
-          : JSON.stringify(errBody.detail)
+        detail =
+          typeof errBody.detail === 'string' ? errBody.detail : JSON.stringify(errBody.detail)
       }
     } catch {
       // 忽略解析错误

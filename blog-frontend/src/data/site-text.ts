@@ -36,7 +36,8 @@ export const siteText: Record<string, PageText> = {
   books: {
     kicker: 'Library',
     title: '图书',
-    subtitle: '分享一些小说，大多数我自己看过然后再上来的（资源来自网络，如有侵权，深感抱歉，请立即联系我删除）',
+    subtitle:
+      '分享一些小说，大多数我自己看过然后再上来的（资源来自网络，如有侵权，深感抱歉，请立即联系我删除）',
   },
   gallery: {
     kicker: 'Projects',

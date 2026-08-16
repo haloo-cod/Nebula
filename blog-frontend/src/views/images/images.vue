@@ -1,122 +1,122 @@
 <template>
-    <main class="gallery-images-page">
-      <!-- 概览:相册网格 -->
-      <template v-if="!currentAlbum">
-        <RouterLink to="/" class="back-link">返回首页</RouterLink>
+  <main class="gallery-images-page">
+    <!-- 概览:相册网格 -->
+    <template v-if="!currentAlbum">
+      <RouterLink to="/" class="back-link">返回首页</RouterLink>
 
-        <section class="section-heading">
-          <span class="gallery-kicker">{{ siteText.images.kicker }}</span>
-          <h1>{{ siteText.images.title }}</h1>
-          <p>{{ siteText.images.subtitle }}</p>
-        </section>
+      <section class="section-heading">
+        <span class="gallery-kicker">{{ siteText.images.kicker }}</span>
+        <h1>{{ siteText.images.title }}</h1>
+        <p>{{ siteText.images.subtitle }}</p>
+      </section>
 
-        <div class="album-grid">
-          <AlbumCard v-for="album in albums" :key="album.id" :album="album" @open="openAlbum" />
-        </div>
-      </template>
-
-      <!-- 相册详情:瀑布流 -->
-      <template v-else>
-        <section class="album-detail">
-          <div class="album-detail__header">
-            <div class="album-detail__meta">
-              <div class="album-detail__nav">
-                <button class="album-detail__back" @click="closeAlbum">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2.5"
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                  </svg>
-                  返回画廊
-                </button>
-                <span class="album-detail__dot"></span>
-                <span class="album-detail__date">{{ currentAlbum.date }}</span>
-              </div>
-              <h1>{{ currentAlbum.title }}</h1>
-              <p>{{ currentAlbum.description }}</p>
-            </div>
-            <div class="album-detail__count">
-              共 <strong>{{ currentAlbum.photos.length }}</strong> 瞬间
-            </div>
-          </div>
-
-          <div class="photo-masonry">
-            <figure
-              v-for="(photo, index) in currentAlbum.photos"
-              :key="`${photo.url}-${index}`"
-              class="photo-item"
-              :style="{ animationDelay: `${index * 50}ms` }"
-              @click="openLightbox(index)"
-            >
-              <img :src="photo.url" :alt="photo.caption || '照片'" loading="lazy" />
-              <figcaption v-if="photo.caption" class="photo-item__caption">
-                {{ photo.caption }}
-              </figcaption>
-            </figure>
-          </div>
-        </section>
-      </template>
-    </main>
-
-    <!-- 灯箱:全屏查看,支持左右切换(Teleport 到 body 避免祖先 transform 影响 fixed 定位) -->
-    <Teleport to="body">
-      <div v-if="currentPhoto" class="lightbox" @click="closeLightbox">
-        <button class="lightbox__close" aria-label="关闭" @click="closeLightbox">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
-        <button
-          v-if="currentAlbum && currentAlbum.photos.length > 1"
-          class="lightbox__arrow lightbox__arrow--prev"
-          aria-label="上一张"
-          @click.stop="prevPhoto"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2.5"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-
-        <img
-          class="lightbox__img"
-          :src="currentPhoto.url"
-          :alt="currentPhoto.caption || '全屏照片'"
-          @click.stop
-        />
-
-        <button
-          v-if="currentAlbum && currentAlbum.photos.length > 1"
-          class="lightbox__arrow lightbox__arrow--next"
-          aria-label="下一张"
-          @click.stop="nextPhoto"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2.5"
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
-
-        <div v-if="currentPhoto.caption" class="lightbox__caption">{{ currentPhoto.caption }}</div>
+      <div class="album-grid">
+        <AlbumCard v-for="album in albums" :key="album.id" :album="album" @open="openAlbum" />
       </div>
-    </Teleport>
+    </template>
+
+    <!-- 相册详情:瀑布流 -->
+    <template v-else>
+      <section class="album-detail">
+        <div class="album-detail__header">
+          <div class="album-detail__meta">
+            <div class="album-detail__nav">
+              <button class="album-detail__back" @click="closeAlbum">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                返回画廊
+              </button>
+              <span class="album-detail__dot"></span>
+              <span class="album-detail__date">{{ currentAlbum.date }}</span>
+            </div>
+            <h1>{{ currentAlbum.title }}</h1>
+            <p>{{ currentAlbum.description }}</p>
+          </div>
+          <div class="album-detail__count">
+            共 <strong>{{ currentAlbum.photos.length }}</strong> 瞬间
+          </div>
+        </div>
+
+        <div class="photo-masonry">
+          <figure
+            v-for="(photo, index) in currentAlbum.photos"
+            :key="`${photo.url}-${index}`"
+            class="photo-item"
+            :style="{ animationDelay: `${index * 50}ms` }"
+            @click="openLightbox(index)"
+          >
+            <img :src="photo.url" :alt="photo.caption || '照片'" loading="lazy" />
+            <figcaption v-if="photo.caption" class="photo-item__caption">
+              {{ photo.caption }}
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+    </template>
+  </main>
+
+  <!-- 灯箱:全屏查看,支持左右切换(Teleport 到 body 避免祖先 transform 影响 fixed 定位) -->
+  <Teleport to="body">
+    <div v-if="currentPhoto" class="lightbox" @click="closeLightbox">
+      <button class="lightbox__close" aria-label="关闭" @click="closeLightbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+
+      <button
+        v-if="currentAlbum && currentAlbum.photos.length > 1"
+        class="lightbox__arrow lightbox__arrow--prev"
+        aria-label="上一张"
+        @click.stop="prevPhoto"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+      </button>
+
+      <img
+        class="lightbox__img"
+        :src="currentPhoto.url"
+        :alt="currentPhoto.caption || '全屏照片'"
+        @click.stop
+      />
+
+      <button
+        v-if="currentAlbum && currentAlbum.photos.length > 1"
+        class="lightbox__arrow lightbox__arrow--next"
+        aria-label="下一张"
+        @click.stop="nextPhoto"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+      </button>
+
+      <div v-if="currentPhoto.caption" class="lightbox__caption">{{ currentPhoto.caption }}</div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">

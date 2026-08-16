@@ -67,7 +67,9 @@ async function handleLogin() {
         <el-form-item>
           <el-input
             v-model="form.username"
-            placeholder="用户名"
+            label="用户名"
+            placeholder="请输入用户名"
+            autocomplete="username"
             size="large"
             :prefix-icon="User"
             clearable
@@ -77,8 +79,10 @@ async function handleLogin() {
         <el-form-item>
           <el-input
             v-model="form.password"
+            label="密码"
             type="password"
-            placeholder="密码"
+            placeholder="请输入密码"
+            autocomplete="current-password"
             size="large"
             :prefix-icon="Lock"
             show-password
@@ -118,36 +122,40 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  min-height: 100dvh;
+  padding: 24px;
+  background: #f1f4f2;
 }
 
 .login-card {
   width: 100%;
   max-width: 400px;
-  padding: 40px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  padding: 32px;
+  border: 1px solid #e4e4e7;
+  border-radius: 18px;
+  background: radial-gradient(circle at 100% 0%, rgba(31, 122, 104, 0.1), transparent 38%), #ffffff;
+  box-shadow:
+    0 1px 2px rgba(24, 24, 27, 0.04),
+    0 18px 48px rgba(24, 24, 27, 0.08);
 }
 
 .login-header {
-  text-align: center;
   margin-bottom: 32px;
+  text-align: center;
 }
 
 .login-title {
+  margin: 0 0 8px;
+  color: #18181b;
   font-size: 24px;
   font-weight: 700;
-  color: #303133;
-  margin: 0 0 8px;
+  letter-spacing: -0.02em;
 }
 
 .login-subtitle {
-  font-size: 14px;
-  color: #909399;
   margin: 0;
+  color: #71717a;
+  font-size: 14px;
 }
 
 .login-form {
@@ -161,7 +169,17 @@ async function handleLogin() {
 .login-btn {
   width: 100%;
   height: 44px;
+  border-radius: 10px;
   font-size: 16px;
-  border-radius: 8px;
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: 16px;
+  }
+
+  .login-card {
+    padding: 24px 18px;
+  }
 }
 </style>

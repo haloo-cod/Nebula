@@ -71,9 +71,13 @@ function refreshGlass() {
   })
 }
 
-watch(() => props.modelValue, (open) => {
-  if (open) refreshGlass()
-}, { immediate: true })
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) refreshGlass()
+  },
+  { immediate: true },
+)
 
 const slideTransitionName = computed(() =>
   props.position === 'left' ? 'drawer-slide-left' : 'drawer-slide-right',

@@ -6,7 +6,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Plus, Upload } from '@element-plus/icons-vue'
+import { Download, MoreFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { api, BASE_URL, getToken } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import { downloadWithProgress } from '@/utils/download'
@@ -250,10 +250,47 @@ onMounted(() => loadData())
           <el-icon><Download /></el-icon>打包下载
         </el-button>
       </div>
+      <!-- 移动端卡片列表 -->
+      <div class="post-mobile-list">
+        <div v-for="row in data" :key="row.slug" class="post-mobile-card">
+          <div class="post-mobile-head">
+            <div class="post-mobile-title-wrap">
+              <div class="post-mobile-title">
+                <el-tag v-if="row.is_pinned" type="danger" size="small">置顶</el-tag>
+                <el-tag v-if="row.is_draft" type="info" size="small">草稿</el-tag>
+                <span>{{ row.title }}</span>
+              </div>
+              <div class="post-mobile-meta">
+                <span v-if="row.category">{{ row.category }}</span>
+                <span>{{ row.date }}</span>
+              </div>
+            </div>
+            <el-dropdown trigger="click">
+              <el-button circle :icon="MoreFilled" aria-label="更多操作" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="goEdit(row.slug)">编辑</el-dropdown-item>
+                  <el-dropdown-item @click="downloadPost(row)">下载</el-dropdown-item>
+                  <el-dropdown-item divided @click="handleDelete(row, `「${row.title}」`)">
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <div v-if="row.tags.length" class="post-mobile-tags">
+            <el-tag v-for="tag in row.tags" :key="tag" size="small">{{ tag }}</el-tag>
+          </div>
+        </div>
+        <el-empty v-if="data.length === 0" description="暂无文章" :image-size="72" />
+      </div>
+
+      <!-- 桌面端表格 -->
       <el-table
         :data="data as any"
         v-loading="loading"
         stripe
+        class="post-desktop-table"
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
@@ -362,5 +399,92 @@ onMounted(() => loadData())
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* 移动端卡片列表（默认隐藏，窄屏替换表格） */
+.post-mobile-list {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.post-mobile-card {
+  padding: 14px;
+  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border-radius: 12px;
+  background: var(--admin-panel-bg, #ffffff);
+}
+
+.post-mobile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.post-mobile-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.post-mobile-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--admin-text-color, #303133);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.post-mobile-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-mobile-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+
+.post-mobile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+@media (max-width: 767px) {
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-header > .el-input {
+    width: 100% !important;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions > * {
+    flex: 1;
+  }
+
+  .post-desktop-table {
+    display: none;
+  }
+
+  .post-mobile-list {
+    display: flex;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
+  }
 }
 </style>

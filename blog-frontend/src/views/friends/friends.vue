@@ -1,81 +1,66 @@
 <template>
-    <main class="friends-page">
-      <!-- 页面标题 -->
-      <header class="friends-header">
-        <p class="friends-kicker">{{ siteText.friends.kicker }}</p>
-        <h1 class="friends-title">{{ siteText.friends.title }}</h1>
-        <p class="friends-desc">{{ siteText.friends.subtitle }}</p>
-      </header>
+  <main class="friends-page">
+    <!-- 页面标题 -->
+    <header class="friends-header">
+      <p class="friends-kicker">{{ siteText.friends.kicker }}</p>
+      <h1 class="friends-title">{{ siteText.friends.title }}</h1>
+      <p class="friends-desc">{{ siteText.friends.subtitle }}</p>
+    </header>
 
-      <!-- 顶部液态玻璃鱼缸 -->
-      <section class="aquarium-section" aria-label="友链头像墙">
-        <LiquidGlass
-          class="friends-aquarium"
-          :theme="ui.theme"
-          :corner-radius="24"
-          :ripple-trail="true"
-        >
-          <div ref="aquariumRef" class="aquarium-content">
-            <a
-              v-for="item in floatingItems"
-              :key="item.name"
-              :href="item.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="floating-avatar"
-              :style="item.style"
-              @mouseenter="pause(item.name)"
-              @mouseleave="resume(item.name)"
-              @focus="pause(item.name)"
-              @blur="resume(item.name)"
-            >
-              <img
-                :src="item.avatar"
-                :alt="`${item.name} avatar`"
-                class="floating-avatar__img"
-                loading="lazy"
-              />
-              <span class="floating-avatar__name">{{ item.name }}</span>
-            </a>
-          </div>
-        </LiquidGlass>
-      </section>
-
-      <!-- 下方友链列表 -->
-      <section class="friends-list-section" aria-label="友链列表">
-        <div class="friends-grid">
+    <!-- 顶部液态玻璃鱼缸 -->
+    <section class="aquarium-section" aria-label="友链头像墙">
+      <LiquidGlass
+        class="friends-aquarium"
+        :theme="ui.theme"
+        :corner-radius="24"
+        :ripple-trail="true"
+      >
+        <div ref="aquariumRef" class="aquarium-content">
           <a
-            v-for="friend in friends"
-            :key="friend.name"
-            :href="friend.url"
+            v-for="item in floatingItems"
+            :key="item.name"
+            :href="item.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="friend-link"
+            class="floating-avatar"
+            :style="item.style"
+            @mouseenter="pause(item.name)"
+            @mouseleave="resume(item.name)"
+            @focus="pause(item.name)"
+            @blur="resume(item.name)"
           >
-            <LiquidGlass
-              v-if="ui.liquidGlassEnabled"
-              class="friend-card-glass"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              :corner-radius="16"
-              :ripple-trail="true"
-            >
-              <article class="friend-card friend-card--liquid">
-                <img
-                  :src="friend.avatar"
-                  :alt="`${friend.name} avatar`"
-                  class="friend-avatar"
-                  loading="lazy"
-                />
-                <div class="friend-info">
-                  <h2 class="friend-name">{{ friend.name }}</h2>
-                  <p class="friend-bio">{{ friend.bio }}</p>
-                </div>
-                <SvgIcon name="arrow_forward_ios" class="friend-external" />
-              </article>
-            </LiquidGlass>
+            <img
+              :src="item.avatar"
+              :alt="`${item.name} avatar`"
+              class="floating-avatar__img"
+              loading="lazy"
+            />
+            <span class="floating-avatar__name">{{ item.name }}</span>
+          </a>
+        </div>
+      </LiquidGlass>
+    </section>
 
-            <PanelFallbackGlass v-else tag="article" class="friend-card friend-card-fallback">
+    <!-- 下方友链列表 -->
+    <section class="friends-list-section" aria-label="友链列表">
+      <div class="friends-grid">
+        <a
+          v-for="friend in friends"
+          :key="friend.name"
+          :href="friend.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="friend-link"
+        >
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            class="friend-card-glass"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :corner-radius="16"
+            :ripple-trail="true"
+          >
+            <article class="friend-card friend-card--liquid">
               <img
                 :src="friend.avatar"
                 :alt="`${friend.name} avatar`"
@@ -87,56 +72,37 @@
                 <p class="friend-bio">{{ friend.bio }}</p>
               </div>
               <SvgIcon name="arrow_forward_ios" class="friend-external" />
-            </PanelFallbackGlass>
-          </a>
-        </div>
-      </section>
+            </article>
+          </LiquidGlass>
 
-      <!-- 交换友链 -->
-      <section class="friends-exchange-section" aria-label="交换友链">
-        <LiquidGlass
-          v-if="ui.liquidGlassEnabled"
-          class="exchange-glass"
-          :theme="ui.theme"
-          :blur-radius="ui.liquidGlassBlur"
-          :corner-radius="16"
-          :ripple-trail="true"
-        >
-          <article class="exchange-card exchange-card--liquid">
-            <h2 class="exchange-title">交换友链</h2>
-
-            <div class="exchange-site">
-              <img
-                :src="exchangeInfo.avatar"
-                :alt="`${exchangeInfo.name} avatar`"
-                class="exchange-avatar"
-                loading="lazy"
-              />
-              <div class="exchange-site-info">
-                <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
-                <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
-                <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
-                <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
-              </div>
+          <PanelFallbackGlass v-else tag="article" class="friend-card friend-card-fallback">
+            <img
+              :src="friend.avatar"
+              :alt="`${friend.name} avatar`"
+              class="friend-avatar"
+              loading="lazy"
+            />
+            <div class="friend-info">
+              <h2 class="friend-name">{{ friend.name }}</h2>
+              <p class="friend-bio">{{ friend.bio }}</p>
             </div>
+            <SvgIcon name="arrow_forward_ios" class="friend-external" />
+          </PanelFallbackGlass>
+        </a>
+      </div>
+    </section>
 
-            <div class="exchange-block">
-              <h3 class="exchange-block-title">申请要求</h3>
-              <ul class="exchange-list">
-                <li v-for="(req, index) in exchangeInfo.requirements" :key="index">
-                  {{ req }}
-                </li>
-              </ul>
-            </div>
-
-            <div class="exchange-block">
-              <h3 class="exchange-block-title">联系方式</h3>
-              <p class="exchange-contact">{{ exchangeInfo.contact }}</p>
-            </div>
-          </article>
-        </LiquidGlass>
-
-        <PanelFallbackGlass v-else tag="article" class="exchange-card exchange-card-fallback">
+    <!-- 交换友链 -->
+    <section class="friends-exchange-section" aria-label="交换友链">
+      <LiquidGlass
+        v-if="ui.liquidGlassEnabled"
+        class="exchange-glass"
+        :theme="ui.theme"
+        :blur-radius="ui.liquidGlassBlur"
+        :corner-radius="16"
+        :ripple-trail="true"
+      >
+        <article class="exchange-card exchange-card--liquid">
           <h2 class="exchange-title">交换友链</h2>
 
           <div class="exchange-site">
@@ -167,9 +133,43 @@
             <h3 class="exchange-block-title">联系方式</h3>
             <p class="exchange-contact">{{ exchangeInfo.contact }}</p>
           </div>
-        </PanelFallbackGlass>
-      </section>
-    </main>
+        </article>
+      </LiquidGlass>
+
+      <PanelFallbackGlass v-else tag="article" class="exchange-card exchange-card-fallback">
+        <h2 class="exchange-title">交换友链</h2>
+
+        <div class="exchange-site">
+          <img
+            :src="exchangeInfo.avatar"
+            :alt="`${exchangeInfo.name} avatar`"
+            class="exchange-avatar"
+            loading="lazy"
+          />
+          <div class="exchange-site-info">
+            <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
+            <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
+            <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
+            <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
+          </div>
+        </div>
+
+        <div class="exchange-block">
+          <h3 class="exchange-block-title">申请要求</h3>
+          <ul class="exchange-list">
+            <li v-for="(req, index) in exchangeInfo.requirements" :key="index">
+              {{ req }}
+            </li>
+          </ul>
+        </div>
+
+        <div class="exchange-block">
+          <h3 class="exchange-block-title">联系方式</h3>
+          <p class="exchange-contact">{{ exchangeInfo.contact }}</p>
+        </div>
+      </PanelFallbackGlass>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">

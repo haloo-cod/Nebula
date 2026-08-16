@@ -158,13 +158,28 @@ export const useUIStore = defineStore('ui', () => {
     return group[Math.min(idx, group.length - 1)]?.src ?? ''
   })
   const currentBackground = computed(() => {
-    const group = theme.value === 'dark'
-      ? (isMobile.value ? mobileDarkBgs.value : darkBgs.value)
-      : (isMobile.value ? mobileLightBgs.value : lightBgs.value)
-    const idx = theme.value === 'dark'
-      ? (isMobile.value ? mobileDarkBgIndex.value : darkBgIndex.value)
-      : (isMobile.value ? mobileLightBgIndex.value : lightBgIndex.value)
-    return group[Math.min(idx, Math.max(0, group.length - 1))] ?? { src: '', mediaType: 'image' as const }
+    const group =
+      theme.value === 'dark'
+        ? isMobile.value
+          ? mobileDarkBgs.value
+          : darkBgs.value
+        : isMobile.value
+          ? mobileLightBgs.value
+          : lightBgs.value
+    const idx =
+      theme.value === 'dark'
+        ? isMobile.value
+          ? mobileDarkBgIndex.value
+          : darkBgIndex.value
+        : isMobile.value
+          ? mobileLightBgIndex.value
+          : lightBgIndex.value
+    return (
+      group[Math.min(idx, Math.max(0, group.length - 1))] ?? {
+        src: '',
+        mediaType: 'image' as const,
+      }
+    )
   })
 
   // 视口变化时更新 isMobile

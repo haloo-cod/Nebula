@@ -1,83 +1,70 @@
 <template>
-    <div class="books-page">
-      <div class="books-header">
-        <p class="books-kicker">{{ siteText.books.kicker }}</p>
-        <h1 class="books-title">{{ siteText.books.title }}</h1>
-        <p class="books-desc">{{ siteText.books.subtitle }}</p>
-      </div>
+  <div class="books-page">
+    <div class="books-header">
+      <p class="books-kicker">{{ siteText.books.kicker }}</p>
+      <h1 class="books-title">{{ siteText.books.title }}</h1>
+      <p class="books-desc">{{ siteText.books.subtitle }}</p>
+    </div>
 
-      <!-- 搜索栏（UI 占位，未来接后端搜索） -->
-      <div class="books-search">
-        <span class="books-search-icon">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-        </span>
-        <input
-          v-model="searchQuery"
-          class="books-search-input"
-          type="text"
-          placeholder="搜索书名或作者..."
-        />
-      </div>
-
-      <div class="books-sort" role="group" aria-label="图书排序">
-        <span class="books-sort-label">排序</span>
-        <button
-          v-for="option in [
-            { value: 'newest' as BookSort, label: '最新上传' },
-            { value: 'oldest' as BookSort, label: '最早上传' },
-            { value: 'custom' as BookSort, label: '自定义排序' },
-          ]"
-          :key="option.value"
-          type="button"
-          class="books-sort-option"
-          :class="{ active: sortMode === option.value }"
-          @click="sortMode = option.value"
+    <!-- 搜索栏（UI 占位，未来接后端搜索） -->
+    <div class="books-search">
+      <span class="books-search-icon">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          {{ option.label }}
-        </button>
-      </div>
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </span>
+      <input
+        v-model="searchQuery"
+        class="books-search-input"
+        type="text"
+        placeholder="搜索书名或作者..."
+      />
+    </div>
 
-      <div class="books-grid">
-        <RouterLink
-          v-for="book in books"
-          :key="book.slug"
-          :to="`/books/read/${book.slug}`"
-          class="book-link"
+    <div class="books-sort" role="group" aria-label="图书排序">
+      <span class="books-sort-label">排序</span>
+      <button
+        v-for="option in [
+          { value: 'newest' as BookSort, label: '最新上传' },
+          { value: 'oldest' as BookSort, label: '最早上传' },
+          { value: 'custom' as BookSort, label: '自定义排序' },
+        ]"
+        :key="option.value"
+        type="button"
+        class="books-sort-option"
+        :class="{ active: sortMode === option.value }"
+        @click="sortMode = option.value"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+
+    <div class="books-grid">
+      <RouterLink
+        v-for="book in books"
+        :key="book.slug"
+        :to="`/books/read/${book.slug}`"
+        class="book-link"
+      >
+        <LiquidGlass
+          v-if="ui.liquidGlassEnabled"
+          :cornerRadius="18"
+          :theme="ui.theme"
+          :blur-radius="ui.liquidGlassBlur"
+          :ripple-trail="true"
+          class="book-glass"
         >
-          <LiquidGlass
-            v-if="ui.liquidGlassEnabled"
-            :cornerRadius="18"
-            :theme="ui.theme"
-            :blur-radius="ui.liquidGlassBlur"
-            :ripple-trail="true"
-            class="book-glass"
-          >
-            <article class="book-card book-card--liquid">
-              <div class="book-cover" :style="getCoverStyle(book)">
-                <span v-if="!book.cover" class="book-cover-placeholder">{{
-                  getPlaceholderLabel(book.title)
-                }}</span>
-              </div>
-              <div class="book-info">
-                <h2 class="book-name">{{ book.title }}</h2>
-                <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
-              </div>
-            </article>
-          </LiquidGlass>
-
-          <PanelFallbackGlass v-else tag="article" class="book-card book-card-fallback">
+          <article class="book-card book-card--liquid">
             <div class="book-cover" :style="getCoverStyle(book)">
               <span v-if="!book.cover" class="book-cover-placeholder">{{
                 getPlaceholderLabel(book.title)
@@ -87,21 +74,34 @@
               <h2 class="book-name">{{ book.title }}</h2>
               <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
             </div>
-          </PanelFallbackGlass>
-        </RouterLink>
-      </div>
+          </article>
+        </LiquidGlass>
 
-      <div v-if="totalPages > 1" class="books-pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          :page-size="PAGE_SIZE"
-          :total="totalBooks"
-          :pager-count="5"
-          background
-          layout="prev, pager, next"
-        />
-      </div>
+        <PanelFallbackGlass v-else tag="article" class="book-card book-card-fallback">
+          <div class="book-cover" :style="getCoverStyle(book)">
+            <span v-if="!book.cover" class="book-cover-placeholder">{{
+              getPlaceholderLabel(book.title)
+            }}</span>
+          </div>
+          <div class="book-info">
+            <h2 class="book-name">{{ book.title }}</h2>
+            <p class="book-author">{{ book.author || '作者信息待补充' }}</p>
+          </div>
+        </PanelFallbackGlass>
+      </RouterLink>
     </div>
+
+    <div v-if="totalPages > 1" class="books-pagination">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="PAGE_SIZE"
+        :total="totalBooks"
+        :pager-count="5"
+        background
+        layout="prev, pager, next"
+      />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">

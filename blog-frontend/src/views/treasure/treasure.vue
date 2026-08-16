@@ -1,107 +1,107 @@
 <template>
-    <div class="treasure-page">
-      <!-- 页面头部 -->
-      <header class="treasure-header">
-        <span class="treasure-kicker">{{ siteText.treasure.kicker }}</span>
-        <h1 class="treasure-title">{{ siteText.treasure.title }}</h1>
-        <p class="treasure-desc">{{ siteText.treasure.subtitle }}</p>
-      </header>
+  <div class="treasure-page">
+    <!-- 页面头部 -->
+    <header class="treasure-header">
+      <span class="treasure-kicker">{{ siteText.treasure.kicker }}</span>
+      <h1 class="treasure-title">{{ siteText.treasure.title }}</h1>
+      <p class="treasure-desc">{{ siteText.treasure.subtitle }}</p>
+    </header>
 
-      <!-- 分类筛选标签 -->
-      <nav class="treasure-tabs" aria-label="分类筛选">
-        <button
-          class="tab-btn"
-          :class="{ 'tab-btn-active': activeCategory === null }"
-          type="button"
-          @click="activeCategory = null"
+    <!-- 分类筛选标签 -->
+    <nav class="treasure-tabs" aria-label="分类筛选">
+      <button
+        class="tab-btn"
+        :class="{ 'tab-btn-active': activeCategory === null }"
+        type="button"
+        @click="activeCategory = null"
+      >
+        全部
+      </button>
+      <button
+        v-for="cat in categories"
+        :key="cat"
+        class="tab-btn"
+        :class="{ 'tab-btn-active': activeCategory === cat }"
+        type="button"
+        @click="activeCategory = cat"
+      >
+        {{ cat }}
+      </button>
+    </nav>
+
+    <!-- 宝物网格 -->
+    <TransitionGroup name="grid-item" tag="div" class="treasure-grid">
+      <a
+        v-for="item in pagedTreasures"
+        :key="item.slug"
+        :href="item.downloadUrl ? resolveUrl(item.downloadUrl) : item.url"
+        :target="item.downloadUrl ? undefined : '_blank'"
+        :rel="item.downloadUrl ? undefined : 'noopener noreferrer'"
+        :download="item.downloadUrl ? '' : undefined"
+        class="treasure-link"
+        @click="handleTreasureClick($event, item)"
+      >
+        <LiquidGlass
+          v-if="ui.liquidGlassEnabled"
+          class="treasure-glass"
+          :theme="ui.theme"
+          :corner-radius="22"
+          :blur-radius="ui.liquidGlassBlur"
+          :glass-thickness="36"
+          :highlight-width="3"
+          ripple-trail
         >
-          全部
-        </button>
-        <button
-          v-for="cat in categories"
-          :key="cat"
-          class="tab-btn"
-          :class="{ 'tab-btn-active': activeCategory === cat }"
-          type="button"
-          @click="activeCategory = cat"
-        >
-          {{ cat }}
-        </button>
-      </nav>
+          <TreasureCardContent :item="item" />
+        </LiquidGlass>
 
-      <!-- 宝物网格 -->
-      <TransitionGroup name="grid-item" tag="div" class="treasure-grid">
-        <a
-          v-for="item in pagedTreasures"
-          :key="item.slug"
-          :href="item.downloadUrl ? resolveUrl(item.downloadUrl) : item.url"
-          :target="item.downloadUrl ? undefined : '_blank'"
-          :rel="item.downloadUrl ? undefined : 'noopener noreferrer'"
-          :download="item.downloadUrl ? '' : undefined"
-          class="treasure-link"
-          @click="handleTreasureClick($event, item)"
-        >
-          <LiquidGlass
-            v-if="ui.liquidGlassEnabled"
-            class="treasure-glass"
-            :theme="ui.theme"
-            :corner-radius="22"
-            :blur-radius="ui.liquidGlassBlur"
-            :glass-thickness="36"
-            :highlight-width="3"
-            ripple-trail
-          >
-            <TreasureCardContent :item="item" />
-          </LiquidGlass>
+        <PanelFallbackGlass v-else tag="div" class="treasure-glass treasure-glass--fallback">
+          <TreasureCardContent :item="item" />
+        </PanelFallbackGlass>
+      </a>
+    </TransitionGroup>
 
-          <PanelFallbackGlass v-else tag="div" class="treasure-glass treasure-glass--fallback">
-            <TreasureCardContent :item="item" />
-          </PanelFallbackGlass>
-        </a>
-      </TransitionGroup>
-
-      <Transition name="download-notice">
-        <div v-if="downloadNotice" class="download-notice" role="status">
-          {{ downloadNotice }}
-        </div>
-      </Transition>
-      <div v-if="downloading" class="download-progress" role="status">
-        <span>下载中 {{ downloadProgress }}%</span>
-        <div class="download-progress-track">
-          <div class="download-progress-bar" :style="{ width: `${downloadProgress}%` }"></div>
-        </div>
+    <Transition name="download-notice">
+      <div v-if="downloadNotice" class="download-notice" role="status">
+        {{ downloadNotice }}
       </div>
-
-      <!-- 空状态 -->
-      <div v-if="filteredTreasures.length === 0" class="treasure-empty">
-        <p>该分类暂无内容</p>
-      </div>
-
-      <!-- 分页 -->
-      <div v-if="totalPages > 1" class="treasure-pagination">
-        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
-          上一页
-        </button>
-        <button
-          v-for="page in pageNumbers"
-          :key="page"
-          class="page-btn"
-          :class="{ 'page-btn-active': page === currentPage }"
-          type="button"
-          @click="currentPage = page"
-        >
-          {{ page }}
-        </button>
-        <button
-          class="page-btn"
-          type="button"
-          :disabled="currentPage === totalPages"
-          @click="goNextPage"
-        >
-          下一页
-        </button>
+    </Transition>
+    <div v-if="downloading" class="download-progress" role="status">
+      <span>下载中 {{ downloadProgress }}%</span>
+      <div class="download-progress-track">
+        <div class="download-progress-bar" :style="{ width: `${downloadProgress}%` }"></div>
       </div>
     </div>
+
+    <!-- 空状态 -->
+    <div v-if="filteredTreasures.length === 0" class="treasure-empty">
+      <p>该分类暂无内容</p>
+    </div>
+
+    <!-- 分页 -->
+    <div v-if="totalPages > 1" class="treasure-pagination">
+      <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
+        上一页
+      </button>
+      <button
+        v-for="page in pageNumbers"
+        :key="page"
+        class="page-btn"
+        :class="{ 'page-btn-active': page === currentPage }"
+        type="button"
+        @click="currentPage = page"
+      >
+        {{ page }}
+      </button>
+      <button
+        class="page-btn"
+        type="button"
+        :disabled="currentPage === totalPages"
+        @click="goNextPage"
+      >
+        下一页
+      </button>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">

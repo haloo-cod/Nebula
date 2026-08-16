@@ -1,97 +1,93 @@
 <template>
-    <div class="archive-tree-page">
-      <div class="archive-tree-stage" :style="{ height: `${stageHeight}px` }">
-        <svg
-          class="archive-tree-svg"
-          :viewBox="`0 0 ${stageWidth} ${stageHeight}`"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <filter id="treeSketchGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+  <div class="archive-tree-page">
+    <div class="archive-tree-stage" :style="{ height: `${stageHeight}px` }">
+      <svg
+        class="archive-tree-svg"
+        :viewBox="`0 0 ${stageWidth} ${stageHeight}`"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <filter id="treeSketchGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
 
-          <g class="tree-sketch" filter="url(#treeSketchGlow)">
-            <path v-for="root in rootPaths" :key="root" :d="root" class="tree-root-line" />
+        <g class="tree-sketch" filter="url(#treeSketchGlow)">
+          <path v-for="root in rootPaths" :key="root" :d="root" class="tree-root-line" />
 
-            <path :d="trunkLeftPath" class="tree-trunk-outline" />
-            <path :d="trunkRightPath" class="tree-trunk-outline" />
+          <path :d="trunkLeftPath" class="tree-trunk-outline" />
+          <path :d="trunkRightPath" class="tree-trunk-outline" />
 
-            <path v-for="line in barkLines" :key="line" :d="line" class="tree-bark-line" />
+          <path v-for="line in barkLines" :key="line" :d="line" class="tree-bark-line" />
 
-            <path
-              v-for="branch in branches"
-              :key="branch.id"
-              :d="branch.path"
-              class="tree-branch-line"
-            />
-            <path v-for="twig in crownTwigs" :key="twig" :d="twig" class="tree-crown-line" />
-          </g>
-        </svg>
-
-        <div class="archive-tree-layer">
-          <div
-            v-for="marker in yearMarkers"
-            :key="marker.year"
-            class="year-marker"
-            :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
-          >
-            <span class="year-marker-line"></span>
-            <span class="year-marker-text">{{ marker.year }}</span>
-          </div>
-
-          <div
+          <path
             v-for="branch in branches"
-            :key="`month-${branch.id}`"
-            class="month-marker"
-            :class="branch.side === 'left' ? 'month-marker--left' : 'month-marker--right'"
-            :style="{ left: `${branch.monthX}px`, top: `${branch.monthY}px` }"
-          >
-            {{ branch.month }} 月
-          </div>
+            :key="branch.id"
+            :d="branch.path"
+            class="tree-branch-line"
+          />
+          <path v-for="twig in crownTwigs" :key="twig" :d="twig" class="tree-crown-line" />
+        </g>
+      </svg>
 
-          <RouterLink
-            v-for="card in cards"
-            :key="card.slug"
-            :to="`/archive/post/${card.slug}`"
-            class="archive-leaf-card"
-            :class="card.side === 'left' ? 'archive-leaf-card--left' : 'archive-leaf-card--right'"
-            :style="{
-              left: `${card.x}px`,
-              top: `${card.y}px`,
-              transform: `rotate(${card.rotate}deg)`,
-            }"
-          >
-            <span class="archive-leaf-card-pin"></span>
-            <span class="archive-leaf-card-string"></span>
-            <div class="archive-leaf-card-head">
-              <span class="archive-leaf-card-date"
-                >{{ card.monthLabel }} / {{ card.dayLabel }}</span
-              >
-              <span v-if="card.category" class="archive-leaf-card-category">{{
-                card.category
-              }}</span>
-            </div>
-            <h3 class="archive-leaf-card-title">{{ card.title }}</h3>
-            <p v-if="card.description" class="archive-leaf-card-desc">{{ card.description }}</p>
-            <div class="archive-leaf-card-tags">
-              <span
-                v-for="tag in card.tags.slice(0, 2)"
-                :key="`${card.slug}-${tag}`"
-                class="archive-leaf-card-tag"
-              >
-                #{{ tag }}
-              </span>
-            </div>
-          </RouterLink>
+      <div class="archive-tree-layer">
+        <div
+          v-for="marker in yearMarkers"
+          :key="marker.year"
+          class="year-marker"
+          :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
+        >
+          <span class="year-marker-line"></span>
+          <span class="year-marker-text">{{ marker.year }}</span>
         </div>
+
+        <div
+          v-for="branch in branches"
+          :key="`month-${branch.id}`"
+          class="month-marker"
+          :class="branch.side === 'left' ? 'month-marker--left' : 'month-marker--right'"
+          :style="{ left: `${branch.monthX}px`, top: `${branch.monthY}px` }"
+        >
+          {{ branch.month }} 月
+        </div>
+
+        <RouterLink
+          v-for="card in cards"
+          :key="card.slug"
+          :to="`/archive/post/${card.slug}`"
+          class="archive-leaf-card"
+          :class="card.side === 'left' ? 'archive-leaf-card--left' : 'archive-leaf-card--right'"
+          :style="{
+            left: `${card.x}px`,
+            top: `${card.y}px`,
+            transform: `rotate(${card.rotate}deg)`,
+          }"
+        >
+          <span class="archive-leaf-card-pin"></span>
+          <span class="archive-leaf-card-string"></span>
+          <div class="archive-leaf-card-head">
+            <span class="archive-leaf-card-date">{{ card.monthLabel }} / {{ card.dayLabel }}</span>
+            <span v-if="card.category" class="archive-leaf-card-category">{{ card.category }}</span>
+          </div>
+          <h3 class="archive-leaf-card-title">{{ card.title }}</h3>
+          <p v-if="card.description" class="archive-leaf-card-desc">{{ card.description }}</p>
+          <div class="archive-leaf-card-tags">
+            <span
+              v-for="tag in card.tags.slice(0, 2)"
+              :key="`${card.slug}-${tag}`"
+              class="archive-leaf-card-tag"
+            >
+              #{{ tag }}
+            </span>
+          </div>
+        </RouterLink>
       </div>
     </div>
+  </div>
 </template>
 
 <script setup lang="ts">

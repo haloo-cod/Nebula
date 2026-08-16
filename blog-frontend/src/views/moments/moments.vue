@@ -1,69 +1,69 @@
 <template>
-    <div class="moments-page">
-      <!-- 页头 -->
-      <header class="moments-header post-rise-inner">
-        <p class="moments-kicker">{{ siteText.moments.kicker }}</p>
-        <h1 class="moments-title">{{ siteText.moments.title }}</h1>
-        <p class="moments-desc">{{ siteText.moments.subtitle }}</p>
-        <span class="moments-count">共 {{ total }} 条</span>
-      </header>
+  <div class="moments-page">
+    <!-- 页头 -->
+    <header class="moments-header post-rise-inner">
+      <p class="moments-kicker">{{ siteText.moments.kicker }}</p>
+      <h1 class="moments-title">{{ siteText.moments.title }}</h1>
+      <p class="moments-desc">{{ siteText.moments.subtitle }}</p>
+      <span class="moments-count">共 {{ total }} 条</span>
+    </header>
 
-      <!-- 时间线区域 -->
-      <div class="moments-timeline">
-        <template v-for="(group, gi) in dayGroups" :key="group.date">
-          <!-- 日期分隔条 -->
-          <div
-            class="moments-day-divider post-rise-inner"
-            :style="{ animationDelay: `${gi * 0.08 + 0.2}s` }"
-          >
-            <span class="moments-day-line"></span>
-            <span class="moments-day-label">{{ group.label }} · {{ group.moments.length }}条</span>
-            <span class="moments-day-line"></span>
-          </div>
-
-          <!-- 每条说说:独立液态玻璃卡片 -->
-          <div
-            v-for="(moment, mi) in group.moments"
-            :key="moment.id"
-            :id="`moment-${moment.id}`"
-            class="moments-card-wrap"
-            :class="{ 'moments-card-highlight': highlightId === moment.id }"
-          >
-            <!-- 液态玻璃开启时 -->
-            <LazyLiquidGlass
-              v-if="ui.liquidGlassEnabled"
-              class="moments-glass post-rise-inner"
-              :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
-              :corner-radius="18"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              :ripple-trail="true"
-              realtime-offset
-            >
-              <MomentCard :moment="moment" @select="openDetail" />
-            </LazyLiquidGlass>
-
-            <!-- 液态玻璃关闭时的 fallback -->
-            <PanelFallbackGlass
-              v-else
-              class="moments-panel post-rise-inner"
-              :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
-            >
-              <MomentCard :moment="moment" @select="openDetail" />
-            </PanelFallbackGlass>
-          </div>
-        </template>
-
-        <!-- 无限滚动哨兵 -->
-        <div ref="sentinelRef" class="moments-sentinel">
-          <span v-if="loadingMore" class="moments-loading">加载中...</span>
-          <span v-else-if="noMore" class="moments-no-more">— 没有更多了 —</span>
+    <!-- 时间线区域 -->
+    <div class="moments-timeline">
+      <template v-for="(group, gi) in dayGroups" :key="group.date">
+        <!-- 日期分隔条 -->
+        <div
+          class="moments-day-divider post-rise-inner"
+          :style="{ animationDelay: `${gi * 0.08 + 0.2}s` }"
+        >
+          <span class="moments-day-line"></span>
+          <span class="moments-day-label">{{ group.label }} · {{ group.moments.length }}条</span>
+          <span class="moments-day-line"></span>
         </div>
+
+        <!-- 每条说说:独立液态玻璃卡片 -->
+        <div
+          v-for="(moment, mi) in group.moments"
+          :key="moment.id"
+          :id="`moment-${moment.id}`"
+          class="moments-card-wrap"
+          :class="{ 'moments-card-highlight': highlightId === moment.id }"
+        >
+          <!-- 液态玻璃开启时 -->
+          <LazyLiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            class="moments-glass post-rise-inner"
+            :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
+            :corner-radius="18"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :ripple-trail="true"
+            realtime-offset
+          >
+            <MomentCard :moment="moment" @select="openDetail" />
+          </LazyLiquidGlass>
+
+          <!-- 液态玻璃关闭时的 fallback -->
+          <PanelFallbackGlass
+            v-else
+            class="moments-panel post-rise-inner"
+            :style="{ animationDelay: `${gi * 0.08 + mi * 0.06 + 0.3}s` }"
+          >
+            <MomentCard :moment="moment" @select="openDetail" />
+          </PanelFallbackGlass>
+        </div>
+      </template>
+
+      <!-- 无限滚动哨兵 -->
+      <div ref="sentinelRef" class="moments-sentinel">
+        <span v-if="loadingMore" class="moments-loading">加载中...</span>
+        <span v-else-if="noMore" class="moments-no-more">— 没有更多了 —</span>
       </div>
     </div>
+  </div>
 
-    <!-- 详情 overlay -->
-    <MomentDetail :moment="selectedMoment" @close="closeDetail" />
+  <!-- 详情 overlay -->
+  <MomentDetail :moment="selectedMoment" @close="closeDetail" />
 </template>
 
 <script setup lang="ts">

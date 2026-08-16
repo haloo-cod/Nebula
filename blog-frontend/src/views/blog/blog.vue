@@ -1,67 +1,45 @@
 <template>
-    <main class="blog-page">
-      <div class="blog-header">
-        <p class="blog-kicker">{{ siteText.blog.kicker }}</p>
-        <h1 class="blog-title">{{ siteText.blog.title }}</h1>
-        <p class="blog-desc">{{ siteText.blog.subtitle }}</p>
-        <div class="blog-filter">
-          <button
-            class="filter-btn"
-            :class="{ active: !activeCategory }"
-            @click="activeCategory = ''"
-          >
-            全部
-          </button>
-          <button
-            v-for="cat in categories"
-            :key="cat"
-            class="filter-btn"
-            :class="{ active: activeCategory === cat }"
-            @click="activeCategory = activeCategory === cat ? '' : cat"
-          >
-            {{ cat }}
-          </button>
-        </div>
-      </div>
-
-      <TransitionGroup name="grid-item" tag="div" class="blog-grid">
-        <RouterLink
-          v-for="post in visiblePosts"
-          :key="post.slug"
-          :to="`/post/${post.slug}`"
-          class="blog-link"
+  <main class="blog-page">
+    <div class="blog-header">
+      <p class="blog-kicker">{{ siteText.blog.kicker }}</p>
+      <h1 class="blog-title">{{ siteText.blog.title }}</h1>
+      <p class="blog-desc">{{ siteText.blog.subtitle }}</p>
+      <div class="blog-filter">
+        <button
+          class="filter-btn"
+          :class="{ active: !activeCategory }"
+          @click="activeCategory = ''"
         >
-          <LiquidGlass
-            v-if="ui.liquidGlassEnabled"
-            :cornerRadius="18"
-            :theme="ui.theme"
-            :blur-radius="ui.liquidGlassBlur"
-            :ripple-trail="true"
-            class="blog-glass"
-          >
-            <article class="post-card post-card--liquid">
-              <span v-if="post.pinned" class="pinned-badge">
-                <SvgIcon name="keep" class="pinned-badge__icon" />
-                <span>置顶</span>
-              </span>
-              <span class="post-date">{{ post.date || '--' }}</span>
-              <h2>{{ post.title }}</h2>
-              <p>{{ post.description || '暂无摘要。' }}</p>
-              <div class="post-meta">
-                <span
-                  v-if="post.category"
-                  class="post-cat"
-                  :class="`cat-${catColorKey(post.category)}`"
-                >
-                  {{ post.category }}
-                </span>
-                <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
-              </div>
-              <span class="comment-badge">💬 {{ getCommentCount(post.slug) }}</span>
-            </article>
-          </LiquidGlass>
+          全部
+        </button>
+        <button
+          v-for="cat in categories"
+          :key="cat"
+          class="filter-btn"
+          :class="{ active: activeCategory === cat }"
+          @click="activeCategory = activeCategory === cat ? '' : cat"
+        >
+          {{ cat }}
+        </button>
+      </div>
+    </div>
 
-          <PanelFallbackGlass v-else tag="article" class="post-card post-card-fallback">
+    <TransitionGroup name="grid-item" tag="div" class="blog-grid">
+      <RouterLink
+        v-for="post in visiblePosts"
+        :key="post.slug"
+        :to="`/post/${post.slug}`"
+        class="blog-link"
+      >
+        <LiquidGlass
+          v-if="ui.liquidGlassEnabled"
+          :cornerRadius="18"
+          :theme="ui.theme"
+          :blur-radius="ui.liquidGlassBlur"
+          :ripple-trail="true"
+          class="blog-glass"
+        >
+          <article class="post-card post-card--liquid">
             <span v-if="post.pinned" class="pinned-badge">
               <SvgIcon name="keep" class="pinned-badge__icon" />
               <span>置顶</span>
@@ -80,34 +58,56 @@
               <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
             </div>
             <span class="comment-badge">💬 {{ getCommentCount(post.slug) }}</span>
-          </PanelFallbackGlass>
-        </RouterLink>
-      </TransitionGroup>
+          </article>
+        </LiquidGlass>
 
-      <div v-if="totalPages > 1" class="blog-pagination">
-        <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
-          上一页
-        </button>
-        <button
-          v-for="page in pageNumbers"
-          :key="page"
-          class="page-btn"
-          :class="{ 'page-btn-active': page === currentPage }"
-          type="button"
-          @click="currentPage = page"
-        >
-          {{ page }}
-        </button>
-        <button
-          class="page-btn"
-          type="button"
-          :disabled="currentPage === totalPages"
-          @click="goNextPage"
-        >
-          下一页
-        </button>
-      </div>
-    </main>
+        <PanelFallbackGlass v-else tag="article" class="post-card post-card-fallback">
+          <span v-if="post.pinned" class="pinned-badge">
+            <SvgIcon name="keep" class="pinned-badge__icon" />
+            <span>置顶</span>
+          </span>
+          <span class="post-date">{{ post.date || '--' }}</span>
+          <h2>{{ post.title }}</h2>
+          <p>{{ post.description || '暂无摘要。' }}</p>
+          <div class="post-meta">
+            <span
+              v-if="post.category"
+              class="post-cat"
+              :class="`cat-${catColorKey(post.category)}`"
+            >
+              {{ post.category }}
+            </span>
+            <span v-for="tag in tagsOf(post)" :key="tag" class="post-tag">#{{ tag }}</span>
+          </div>
+          <span class="comment-badge">💬 {{ getCommentCount(post.slug) }}</span>
+        </PanelFallbackGlass>
+      </RouterLink>
+    </TransitionGroup>
+
+    <div v-if="totalPages > 1" class="blog-pagination">
+      <button class="page-btn" type="button" :disabled="currentPage === 1" @click="goPrevPage">
+        上一页
+      </button>
+      <button
+        v-for="page in pageNumbers"
+        :key="page"
+        class="page-btn"
+        :class="{ 'page-btn-active': page === currentPage }"
+        type="button"
+        @click="currentPage = page"
+      >
+        {{ page }}
+      </button>
+      <button
+        class="page-btn"
+        type="button"
+        :disabled="currentPage === totalPages"
+        @click="goNextPage"
+      >
+        下一页
+      </button>
+    </div>
+  </main>
 </template>
 
 <script setup lang="ts">

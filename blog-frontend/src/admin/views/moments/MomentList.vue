@@ -183,7 +183,34 @@ onMounted(() => loadData())
 
     <!-- 说说表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
+      <!-- 移动端卡片列表 -->
+      <div class="moment-mobile-list">
+        <div v-for="row in data" :key="row.id" class="moment-mobile-card">
+          <div class="moment-mobile-content">{{ row.content }}</div>
+          <div class="moment-mobile-meta">
+            <span v-if="row.mood">{{ moodEmoji(row.mood) }}</span>
+            <span>{{ row.images.length }} 张图</span>
+            <span>{{ row.likes }} 赞</span>
+            <span>{{ row.date.replace('T', ' ').slice(0, 16) }}</span>
+          </div>
+          <div class="moment-mobile-actions">
+            <el-button type="primary" link size="small" @click="openComments(row)">评论</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')">
+              删除
+            </el-button>
+          </div>
+        </div>
+        <el-empty v-if="data.length === 0" description="暂无说说" :image-size="72" />
+      </div>
+
+      <!-- 桌面端表格 -->
+      <el-table
+        :data="data as any"
+        v-loading="loading"
+        stripe
+        class="moment-desktop-table"
+        style="width: 100%"
+      >
         <el-table-column prop="content" label="内容" min-width="300">
           <template #default="{ row }">
             <div class="content-cell">
@@ -352,5 +379,65 @@ onMounted(() => loadData())
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* 移动端卡片列表（默认隐藏，窄屏替换表格） */
+.moment-mobile-list {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.moment-mobile-card {
+  padding: 14px;
+  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border-radius: 12px;
+  background: var(--admin-panel-bg, #ffffff);
+}
+
+.moment-mobile-content {
+  color: var(--admin-text-color, #303133);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.moment-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+
+.moment-mobile-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--admin-border-color, #e4e7ed);
+}
+
+@media (max-width: 767px) {
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-header .el-button {
+    align-self: flex-start;
+  }
+
+  .moment-desktop-table {
+    display: none;
+  }
+
+  .moment-mobile-list {
+    display: flex;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
+  }
 }
 </style>
