@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Fold, Expand, Moon, User, House, SwitchButton } from '@element-plus/icons-vue'
+import { Fold, Expand, Moon, House, SwitchButton, ArrowDown } from '@element-plus/icons-vue'
 import { adminMenus } from './AdminMenu'
 
 defineProps<{
@@ -45,26 +45,42 @@ async function handleCommand(command: string) {
 
 <template>
   <div class="admin-topbar">
-    <!-- 左侧：折叠按钮 + 面包屑 -->
     <div class="topbar-left">
-      <el-icon class="collapse-btn" :size="20" @click="emit('toggleCollapse')">
-        <Fold v-if="!collapsed" />
-        <Expand v-else />
-      </el-icon>
-      <span class="breadcrumb-text">{{ currentTitle }}</span>
+      <button
+        class="admin-icon-button collapse-btn"
+        type="button"
+        :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
+        @click="emit('toggleCollapse')"
+      >
+        <el-icon :size="19">
+          <Fold v-if="!collapsed" />
+          <Expand v-else />
+        </el-icon>
+      </button>
+      <div class="page-context">
+        <span class="context-kicker">WORKSPACE</span>
+        <strong>{{ currentTitle }}</strong>
+      </div>
     </div>
 
-    <!-- 右侧：暗色模式 + 用户 -->
     <div class="topbar-right">
-      <el-icon class="action-btn" :size="18" @click="emit('toggleDark')">
-        <Moon />
-      </el-icon>
+      <button
+        class="admin-icon-button action-btn"
+        type="button"
+        aria-label="切换暗色模式"
+        @click="emit('toggleDark')"
+      >
+        <el-icon :size="18"><Moon /></el-icon>
+      </button>
 
       <el-dropdown trigger="click" @command="handleCommand">
-        <span class="user-info">
-          <el-icon :size="18"><User /></el-icon>
+        <button class="user-menu-button" type="button" aria-label="打开管理员菜单">
+          <span class="avatar" aria-hidden="true">{{
+            (authStore.user?.username ?? '管').slice(0, 1).toUpperCase()
+          }}</span>
           <span class="username">{{ authStore.user?.username ?? '管理员' }}</span>
-        </span>
+          <el-icon class="user-chevron"><ArrowDown /></el-icon>
+        </button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="home">
@@ -85,88 +101,131 @@ async function handleCommand(command: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 20px;
-  background: var(--admin-topbar-bg);
-  border-bottom: 1px solid var(--admin-border-color);
+  min-height: 64px;
+  padding: 0 clamp(14px, 2.5vw, 32px);
+  background: transparent;
+  border: 0;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
-.collapse-btn {
+.admin-icon-button,
+.user-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--admin-text-secondary);
   cursor: pointer;
-  color: var(--admin-text-color);
-  transition: color 0.2s;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
 }
 
-.collapse-btn:hover {
-  color: var(--admin-primary-color);
+.admin-icon-button:hover,
+.user-menu-button:hover {
+  background: var(--admin-menu-hover-bg);
+  color: var(--admin-text-color);
+}
+
+.admin-icon-button:active,
+.user-menu-button:active {
+  transform: translateY(1px);
+}
+
+.page-context {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.context-kicker {
+  color: var(--admin-text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
 }
 
 .breadcrumb-text {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--admin-text-color);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 }
 
-.action-btn {
-  cursor: pointer;
-  color: var(--admin-text-color);
-  transition: color 0.2s;
+.user-menu-button {
+  gap: 8px;
+  padding: 0 8px 0 6px;
 }
 
-.action-btn:hover {
+.avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--admin-menu-active-bg);
   color: var(--admin-primary-color);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  color: var(--admin-text-color);
-  transition: color 0.2s;
-}
-
-.user-info:hover {
-  color: var(--admin-primary-color);
+.user-chevron {
+  color: var(--admin-text-secondary);
+  font-size: 14px;
 }
 
 .username {
-  font-size: 14px;
+  max-width: 130px;
+  overflow: hidden;
+  color: var(--admin-text-color);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 767px) {
   .admin-topbar {
-    height: 52px;
-    padding: 0 12px;
+    min-height: 58px;
+    padding: 0 10px;
   }
 
   .topbar-left,
   .topbar-right {
-    gap: 10px;
+    gap: 7px;
   }
 
   .breadcrumb-text {
     font-size: 14px;
   }
 
-  .username {
-    max-width: 92px;
-    overflow: hidden;
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .context-kicker {
+    display: none;
+  }
+
+  .username,
+  .user-chevron {
+    display: none;
+  }
+
+  .user-menu-button {
+    min-width: 42px;
+    padding: 0;
   }
 }
 </style>

@@ -1,0 +1,404 @@
+/* 管理后台共享视觉与响应式样式
+ * 统一覆盖 Element Plus 的默认密度、边界和交互状态，页面组件只保留业务布局。
+ */
+#admin-app {
+  --admin-content-max-width: 1680px;
+  --admin-surface-radius: 16px;
+  --admin-control-height: 40px;
+  --admin-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 8px 24px rgba(24, 24, 27, 0.04);
+  --admin-shadow-hover: 0 10px 28px rgba(24, 24, 27, 0.1);
+  --el-color-primary: var(--admin-primary-color);
+  --el-color-primary-light-3: color-mix(in srgb, var(--admin-primary-color) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--admin-primary-color) 45%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--admin-primary-color) 22%, white);
+  --el-color-primary-light-8: color-mix(in srgb, var(--admin-primary-color) 14%, white);
+  --el-color-primary-light-9: color-mix(in srgb, var(--admin-primary-color) 8%, white);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--admin-primary-color) 82%, black);
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: 999px;
+  color-scheme: light;
+}
+
+#admin-app.admin-dark {
+  --el-color-primary-light-3: color-mix(in srgb, var(--admin-primary-color) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--admin-primary-color) 45%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--admin-primary-color) 28%, black);
+  --el-color-primary-light-8: color-mix(in srgb, var(--admin-primary-color) 20%, black);
+  --el-color-primary-light-9: color-mix(in srgb, var(--admin-primary-color) 14%, black);
+  color-scheme: dark;
+}
+
+/* 页面级结构 */
+#admin-app .admin-layout-content > * {
+  width: 100%;
+  max-width: var(--admin-content-max-width);
+  margin: 0 auto;
+}
+
+#admin-app .page-header {
+  min-height: 52px;
+  padding: 2px 0 4px;
+}
+
+#admin-app .page-header h1,
+#admin-app .page-header h2,
+#admin-app .page-header h3,
+#admin-app .page-title {
+  color: var(--admin-text-color);
+  letter-spacing: -0.015em;
+}
+
+#admin-app .page-header h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+#admin-app .page-header p {
+  margin: 0;
+  color: var(--admin-text-secondary);
+  font-size: 13px;
+}
+
+#admin-app .page-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#admin-app .header-actions,
+#admin-app .upload-actions,
+#admin-app .filter-row,
+#admin-app .table-toolbar,
+#admin-app .batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 卡片与表面 */
+#admin-app .el-card {
+  overflow: hidden;
+  border: 1px solid var(--admin-border-color);
+  border-radius: var(--admin-surface-radius);
+  background: var(--admin-panel-bg);
+  box-shadow: var(--admin-shadow-card);
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+#admin-app .el-card.is-hover-shadow:hover {
+  border-color: color-mix(in srgb, var(--admin-primary-color) 26%, var(--admin-border-color));
+  box-shadow: var(--admin-shadow-hover);
+  transform: translateY(-1px);
+}
+
+#admin-app .el-card__header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--admin-border-color);
+  color: var(--admin-text-color);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+#admin-app .el-card__body {
+  padding: 22px;
+}
+
+#admin-app .table-card,
+#admin-app .section-card,
+#admin-app .filter-card,
+#admin-app .cover-card,
+#admin-app .editor-card {
+  border-radius: var(--admin-surface-radius);
+}
+
+#admin-app .card-header-row,
+#admin-app .card-header-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 表格：保留横向滚动，避免窄屏挤压或撑破页面 */
+#admin-app .el-table {
+  --el-table-header-bg-color: var(--admin-fill-bg);
+  --el-table-tr-bg-color: var(--admin-panel-bg);
+  --el-table-row-hover-bg-color: var(--admin-menu-hover-bg);
+  --el-table-border-color: var(--admin-border-color);
+  --el-table-text-color: var(--admin-text-color);
+  --el-table-header-text-color: var(--admin-text-secondary);
+  background: transparent;
+  font-size: 13px;
+}
+
+#admin-app .el-table th.el-table__cell {
+  height: 44px;
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#admin-app .el-table td.el-table__cell {
+  height: 54px;
+}
+
+#admin-app .el-table .cell {
+  line-height: 1.45;
+}
+
+#admin-app .el-table__inner-wrapper::before {
+  display: none;
+}
+
+#admin-app .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: color-mix(in srgb, var(--admin-fill-bg) 58%, transparent);
+}
+
+#admin-app .el-table__body-wrapper {
+  overflow-x: auto;
+}
+
+#admin-app .el-table .el-button.is-link {
+  min-height: 32px;
+  padding: 4px 6px;
+}
+
+/* 表单控件 */
+#admin-app .el-form-item__label {
+  padding-bottom: 7px;
+  color: var(--admin-text-color);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+#admin-app .el-input__wrapper,
+#admin-app .el-textarea__inner,
+#admin-app .el-select__wrapper {
+  border-radius: 10px;
+  background: var(--admin-fill-bg);
+  box-shadow: 0 0 0 1px var(--admin-border-color) inset;
+  transition:
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+#admin-app .el-input__wrapper,
+#admin-app .el-select__wrapper {
+  min-height: var(--admin-control-height);
+}
+
+#admin-app .el-input__wrapper:hover,
+#admin-app .el-textarea__inner:hover,
+#admin-app .el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--admin-primary-color) 45%, var(--admin-border-color)) inset;
+}
+
+#admin-app .el-input__wrapper.is-focus,
+#admin-app .el-textarea__inner:focus,
+#admin-app .el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--admin-primary-color) 24%, transparent),
+    0 0 0 1px var(--admin-primary-color) inset;
+}
+
+#admin-app .el-button {
+  min-height: var(--admin-control-height);
+  border-radius: 9px;
+  font-weight: 550;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+#admin-app .el-button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+#admin-app .el-button--small {
+  min-height: 32px;
+  border-radius: 8px;
+}
+
+#admin-app .el-button--primary {
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--admin-primary-color) 18%, transparent);
+}
+
+#admin-app .el-button:focus-visible,
+#admin-app .el-menu-item:focus-visible,
+#admin-app .admin-icon-button:focus-visible,
+#admin-app .user-menu-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--admin-primary-color) 40%, transparent);
+  outline-offset: 2px;
+}
+
+/* 分页与空状态 */
+#admin-app .pagination-wrap {
+  padding-top: 18px;
+}
+
+#admin-app .el-pagination {
+  --el-pagination-button-bg-color: var(--admin-fill-bg);
+  --el-pagination-hover-color: var(--admin-primary-color);
+}
+
+/* 弹窗：统一成移动端友好的 sheet 尺寸 */
+.el-overlay .el-dialog {
+  overflow: hidden;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--admin-border-color, #e4e4e7);
+  border-radius: 16px;
+  background: var(--admin-panel-bg, #ffffff);
+  box-shadow: 0 24px 80px rgba(24, 24, 27, 0.2);
+}
+
+.el-overlay .el-dialog__header {
+  margin-right: 0;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--admin-border-color, #e4e4e7);
+}
+
+.el-overlay .el-dialog__body {
+  max-height: min(70vh, 680px);
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.el-overlay .el-dialog__footer {
+  padding: 14px 22px 20px;
+  border-top: 1px solid var(--admin-border-color, #e4e4e7);
+}
+
+@media (max-width: 960px) {
+  #admin-app .page-header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  #admin-app .page-header > .el-input,
+  #admin-app .page-header > .filter-row,
+  #admin-app .page-header > .upload-actions {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  #admin-app .admin-layout-content > * {
+    max-width: none;
+  }
+
+  #admin-app .page-header {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #admin-app .page-header > .el-input,
+  #admin-app .page-header .filter-row,
+  #admin-app .page-header .filter-row > *,
+  #admin-app .page-header .el-input {
+    width: 100% !important;
+  }
+
+  #admin-app .header-actions,
+  #admin-app .upload-actions {
+    width: 100%;
+  }
+
+  #admin-app .header-actions .el-button,
+  #admin-app .upload-actions .el-button {
+    flex: 1 1 auto;
+  }
+
+  #admin-app .el-card__body {
+    padding: 16px;
+  }
+
+  #admin-app .el-card__header {
+    padding: 16px;
+  }
+
+  #admin-app .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #admin-app .el-form--inline .el-form-item {
+    display: flex;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  #admin-app .el-form--inline .el-form-item__content,
+  #admin-app .el-form--inline .el-input,
+  #admin-app .el-form--inline .el-select {
+    width: 100% !important;
+  }
+
+  #admin-app .pagination-wrap {
+    justify-content: center;
+    overflow-x: auto;
+  }
+
+  #admin-app .el-pagination {
+    flex-shrink: 0;
+  }
+
+  /* 窄屏表格：压缩内边距与链接按钮密度 */
+  #admin-app .el-table th.el-table__cell,
+  #admin-app .el-table td.el-table__cell {
+    padding: 0 10px;
+  }
+
+  #admin-app .el-table .el-button.is-link {
+    padding: 4px 5px;
+  }
+
+  /* 移动端弹窗按钮满宽自适应 */
+  .el-overlay .el-dialog {
+    width: calc(100vw - 24px) !important;
+    margin: 12px auto;
+    border-radius: 14px;
+  }
+
+  .el-overlay .el-dialog__header {
+    padding: 16px 16px 12px;
+  }
+
+  .el-overlay .el-dialog__body {
+    max-height: calc(100dvh - 180px);
+    padding: 16px;
+  }
+
+  .el-overlay .el-dialog__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px 16px;
+  }
+
+  .el-overlay .el-dialog__footer .el-button {
+    min-width: 76px;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #admin-app *,
+  #admin-app *::before,
+  #admin-app *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

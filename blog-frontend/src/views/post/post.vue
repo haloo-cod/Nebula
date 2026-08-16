@@ -1,46 +1,46 @@
 <template>
-    <div class="post-page">
-      <GlassPanel class="post-panel">
-        <div class="post-rise-inner">
-          <div class="post-header">
-            <button class="back-btn" @click="goBack" aria-label="返回">
-              <span class="back-arrow">◀</span>
-              <span>返回</span>
-            </button>
-          </div>
-
-          <div v-if="loading" class="post-state">加载中...</div>
-
-          <div v-else-if="currentPost">
-            <div v-if="currentPost.cover" class="post-cover">
-              <img :src="currentPost.cover" :alt="currentPost.title" />
-            </div>
-
-            <div class="post-meta">
-              <h1 class="post-title">{{ currentPost.title }}</h1>
-              <span v-if="currentPost.date" class="post-date">{{ currentPost.date }}</span>
-              <div class="post-tags-row">
-                <span
-                  v-if="currentPost.category"
-                  class="post-cat"
-                  :class="`cat-${catColorKey(currentPost.category)}`"
-                >
-                  {{ currentPost.category }}
-                </span>
-                <span v-for="tag in currentPost.tags.slice(0, 4)" :key="tag" class="post-tag"
-                  >#{{ tag }}</span
-                >
-              </div>
-            </div>
-
-            <div class="prose" v-html="html"></div>
-            <AboutComments :page-key="`post:${currentPost.slug}`" />
-          </div>
-
-          <div v-else class="post-state">文章不存在</div>
+  <div class="post-page">
+    <GlassPanel class="post-panel">
+      <div class="post-rise-inner">
+        <div class="post-header">
+          <button class="back-btn" @click="goBack" aria-label="返回">
+            <span class="back-arrow">◀</span>
+            <span>返回</span>
+          </button>
         </div>
-      </GlassPanel>
-    </div>
+
+        <div v-if="loading" class="post-state">加载中...</div>
+
+        <div v-else-if="currentPost">
+          <div v-if="currentPost.cover" class="post-cover">
+            <img :src="currentPost.cover" :alt="currentPost.title" />
+          </div>
+
+          <div class="post-meta">
+            <h1 class="post-title">{{ currentPost.title }}</h1>
+            <span v-if="currentPost.date" class="post-date">{{ currentPost.date }}</span>
+            <div class="post-tags-row">
+              <span
+                v-if="currentPost.category"
+                class="post-cat"
+                :class="`cat-${catColorKey(currentPost.category)}`"
+              >
+                {{ currentPost.category }}
+              </span>
+              <span v-for="tag in currentPost.tags.slice(0, 4)" :key="tag" class="post-tag"
+                >#{{ tag }}</span
+              >
+            </div>
+          </div>
+
+          <div class="prose" v-html="html"></div>
+          <AboutComments :page-key="`post:${currentPost.slug}`" />
+        </div>
+
+        <div v-else class="post-state">文章不存在</div>
+      </div>
+    </GlassPanel>
+  </div>
 </template>
 
 <script setup lang="ts">

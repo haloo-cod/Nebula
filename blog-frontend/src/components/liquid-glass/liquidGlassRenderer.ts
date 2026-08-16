@@ -770,7 +770,9 @@ function attachVideoFrameCallbacks(entry: TextureEntry) {
   const generation = (entry.videoCallbackGeneration ?? 0) + 1
   entry.videoCallbackGeneration = generation
   const frameVideo = video as HTMLVideoElement & {
-    requestVideoFrameCallback?: (callback: (now: number, metadata: { mediaTime?: number }) => void) => number
+    requestVideoFrameCallback?: (
+      callback: (now: number, metadata: { mediaTime?: number }) => void,
+    ) => number
   }
   if (typeof frameVideo.requestVideoFrameCallback !== 'function') return
   const markFrame = (_now?: number, metadata?: { mediaTime?: number }) => {
@@ -787,7 +789,8 @@ function attachVideoFrameCallbacks(entry: TextureEntry) {
 }
 
 function uploadCurrentVideoFrame(entry: TextureEntry): boolean {
-  if (!gl || !entry.video || entry.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
+  if (!gl || !entry.video || entry.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)
+    return false
   const frame = Math.floor(entry.video.currentTime * 1000)
   if (entry.videoUploadedFrame === frame) return true
   try {
@@ -809,7 +812,8 @@ function updateVideoTexture(entry: TextureEntry) {
   const hasFrameCallback = 'requestVideoFrameCallback' in entry.video
   const now = performance.now()
   const currentTime = entry.video.currentTime
-  const callbackStalled = hasFrameCallback &&
+  const callbackStalled =
+    hasFrameCallback &&
     entry.videoFrameReady === false &&
     now - (entry.videoLastCallbackAt ?? 0) >= VIDEO_CALLBACK_WATCHDOG_MS &&
     currentTime !== (entry.videoLastCallbackTime ?? currentTime)
@@ -1168,7 +1172,13 @@ function renderLoop() {
     if (!inst.ready) continue
     const [ox, oy] = inst.uniforms.canvasOffset
     const [gw, gh] = inst.uniforms.glassSize
-    if (ox + gw < -CULL_MARGIN || oy + gh < -CULL_MARGIN || ox > vpW + CULL_MARGIN || oy > vpH + CULL_MARGIN) continue
+    if (
+      ox + gw < -CULL_MARGIN ||
+      oy + gh < -CULL_MARGIN ||
+      ox > vpW + CULL_MARGIN ||
+      oy > vpH + CULL_MARGIN
+    )
+      continue
     requiredWidth = Math.max(requiredWidth, Math.round(gw))
     requiredHeight = Math.max(requiredHeight, Math.round(gh))
   }
@@ -1212,10 +1222,13 @@ function renderLoop() {
     const srcY = offscreenHeight - srcH
     const sourceValid = Boolean(
       offscreenCanvas &&
-      srcW > 0 && srcH > 0 && srcY >= 0 &&
+      srcW > 0 &&
+      srcH > 0 &&
+      srcY >= 0 &&
       srcW <= offscreenCanvas.width &&
       srcY + srcH <= offscreenCanvas.height &&
-      canvas.width > 0 && canvas.height > 0,
+      canvas.width > 0 &&
+      canvas.height > 0,
     )
     if (!sourceValid) {
       metrics.copyBoundsErrors++

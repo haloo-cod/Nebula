@@ -90,7 +90,9 @@ function openUpload() {
 async function loadLibraryFiles() {
   try {
     libraryFiles.value = (await fetchFiles()).filter((file) => file.mime_type.startsWith('video/'))
-  } catch { libraryFiles.value = [] }
+  } catch {
+    libraryFiles.value = []
+  }
 }
 
 function formatFileSize(size = 0): string {
@@ -102,7 +104,12 @@ function formatFileSize(size = 0): string {
 function handleVideoFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0] ?? null
   if (!file) return
-  const expected = ({ 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov' } as Record<string, string>)[file.type]
+  const expected = (
+    { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov' } as Record<
+      string,
+      string
+    >
+  )[file.type]
   const suffix = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
   if (!expected || expected !== suffix) {
     ElMessage.error('仅支持 MIME 与扩展名匹配的 MP4、WebM 或 MOV 视频')
@@ -123,7 +130,11 @@ function handleVideoPreview(event: Event) {
 
 /** 从媒体库选择图片，随后创建背景记录。 */
 async function handleUpload() {
-  const sourceCount = [externalUrl.value.trim(), videoFile.value, selectedLibraryFileId.value].filter(Boolean).length
+  const sourceCount = [
+    externalUrl.value.trim(),
+    videoFile.value,
+    selectedLibraryFileId.value,
+  ].filter(Boolean).length
   if (mediaType.value === 'video' && sourceCount !== 1) {
     ElMessage.warning('请选择一个视频来源：文件管理、本地上传或外部 URL')
     return
@@ -156,7 +167,9 @@ async function handleUpload() {
         const form = new FormData()
         form.append('file', videoFile.value)
         const uploaded = await api.post<{ url: string; mime_type: string; file_size: number }>(
-          '/api/v1/backgrounds/video-upload', form, true,
+          '/api/v1/backgrounds/video-upload',
+          form,
+          true,
         )
         mediaUrl = uploaded.url
         mimeType = uploaded.mime_type
@@ -166,17 +179,21 @@ async function handleUpload() {
         throw new Error('视频来源地址为空，请重新选择文件管理视频、本地视频或外部 URL')
       }
       if (!mimeType && videoFile.value) mimeType = videoFile.value.type
-      await api.post('/api/v1/backgrounds', {
-        image_id: null,
-        media_type: 'video',
-        media_url: mediaUrl,
-        poster_url: posterUrl.value.trim(),
-        mime_type: mimeType,
-        file_size: fileSize,
-        theme: uploadForm.value.theme,
-        device: uploadForm.value.device,
-        sort_order: backgrounds.value.length,
-      }, true)
+      await api.post(
+        '/api/v1/backgrounds',
+        {
+          image_id: null,
+          media_type: 'video',
+          media_url: mediaUrl,
+          poster_url: posterUrl.value.trim(),
+          mime_type: mimeType,
+          file_size: fileSize,
+          theme: uploadForm.value.theme,
+          device: uploadForm.value.device,
+          sort_order: backgrounds.value.length,
+        },
+        true,
+      )
       ElMessage.success('视频背景添加成功')
       showUploadDialog.value = false
       await loadBackgrounds()
@@ -190,7 +207,9 @@ async function handleUpload() {
         hasLocalFile: Boolean(videoFile.value),
         externalUrl: externalUrl.value.trim(),
       })
-    } finally { uploading.value = false }
+    } finally {
+      uploading.value = false
+    }
     return
   }
   if (!selectedImages.value.length && !selectedImage.value) {
@@ -337,7 +356,16 @@ onMounted(() => loadBackgrounds())
       </div>
       <div v-loading="loading" class="bg-grid">
         <div v-for="bg in backgrounds" :key="bg.id" class="bg-item">
-          <video v-if="bg.media_type === 'video'" :src="resolveUrl(bg.url)" :poster="bg.poster_url ? resolveUrl(bg.poster_url) : undefined" muted loop autoplay playsinline class="bg-img" />
+          <video
+            v-if="bg.media_type === 'video'"
+            :src="resolveUrl(bg.url)"
+            :poster="bg.poster_url ? resolveUrl(bg.poster_url) : undefined"
+            muted
+            loop
+            autoplay
+            playsinline
+            class="bg-img"
+          />
           <img v-else :src="resolveUrl(bg.url)" alt="" class="bg-img" />
           <el-checkbox
             class="bg-check"
@@ -348,7 +376,10 @@ onMounted(() => loadBackgrounds())
           <div class="bg-overlay">
             <el-button type="danger" size="small" @click="handleDelete(bg)">移除</el-button>
           </div>
-          <span class="bg-label">{{ formatLabel(bg.theme, bg.device) }} · {{ bg.media_type === 'video' ? '视频' : '图片' }}</span>
+          <span class="bg-label"
+            >{{ formatLabel(bg.theme, bg.device) }} ·
+            {{ bg.media_type === 'video' ? '视频' : '图片' }}</span
+          >
         </div>
         <div v-if="!loading && backgrounds.length === 0" class="empty-state">暂无背景图</div>
       </div>
@@ -376,16 +407,52 @@ onMounted(() => loadBackgrounds())
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="mediaType === 'video'" label="视频来源">
-          <el-select v-model="selectedLibraryFileId" clearable placeholder="从文件管理选择视频" style="width: 100%">
-            <el-option v-for="file in libraryFiles" :key="file.id" :label="`${file.original_name} · ${file.mime_type}`" :value="file.id" />
+          <el-select
+            v-model="selectedLibraryFileId"
+            clearable
+            placeholder="从文件管理选择视频"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="file in libraryFiles"
+              :key="file.id"
+              :label="`${file.original_name} · ${file.mime_type}`"
+              :value="file.id"
+            />
           </el-select>
           <el-input v-model="externalUrl" placeholder="外部视频 URL（可选）" />
-          <el-input v-model="posterUrl" placeholder="Poster URL（可选，播放失败时显示）" style="margin-top: 8px" />
-          <input ref="videoInput" type="file" accept="video/mp4,video/webm,video/quicktime" hidden @change="handleVideoFileChange" />
-          <el-button plain style="margin-top: 8px" @click="videoInput?.click()">选择本地视频（≤50MB）</el-button>
+          <el-input
+            v-model="posterUrl"
+            placeholder="Poster URL（可选，播放失败时显示）"
+            style="margin-top: 8px"
+          />
+          <input
+            ref="videoInput"
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime"
+            hidden
+            @change="handleVideoFileChange"
+          />
+          <el-button plain style="margin-top: 8px" @click="videoInput?.click()"
+            >选择本地视频（≤50MB）</el-button
+          >
           <span v-if="videoFile" class="selected-image-name">{{ videoFile.name }}</span>
-          <video v-if="videoPreview" :src="videoPreview" muted playsinline controls class="video-preview" @loadeddata="handleVideoPreview" @error="handleVideoPreview" />
-          <span v-if="videoFile" class="video-meta">{{ videoFile.type }} · {{ formatFileSize(videoFile.size) }} · {{ videoStatus === 'error' ? '播放失败' : videoStatus === 'ready' ? '可播放' : '检测中' }}</span>
+          <video
+            v-if="videoPreview"
+            :src="videoPreview"
+            muted
+            playsinline
+            controls
+            class="video-preview"
+            @loadeddata="handleVideoPreview"
+            @error="handleVideoPreview"
+          />
+          <span v-if="videoFile" class="video-meta"
+            >{{ videoFile.type }} · {{ formatFileSize(videoFile.size) }} ·
+            {{
+              videoStatus === 'error' ? '播放失败' : videoStatus === 'ready' ? '可播放' : '检测中'
+            }}</span
+          >
         </el-form-item>
         <el-form-item v-else label="选择图片">
           <div class="image-picker">

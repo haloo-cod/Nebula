@@ -44,10 +44,7 @@
       </div>
       <div class="perf-row">
         <span class="perf-label">GL 帧耗时</span>
-        <span
-          class="perf-value"
-          :class="{ 'perf-value--warn': metrics.lastFrameDuration > 8 }"
-        >
+        <span class="perf-value" :class="{ 'perf-value--warn': metrics.lastFrameDuration > 8 }">
           {{ metrics.lastFrameDuration.toFixed(2) }} ms
         </span>
       </div>
@@ -105,7 +102,10 @@
       </div>
       <div class="perf-row">
         <span class="perf-label">Copy bounds</span>
-        <span class="perf-value" :class="{ 'perf-value--warn': copyBoundsPerSec > 0 || metrics.copyBoundsErrors > 0 }">
+        <span
+          class="perf-value"
+          :class="{ 'perf-value--warn': copyBoundsPerSec > 0 || metrics.copyBoundsErrors > 0 }"
+        >
           {{ metrics.copyBoundsErrors }} ({{ copyBoundsPerSec }}/s)
         </span>
       </div>
@@ -314,7 +314,9 @@ function pollMetrics() {
   stats.value = getInstanceStats()
   const videos = getVideoTextureStats()
   videoState.value = videos.length
-    ? videos.map((v) => `${v.readyState}/${v.paused ? 'paused' : 'playing'} ${v.width}x${v.height}`).join(' · ')
+    ? videos
+        .map((v) => `${v.readyState}/${v.paused ? 'paused' : 'playing'} ${v.width}x${v.height}`)
+        .join(' · ')
     : 'none'
   prevMetrics = m
   prevPollTime = now

@@ -526,14 +526,18 @@ function repairEpubLayout(contents: { document?: Document }) {
     `
     document.head.appendChild(style)
   }
-  for (const element of Array.from(document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'))) {
+  for (const element of Array.from(
+    document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'),
+  )) {
     if (readingMode.value === 'scrolled' || element.getBoundingClientRect().height > 100000) {
       element.style.height = 'auto'
       element.style.minHeight = '0'
     }
   }
   window.setTimeout(() => {
-    for (const element of Array.from(document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'))) {
+    for (const element of Array.from(
+      document.querySelectorAll<HTMLElement>('.illus, .cover, .kuchie'),
+    )) {
       if (readingMode.value === 'scrolled' || element.getBoundingClientRect().height > 100000) {
         element.style.height = 'auto'
         element.style.minHeight = '0'
@@ -787,8 +791,7 @@ function normalizeTocHref(href: string): string {
 function isTocItemActive(href: string): boolean {
   if (!activeTocHref.value) return false
   return (
-    activeTocHref.value === href ||
-    normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
+    activeTocHref.value === href || normalizeTocHref(activeTocHref.value) === normalizeTocHref(href)
   )
 }
 
@@ -917,7 +920,6 @@ async function loadReader(anchor?: ReaderAnchor) {
     await warmContinuousReader()
     if (!isCurrentRun(runId)) return
     isReaderBusy.value = false
-
   } catch (err) {
     if (!isCurrentRun(runId)) return
     console.warn('[books] EPUB 阅读器加载失败:', err)

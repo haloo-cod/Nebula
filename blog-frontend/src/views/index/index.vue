@@ -1,67 +1,119 @@
 ﻿<template>
-    <div class="home-root" :class="{ 'home-locked': !showUIElements }">
-      <!-- 面板区域（简介 + 占位） -->
-      <div v-if="showUIElements" class="home-panels">
-        <div class="home-panels-inner">
-          <div class="left-panel-glass">
-            <LiquidGlass
-              v-if="ui.liquidGlassEnabled"
-              :cornerRadius="16"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              :allow-reveal="allowLiquidGlassReveal"
-              :ripple-trail="true"
-              class="panel-liquid-glass"
-            >
-              <HomeProfilePanel
-                :avatar="profileAvatar"
-                :name="profileName"
-                :bio="profileBio"
-                :links="profileLinks"
-              />
-            </LiquidGlass>
-            <PanelFallbackGlass v-else static-blur>
-              <HomeProfilePanel
-                :avatar="profileAvatar"
-                :name="profileName"
-                :bio="profileBio"
-                :links="profileLinks"
-              />
-            </PanelFallbackGlass>
-          </div>
-          <div class="right-panel-glass">
-            <LiquidGlass
-              v-if="ui.liquidGlassEnabled"
-              :cornerRadius="16"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              :allow-reveal="allowLiquidGlassReveal"
-              :ripple-trail="true"
-              class="panel-liquid-glass"
-            >
-              <DataDashboard />
-            </LiquidGlass>
-            <PanelFallbackGlass v-else static-blur>
-              <DataDashboard />
-            </PanelFallbackGlass>
-          </div>
+  <div class="home-root" :class="{ 'home-locked': !showUIElements }">
+    <!-- 面板区域（简介 + 占位） -->
+    <div v-if="showUIElements" class="home-panels">
+      <div class="home-panels-inner">
+        <div class="left-panel-glass">
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="16"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :allow-reveal="allowLiquidGlassReveal"
+            :ripple-trail="true"
+            class="panel-liquid-glass"
+          >
+            <HomeProfilePanel
+              :avatar="profileAvatar"
+              :name="profileName"
+              :bio="profileBio"
+              :links="profileLinks"
+            />
+          </LiquidGlass>
+          <PanelFallbackGlass v-else static-blur>
+            <HomeProfilePanel
+              :avatar="profileAvatar"
+              :name="profileName"
+              :bio="profileBio"
+              :links="profileLinks"
+            />
+          </PanelFallbackGlass>
+        </div>
+        <div class="right-panel-glass">
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="16"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :allow-reveal="allowLiquidGlassReveal"
+            :ripple-trail="true"
+            class="panel-liquid-glass"
+          >
+            <DataDashboard />
+          </LiquidGlass>
+          <PanelFallbackGlass v-else static-blur>
+            <DataDashboard />
+          </PanelFallbackGlass>
         </div>
       </div>
+    </div>
 
-      <!-- 玻璃横条（标题） -->
-      <div class="title-container" :class="containerClass">
-        <div class="title-glass" :class="{ 'title-glass--visible': showUIElements }">
-          <h1 class="typewriter-title" translate="no">
-            {{ typewriterDone ? fullTitle : displayed }}<span class="caret caret-blink">|</span>
-          </h1>
-        </div>
+    <!-- 玻璃横条（标题） -->
+    <div class="title-container" :class="containerClass">
+      <div class="title-glass" :class="{ 'title-glass--visible': showUIElements }">
+        <h1 class="typewriter-title" translate="no">
+          {{ typewriterDone ? fullTitle : displayed }}<span class="caret caret-blink">|</span>
+        </h1>
       </div>
+    </div>
 
-      <!-- 下方面板区域 -->
-      <div v-if="showUIElements" class="home-bottom">
-        <div class="bottom-grid">
-          <!-- 左侧：轮播图 -->
-          <div class="bottom-left">
+    <!-- 下方面板区域 -->
+    <div v-if="showUIElements" class="home-bottom">
+      <div class="bottom-grid">
+        <!-- 左侧：轮播图 -->
+        <div class="bottom-left">
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="16"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :allow-reveal="allowLiquidGlassReveal"
+            :ripple-trail="true"
+            class="panel-liquid-glass"
+          >
+            <Carousel />
+          </LiquidGlass>
+          <PanelFallbackGlass v-else static-blur>
+            <Carousel />
+          </PanelFallbackGlass>
+        </div>
+        <!-- 右侧上：日历 -->
+        <div class="bottom-right-top">
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="16"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :allow-reveal="allowLiquidGlassReveal"
+            :ripple-trail="true"
+            class="panel-liquid-glass"
+          >
+            <CalendarPanel flat />
+          </LiquidGlass>
+          <PanelFallbackGlass v-else static-blur>
+            <CalendarPanel flat />
+          </PanelFallbackGlass>
+        </div>
+        <!-- 右侧中：电子时钟 -->
+        <div class="bottom-right-middle">
+          <LiquidGlass
+            v-if="ui.liquidGlassEnabled"
+            :cornerRadius="16"
+            :theme="ui.theme"
+            :blur-radius="ui.liquidGlassBlur"
+            :allow-reveal="allowLiquidGlassReveal"
+            :ripple-trail="true"
+            class="panel-liquid-glass"
+          >
+            <DigitalClockPanel />
+          </LiquidGlass>
+          <PanelFallbackGlass v-else static-blur>
+            <DigitalClockPanel />
+          </PanelFallbackGlass>
+        </div>
+        <!-- 右侧下：博文轮播 + 说说轮播 -->
+        <div class="bottom-right-bottom">
+          <div class="bottom-right-bottom-inner">
             <LiquidGlass
               v-if="ui.liquidGlassEnabled"
               :cornerRadius="16"
@@ -71,14 +123,11 @@
               :ripple-trail="true"
               class="panel-liquid-glass"
             >
-              <Carousel />
+              <PostCarousel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else static-blur>
-              <Carousel />
+            <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
+              <PostCarousel />
             </PanelFallbackGlass>
-          </div>
-          <!-- 右侧上：日历 -->
-          <div class="bottom-right-top">
             <LiquidGlass
               v-if="ui.liquidGlassEnabled"
               :cornerRadius="16"
@@ -88,65 +137,16 @@
               :ripple-trail="true"
               class="panel-liquid-glass"
             >
-              <CalendarPanel flat />
+              <MomentCarousel />
             </LiquidGlass>
-            <PanelFallbackGlass v-else static-blur>
-              <CalendarPanel flat />
+            <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
+              <MomentCarousel />
             </PanelFallbackGlass>
-          </div>
-          <!-- 右侧中：电子时钟 -->
-          <div class="bottom-right-middle">
-            <LiquidGlass
-              v-if="ui.liquidGlassEnabled"
-              :cornerRadius="16"
-              :theme="ui.theme"
-              :blur-radius="ui.liquidGlassBlur"
-              :allow-reveal="allowLiquidGlassReveal"
-              :ripple-trail="true"
-              class="panel-liquid-glass"
-            >
-              <DigitalClockPanel />
-            </LiquidGlass>
-            <PanelFallbackGlass v-else static-blur>
-              <DigitalClockPanel />
-            </PanelFallbackGlass>
-          </div>
-          <!-- 右侧下：博文轮播 + 说说轮播 -->
-          <div class="bottom-right-bottom">
-            <div class="bottom-right-bottom-inner">
-              <LiquidGlass
-                v-if="ui.liquidGlassEnabled"
-                :cornerRadius="16"
-                :theme="ui.theme"
-                :blur-radius="ui.liquidGlassBlur"
-                :allow-reveal="allowLiquidGlassReveal"
-                :ripple-trail="true"
-                class="panel-liquid-glass"
-              >
-                <PostCarousel />
-              </LiquidGlass>
-              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
-                <PostCarousel />
-              </PanelFallbackGlass>
-              <LiquidGlass
-                v-if="ui.liquidGlassEnabled"
-                :cornerRadius="16"
-                :theme="ui.theme"
-                :blur-radius="ui.liquidGlassBlur"
-                :allow-reveal="allowLiquidGlassReveal"
-                :ripple-trail="true"
-                class="panel-liquid-glass"
-              >
-                <MomentCarousel />
-              </LiquidGlass>
-              <PanelFallbackGlass v-else static-blur class="home-carousel-fallback">
-                <MomentCarousel />
-              </PanelFallbackGlass>
-            </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 </template>
 
 <script setup lang="ts">

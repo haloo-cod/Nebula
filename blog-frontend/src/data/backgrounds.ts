@@ -7,14 +7,23 @@ export interface BackgroundItem {
   fileSize?: number
 }
 
-export function isVideoBackground(item: { src?: string; url?: string; mediaType?: 'image' | 'video'; media_type?: 'image' | 'video'; mimeType?: string; mime_type?: string }): boolean {
+export function isVideoBackground(item: {
+  src?: string
+  url?: string
+  mediaType?: 'image' | 'video'
+  media_type?: 'image' | 'video'
+  mimeType?: string
+  mime_type?: string
+}): boolean {
   const src = item.src ?? item.url ?? ''
   const type = item.mediaType ?? item.media_type
   const mime = item.mimeType ?? item.mime_type
-  return type === 'video'
-    || mime?.startsWith('video/') === true
-    || /\/api\/v1\/files\/\d+\/media(?:\?|$)/i.test(src)
-    || /\.(mp4|webm|mov)(?:\?|$)/i.test(src)
+  return (
+    type === 'video' ||
+    mime?.startsWith('video/') === true ||
+    /\/api\/v1\/files\/\d+\/media(?:\?|$)/i.test(src) ||
+    /\.(mp4|webm|mov)(?:\?|$)/i.test(src)
+  )
 }
 
 const darkDesktopFiles = import.meta.glob<string>(

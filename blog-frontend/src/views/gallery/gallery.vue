@@ -1,22 +1,22 @@
 <template>
-    <main class="gallery-page">
-      <section id="gallery-projects" class="gallery-section">
-        <div class="section-heading">
-          <span class="gallery-kicker">{{ siteText.gallery.kicker }}</span>
-          <h2>{{ siteText.gallery.title }}</h2>
-          <p>{{ siteText.gallery.subtitle }}</p>
-        </div>
+  <main class="gallery-page">
+    <section id="gallery-projects" class="gallery-section">
+      <div class="section-heading">
+        <span class="gallery-kicker">{{ siteText.gallery.kicker }}</span>
+        <h2>{{ siteText.gallery.title }}</h2>
+        <p>{{ siteText.gallery.subtitle }}</p>
+      </div>
 
-        <div class="project-grid">
-          <GlassProjectLink
-            v-for="(project, index) in projects"
-            :key="project.slug"
-            :project="project"
-            :specimen-index="String(index + 1).padStart(2, '0')"
-          />
-        </div>
-      </section>
-    </main>
+      <div class="project-grid">
+        <GlassProjectLink
+          v-for="(project, index) in projects"
+          :key="project.slug"
+          :project="project"
+          :specimen-index="String(index + 1).padStart(2, '0')"
+        />
+      </div>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">

@@ -1,7 +1,11 @@
 <template>
   <div class="page-background">
     <!-- 背景层：fixed 定位，不使用 translateZ/will-change 以免阻断子元素 backdrop-filter 采样 -->
-    <div v-if="!isVideo || videoFailed || reducedMotion" class="bg-layer" :style="bgLayerStyle"></div>
+    <div
+      v-if="!isVideo || videoFailed || reducedMotion"
+      class="bg-layer"
+      :style="bgLayerStyle"
+    ></div>
     <video
       v-else
       ref="videoRef"
@@ -31,7 +35,11 @@ import { storeToRefs } from 'pinia'
 import { useUIStore } from '@/stores/ui'
 import { isVideoBackground } from '@/data/backgrounds'
 import type { BackgroundItem } from '@/data/backgrounds'
-import { bindVideoElement, preloadTexture, preloadVideoTexture } from '@/components/liquid-glass/liquidGlassRenderer'
+import {
+  bindVideoElement,
+  preloadTexture,
+  preloadVideoTexture,
+} from '@/components/liquid-glass/liquidGlassRenderer'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
 withDefaults(defineProps<{ overlay?: number }>(), {
@@ -50,7 +58,8 @@ const bgLayerStyle = computed(() => {
   const blur = backgroundBlurEnabled.value ? backgroundBlur.value : 0
   const scale = blur > 0 ? 1 + Math.min(blur / 240, 0.08) : 1
   return {
-    backgroundImage: !isVideo.value && background.value.src ? `url(${background.value.src})` : undefined,
+    backgroundImage:
+      !isVideo.value && background.value.src ? `url(${background.value.src})` : undefined,
     backgroundColor: 'var(--page-background)',
     filter: blur > 0 ? `blur(${blur}px)` : undefined,
     transform: scale !== 1 ? `scale(${scale})` : undefined,
@@ -63,11 +72,17 @@ function playVideo() {
   if (!video) return
   // 让 WebGL 纹理复用页面上真正显示的 video，避免隐藏副本与背景播放进度漂移。
   if (!bindVideoElement(displayedBackground.value.src, video)) {
-    video.addEventListener('loadeddata', () => {
-      bindVideoElement(displayedBackground.value.src, video)
-    }, { once: true })
+    video.addEventListener(
+      'loadeddata',
+      () => {
+        bindVideoElement(displayedBackground.value.src, video)
+      },
+      { once: true },
+    )
   }
-  void video.play().catch(() => { videoFailed.value = true })
+  void video.play().catch(() => {
+    videoFailed.value = true
+  })
 }
 
 let switchToken = 0
@@ -90,12 +105,20 @@ async function switchBackground(next: BackgroundItem) {
   playVideo()
 }
 
-watch(currentBackground, (next) => { void switchBackground(next) }, { deep: true, immediate: true })
+watch(
+  currentBackground,
+  (next) => {
+    void switchBackground(next)
+  },
+  { deep: true, immediate: true },
+)
 onMounted(() => {
   reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   playVideo()
 })
-onUnmounted(() => { videoRef.value?.pause() })
+onUnmounted(() => {
+  videoRef.value?.pause()
+})
 </script>
 
 <style scoped>

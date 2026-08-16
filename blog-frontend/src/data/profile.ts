@@ -13,5 +13,4 @@ export const profile: Profile = {
 }
 
 // 社交链接列表(icon 对应 SvgIcon 的 name) 这里为静态资料
-export const socialLinks: SocialLink[] = [
-]
+export const socialLinks: SocialLink[] = []

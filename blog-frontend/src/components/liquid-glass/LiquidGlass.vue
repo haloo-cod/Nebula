@@ -388,7 +388,8 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   const syncToken = ++backgroundSyncToken
 
   // 先隐藏 canvas（允许 reveal 时）
-  const keepVisible = visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
+  const keepVisible =
+    visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
   if (ui.themeTransitioning && !keepVisible) {
     visible.value = false
     if (instanceId) {
@@ -430,7 +431,10 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
       renderedBackgroundUrl = url
       markInstanceReady(instanceId, true)
     } else {
-      console.warn('[LiquidGlass] Background texture is not ready', { url, mediaType: currentBackground.value.mediaType })
+      console.warn('[LiquidGlass] Background texture is not ready', {
+        url,
+        mediaType: currentBackground.value.mediaType,
+      })
     }
   }
 }
@@ -625,7 +629,6 @@ defineExpose({ syncCanvasSize, refreshRenderer })
   border-radius: 16px;
   overflow: hidden;
 }
-
 
 .liquid-glass-canvas {
   position: absolute;

@@ -62,6 +62,10 @@ const loading = ref(false)
 const maxTrendValue = computed(() => Math.max(1, ...trend.value.map((item) => item.pv)))
 const pvPoints = computed(() => makeChartPoints('pv'))
 const uvPoints = computed(() => makeChartPoints('uv'))
+const pvAreaPoints = computed(() => makeAreaPoints('pv'))
+const uvAreaPoints = computed(() => makeAreaPoints('uv'))
+const pvDots = computed(() => makeDots('pv'))
+const uvDots = computed(() => makeDots('uv'))
 const recentSevenDayPv = computed(() => trend.value.reduce((sum, item) => sum + item.pv, 0))
 const recentSevenDayUv = computed(() => trend.value.reduce((sum, item) => sum + item.uv, 0))
 
@@ -82,6 +86,25 @@ function makeChartPoints(key: 'pv' | 'uv'): string {
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
     .join(' ')
+}
+
+/** 折线下方闭合为面积填充区域（首尾接 x 轴底部）。 */
+function makeAreaPoints(key: 'pv' | 'uv'): string {
+  const line = makeChartPoints(key)
+  if (!line) return ''
+  return `0,220 ${line} 720,220`
+}
+
+/** 每个数据点的坐标，用于绘制圆点标记。 */
+function makeDots(key: 'pv' | 'uv'): Array<{ x: number; y: number }> {
+  if (trend.value.length === 0) return []
+  const width = 720
+  const height = 220
+  const step = trend.value.length === 1 ? 0 : width / (trend.value.length - 1)
+  return trend.value.map((item, index) => ({
+    x: +(index * step).toFixed(1),
+    y: +(height - (item[key] / maxTrendValue.value) * (height - 20) - 10).toFixed(1),
+  }))
 }
 
 function formatDate(value: string): string {
@@ -136,11 +159,21 @@ onMounted(async () => {
 
 <template>
   <div class="dashboard-page">
+    <section class="dashboard-intro">
+      <div>
+        <span class="dashboard-eyebrow">OVERVIEW</span>
+        <h1>欢迎回来，管理员</h1>
+        <p>这里是你的内容工作台，快速了解站点状态与最近动态。</p>
+      </div>
+      <el-button :icon="Refresh" :loading="loading" @click="loadAnalytics">刷新数据</el-button>
+    </section>
     <!-- 统计卡片 -->
     <div class="stat-cards">
       <el-card shadow="hover" class="stat-card">
         <div class="stat-content">
-          <el-icon :size="32" color="#409eff"><Document /></el-icon>
+          <div class="stat-icon">
+            <el-icon><Document /></el-icon>
+          </div>
           <div class="stat-info">
             <span class="stat-value">{{ overview?.today_pv ?? '--' }}</span>
             <span class="stat-label">今日浏览量（PV）</span>
@@ -150,7 +183,9 @@ onMounted(async () => {
 
       <el-card shadow="hover" class="stat-card">
         <div class="stat-content">
-          <el-icon :size="32" color="#67c23a"><ChatDotRound /></el-icon>
+          <div class="stat-icon">
+            <el-icon><ChatDotRound /></el-icon>
+          </div>
           <div class="stat-info">
             <span class="stat-value">{{ overview?.today_uv ?? '--' }}</span>
             <span class="stat-label">今日访客数（UV）</span>
@@ -160,7 +195,9 @@ onMounted(async () => {
 
       <el-card shadow="hover" class="stat-card">
         <div class="stat-content">
-          <el-icon :size="32" color="#e6a23c"><Reading /></el-icon>
+          <div class="stat-icon">
+            <el-icon><Reading /></el-icon>
+          </div>
           <div class="stat-info">
             <span class="stat-value">{{ overview?.total_pv ?? '--' }}</span>
             <span class="stat-label">累计浏览量（PV）</span>
@@ -170,7 +207,9 @@ onMounted(async () => {
 
       <el-card shadow="hover" class="stat-card">
         <div class="stat-content">
-          <el-icon :size="32" color="#f56c6c"><Connection /></el-icon>
+          <div class="stat-icon">
+            <el-icon><Connection /></el-icon>
+          </div>
           <div class="stat-info">
             <span class="stat-value">{{ overview?.total_uv ?? '--' }}</span>
             <span class="stat-label">累计访客数（UV）</span>
@@ -181,12 +220,12 @@ onMounted(async () => {
 
     <div class="analytics-header">
       <div>
+        <span class="section-eyebrow">TRAFFIC</span>
         <h2>访问分析</h2>
         <span>
           最近 7 天浏览量（PV）{{ recentSevenDayPv }} · 访客数（UV）{{ recentSevenDayUv }}
         </span>
       </div>
-      <el-button :icon="Refresh" :loading="loading" @click="loadAnalytics">刷新数据</el-button>
     </div>
 
     <el-card shadow="never" class="chart-card">
@@ -199,6 +238,19 @@ onMounted(async () => {
           role="img"
           aria-label="最近七天访问趋势"
         >
+          <defs>
+            <linearGradient id="chartAreaPv" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                style="stop-color: var(--admin-primary-color); stop-opacity: 0.22"
+              />
+              <stop offset="100%" style="stop-color: var(--admin-primary-color); stop-opacity: 0" />
+            </linearGradient>
+            <linearGradient id="chartAreaUv" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style="stop-color: #e09b4b; stop-opacity: 0.16" />
+              <stop offset="100%" style="stop-color: #e09b4b; stop-opacity: 0" />
+            </linearGradient>
+          </defs>
           <line
             v-for="level in [0, 1, 2, 3, 4]"
             :key="level"
@@ -217,8 +269,26 @@ onMounted(async () => {
           >
             {{ Math.round((maxTrendValue * level) / 4) }}
           </text>
+          <polygon :points="pvAreaPoints" class="chart-area chart-area-pv" />
+          <polygon :points="uvAreaPoints" class="chart-area chart-area-uv" />
           <polyline :points="pvPoints" class="chart-line chart-line-pv" />
           <polyline :points="uvPoints" class="chart-line chart-line-uv" />
+          <circle
+            v-for="(dot, index) in pvDots"
+            :key="`pv-dot-${index}`"
+            :cx="dot.x"
+            :cy="dot.y"
+            r="3.5"
+            class="chart-dot chart-dot-pv"
+          />
+          <circle
+            v-for="(dot, index) in uvDots"
+            :key="`uv-dot-${index}`"
+            :cx="dot.x"
+            :cy="dot.y"
+            r="3.5"
+            class="chart-dot chart-dot-uv"
+          />
         </svg>
         <div class="chart-labels">
           <span v-for="item in trend" :key="item.date">{{ formatDate(item.date) }}</span>
@@ -309,17 +379,96 @@ onMounted(async () => {
 .dashboard-page {
   display: flex;
   flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 20px;
+  padding: 4px 0 2px;
+}
+
+.dashboard-intro h1 {
+  margin: 4px 0 6px;
+  color: var(--admin-text-color, #18181b);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.dashboard-intro p,
+.analytics-header span {
+  margin: 0;
+  color: var(--admin-text-secondary, #71717a);
+  font-size: 13px;
+}
+
+.dashboard-eyebrow,
+.section-eyebrow {
+  color: var(--admin-primary-color);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
 }
 
 .stat-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .stat-card {
-  border-radius: 12px;
+  min-height: 128px;
+  border-radius: 16px;
+}
+
+.stat-card :deep(.el-card__body) {
+  height: 100%;
+  padding: 20px;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.stat-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--admin-menu-active-bg);
+  color: var(--admin-primary-color);
+  font-size: 22px;
+}
+
+.stat-icon .el-icon {
+  font-size: inherit;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stat-value {
+  color: var(--admin-text-color, #18181b);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.stat-label {
+  color: var(--admin-text-secondary, #71717a);
+  font-size: 12px;
 }
 
 .analytics-header {
@@ -328,23 +477,25 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 16px;
 }
+
 .analytics-header h2 {
-  margin: 0 0 4px;
-  color: var(--admin-text-color, #303133);
-  font-size: 18px;
+  margin: 4px 0 5px;
+  color: var(--admin-text-color, #18181b);
+  font-size: 20px;
 }
-.analytics-header span {
-  color: var(--admin-text-secondary, #909399);
-  font-size: 13px;
-}
+
 .chart-card,
-.data-card {
-  border-radius: 12px;
+.data-card,
+.quick-actions,
+.welcome-card {
+  border-radius: 16px;
 }
+
 .chart-wrap {
   position: relative;
   padding: 4px 0 28px;
 }
+
 .trend-chart {
   display: block;
   width: 100%;
@@ -352,16 +503,19 @@ onMounted(async () => {
   aspect-ratio: 720 / 260;
   overflow: visible;
 }
+
 .chart-grid {
-  stroke: var(--admin-border-color, #e4e7ed);
+  stroke: var(--admin-border-color, #e4e4e7);
   stroke-dasharray: 4 5;
   stroke-width: 1;
 }
+
 .chart-axis-label {
-  fill: var(--admin-text-secondary, #909399);
+  fill: var(--admin-text-secondary, #71717a);
   font-size: 11px;
   text-anchor: start;
 }
+
 .chart-line {
   fill: none;
   stroke-linecap: round;
@@ -369,84 +523,100 @@ onMounted(async () => {
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
+
 .chart-line-pv {
-  stroke: #409eff;
+  stroke: var(--admin-primary-color);
 }
+
 .chart-line-uv {
-  stroke: #67c23a;
+  stroke: #e09b4b;
 }
-.chart-labels {
-  display: flex;
-  justify-content: space-between;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 11px;
+
+.chart-area {
+  stroke: none;
 }
+
+.chart-area-pv {
+  fill: url(#chartAreaPv);
+}
+
+.chart-area-uv {
+  fill: url(#chartAreaUv);
+}
+
+.chart-dot {
+  stroke-width: 2;
+  stroke: var(--admin-panel-bg, #ffffff);
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-dot-pv {
+  fill: var(--admin-primary-color);
+}
+
+.chart-dot-uv {
+  fill: #e09b4b;
+}
+
+.chart-labels,
 .chart-legend {
   display: flex;
+  justify-content: space-between;
+  color: var(--admin-text-secondary, #71717a);
+  font-size: 11px;
+}
+
+.chart-legend {
   justify-content: center;
   gap: 18px;
   margin-top: 10px;
-  color: var(--admin-text-secondary, #909399);
   font-size: 12px;
 }
+
 .chart-legend span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
+
 .legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
 }
+
 .legend-pv {
-  background: #409eff;
+  background: var(--admin-primary-color);
 }
+
 .legend-uv {
-  background: #67c23a;
+  background: #e09b4b;
 }
+
 .analytics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
 }
+
 .data-card :deep(.el-table) {
   background: transparent;
 }
+
 .data-card :deep(.el-table small) {
   display: block;
   overflow: hidden;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary, #71717a);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stat-content {
+.card-header-with-action {
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--admin-text-color, #303133);
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--admin-text-secondary, #909399);
-  margin-top: 2px;
-}
-
-.quick-actions {
-  border-radius: 12px;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .action-btns {
@@ -457,47 +627,57 @@ onMounted(async () => {
 
 .action-btns .el-button {
   width: 100%;
-  height: 36px;
   margin: 0;
-  padding: 0 12px;
-}
-
-.action-btns :deep(.el-icon) {
-  font-size: 16px;
-}
-
-.welcome-card {
-  border-radius: 12px;
 }
 
 .welcome-content h2 {
   margin: 0 0 8px;
+  color: var(--admin-text-color, #18181b);
   font-size: 18px;
-  color: var(--admin-text-color, #303133);
 }
 
 .welcome-content p {
   margin: 0 0 4px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary, #71717a);
   font-size: 14px;
 }
 
 .welcome-content .tip {
-  font-style: italic;
   opacity: 0.7;
+  font-style: italic;
 }
-@media (max-width: 900px) {
+
+@media (max-width: 1100px) {
+  .stat-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .analytics-grid {
     grid-template-columns: 1fr;
   }
 }
+
 @media (max-width: 640px) {
-  .analytics-header {
-    align-items: flex-start;
+  .dashboard-intro {
+    align-items: stretch;
     flex-direction: column;
   }
+
+  .dashboard-intro .el-button {
+    align-self: flex-start;
+  }
+
+  .stat-cards,
   .action-btns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-header {
+    align-items: flex-start;
+  }
+
+  .chart-card :deep(.el-card__body) {
+    padding: 12px;
   }
 }
 </style>

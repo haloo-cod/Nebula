@@ -10,7 +10,15 @@
       >
         ←
       </button>
-      <video v-if="currentIsVideo" :src="currentSrc" muted loop autoplay playsinline class="picker-preview" />
+      <video
+        v-if="currentIsVideo"
+        :src="currentSrc"
+        muted
+        loop
+        autoplay
+        playsinline
+        class="picker-preview"
+      />
       <img v-else :src="currentSrc" alt="当前背景" class="picker-preview" />
       <button
         class="picker-arrow picker-arrow--right"
@@ -50,7 +58,15 @@
         type="button"
         @click="select(i)"
       >
-        <video v-if="isVideoBackground(item)" :src="item.src" muted loop autoplay playsinline class="picker-thumb-img" />
+        <video
+          v-if="isVideoBackground(item)"
+          :src="item.src"
+          muted
+          loop
+          autoplay
+          playsinline
+          class="picker-thumb-img"
+        />
         <img v-else :src="item.src" alt="" class="picker-thumb-img" />
       </button>
     </div>
@@ -81,7 +97,9 @@ const currentIndex = computed(() => {
 })
 
 const currentSrc = computed(() => group.value[currentIndex.value]?.src ?? '')
-const currentItem = computed(() => group.value[currentIndex.value] ?? { src: '', mediaType: 'image' as const })
+const currentItem = computed(
+  () => group.value[currentIndex.value] ?? { src: '', mediaType: 'image' as const },
+)
 const currentIsVideo = computed(() => isVideoBackground(currentItem.value))
 
 function select(index: number) {

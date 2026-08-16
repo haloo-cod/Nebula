@@ -1,93 +1,93 @@
 <template>
-    <div class="study-page">
-      <!-- 左右抽屉开关 -->
-      <button
-        class="drawer-trigger drawer-trigger--left"
-        type="button"
-        aria-label="打开待办清单"
-        @click="leftOpen = true"
+  <div class="study-page">
+    <!-- 左右抽屉开关 -->
+    <button
+      class="drawer-trigger drawer-trigger--left"
+      type="button"
+      aria-label="打开待办清单"
+      @click="leftOpen = true"
+    >
+      <SvgIcon name="arrow_forward_ios" class="trigger-icon" />
+    </button>
+    <button
+      class="drawer-trigger drawer-trigger--right"
+      type="button"
+      aria-label="打开今日日程"
+      @click="rightOpen = true"
+    >
+      <SvgIcon name="arrow_back_ios" class="trigger-icon" />
+    </button>
+
+    <!-- 中央番茄钟面板 -->
+    <div class="study-wrapper">
+      <!-- 页面头部：定位到玻璃面板左上方 -->
+      <header class="study-header">
+        <span class="study-kicker">Study Room</span>
+        <h1 class="study-title">自习室</h1>
+        <p class="study-desc">静下心来，和一段专注的时光相处。</p>
+      </header>
+
+      <LiquidGlass
+        v-if="ui.liquidGlassEnabled"
+        class="study-glass"
+        :theme="ui.theme"
+        :corner-radius="28"
+        :blur-radius="ui.liquidGlassBlur"
+        :glass-thickness="48"
+        :highlight-width="3.5"
+        ripple-trail
       >
-        <SvgIcon name="arrow_forward_ios" class="trigger-icon" />
-      </button>
-      <button
-        class="drawer-trigger drawer-trigger--right"
-        type="button"
-        aria-label="打开今日日程"
-        @click="rightOpen = true"
-      >
-        <SvgIcon name="arrow_back_ios" class="trigger-icon" />
-      </button>
+        <StudyRoomContent
+          :mode="mode"
+          :active-todo="activeTodo"
+          :formatted-time="formattedTime"
+          :is-running="isRunning"
+          :is-flashing="isFlashing"
+          @toggle="toggleTimer"
+          @reset="resetTimer"
+        />
+      </LiquidGlass>
 
-      <!-- 中央番茄钟面板 -->
-      <div class="study-wrapper">
-        <!-- 页面头部：定位到玻璃面板左上方 -->
-        <header class="study-header">
-          <span class="study-kicker">Study Room</span>
-          <h1 class="study-title">自习室</h1>
-          <p class="study-desc">静下心来，和一段专注的时光相处。</p>
-        </header>
-
-        <LiquidGlass
-          v-if="ui.liquidGlassEnabled"
-          class="study-glass"
-          :theme="ui.theme"
-          :corner-radius="28"
-          :blur-radius="ui.liquidGlassBlur"
-          :glass-thickness="48"
-          :highlight-width="3.5"
-          ripple-trail
-        >
-          <StudyRoomContent
-            :mode="mode"
-            :active-todo="activeTodo"
-            :formatted-time="formattedTime"
-            :is-running="isRunning"
-            :is-flashing="isFlashing"
-            @toggle="toggleTimer"
-            @reset="resetTimer"
-          />
-        </LiquidGlass>
-
-        <PanelFallbackGlass v-else tag="div" class="study-glass study-glass--fallback">
-          <StudyRoomContent
-            :mode="mode"
-            :active-todo="activeTodo"
-            :formatted-time="formattedTime"
-            :is-running="isRunning"
-            :is-flashing="isFlashing"
-            @toggle="toggleTimer"
-            @reset="resetTimer"
-          />
-        </PanelFallbackGlass>
-      </div>
-
-      <!-- 历史摘要 -->
-      <div class="history-wrapper">
-        <HistorySummary :history="history" />
-      </div>
+      <PanelFallbackGlass v-else tag="div" class="study-glass study-glass--fallback">
+        <StudyRoomContent
+          :mode="mode"
+          :active-todo="activeTodo"
+          :formatted-time="formattedTime"
+          :is-running="isRunning"
+          :is-flashing="isFlashing"
+          @toggle="toggleTimer"
+          @reset="resetTimer"
+        />
+      </PanelFallbackGlass>
     </div>
 
-    <!-- 左抽屉：待办 -->
-    <StudyDrawer v-model="leftOpen" position="left">
-      <TodoPanel
-        :todos="todos"
-        :active-id="activeTodoId"
-        @add="addTodo"
-        @select="selectTodo"
-        @delete="deleteTodo"
-        @toggle="toggleTodo"
-      />
-    </StudyDrawer>
+    <!-- 历史摘要 -->
+    <div class="history-wrapper">
+      <HistorySummary :history="history" />
+    </div>
+  </div>
 
-    <!-- 右抽屉：日程 -->
-    <StudyDrawer v-model="rightOpen" position="right">
-      <SchedulePanel
-        :schedule="schedule"
-        @add="addSchedule"
-        @delete="deleteSchedule"
-        @toggle="toggleSchedule"
-      />
-    </StudyDrawer>
+  <!-- 左抽屉：待办 -->
+  <StudyDrawer v-model="leftOpen" position="left">
+    <TodoPanel
+      :todos="todos"
+      :active-id="activeTodoId"
+      @add="addTodo"
+      @select="selectTodo"
+      @delete="deleteTodo"
+      @toggle="toggleTodo"
+    />
+  </StudyDrawer>
+
+  <!-- 右抽屉：日程 -->
+  <StudyDrawer v-model="rightOpen" position="right">
+    <SchedulePanel
+      :schedule="schedule"
+      @add="addSchedule"
+      @delete="deleteSchedule"
+      @toggle="toggleSchedule"
+    />
+  </StudyDrawer>
 </template>
 
 <script setup lang="ts">
