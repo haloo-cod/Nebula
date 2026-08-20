@@ -3,7 +3,7 @@
  * 背景图管理 — 列表页
  * 按 theme(dark/light) + device(desktop/mobile) 分组管理背景图
  */
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
@@ -45,6 +45,11 @@ const selectedImage = ref<PickerImage | null>(null)
 const selectedImages = ref<PickerImage[]>([])
 const selectedIds = ref<number[]>([])
 const deleting = ref(false)
+const savingOrder = ref(false)
+const draggedId = ref<number | null>(null)
+const orderChanged = ref(false)
+
+const canReorder = computed(() => Boolean(filterTheme.value && filterDevice.value))
 
 /** 加载背景图列表 */
 async function loadBackgrounds() {
@@ -59,10 +64,61 @@ async function loadBackgrounds() {
       true,
     )
     backgrounds.value = res.items
+    orderChanged.value = false
   } catch {
     ElMessage.error('加载背景图失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 开始拖动背景卡片。排序仅在已筛选的单一分组内进行。 */
+function handleDragStart(event: DragEvent, item: BackgroundItem) {
+  if (!canReorder.value) {
+    event.preventDefault()
+    return
+  }
+  draggedId.value = item.id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(item.id))
+  }
+}
+
+/** 将拖动中的卡片插入目标卡片之前。 */
+function handleDrop(event: DragEvent, target: BackgroundItem) {
+  event.preventDefault()
+  if (!canReorder.value || draggedId.value === null || draggedId.value === target.id) return
+  const fromIndex = backgrounds.value.findIndex((item) => item.id === draggedId.value)
+  const toIndex = backgrounds.value.findIndex((item) => item.id === target.id)
+  if (fromIndex < 0 || toIndex < 0) return
+  const [moved] = backgrounds.value.splice(fromIndex, 1)
+  const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex
+  backgrounds.value.splice(insertIndex, 0, moved)
+  orderChanged.value = true
+  draggedId.value = null
+}
+
+function handleDragEnd() {
+  draggedId.value = null
+}
+
+/** 保存当前主题和设备分组的背景顺序。 */
+async function saveOrder() {
+  if (!canReorder.value || !orderChanged.value) return
+  savingOrder.value = true
+  try {
+    await api.put('/api/v1/backgrounds/reorder', {
+      ids: backgrounds.value.map((item) => item.id),
+      theme: filterTheme.value,
+      device: filterDevice.value,
+    }, true)
+    ElMessage.success('背景顺序已保存')
+    await loadBackgrounds()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '背景顺序保存失败')
+  } finally {
+    savingOrder.value = false
   }
 }
 
@@ -345,6 +401,17 @@ onMounted(() => loadBackgrounds())
     <el-card shadow="never" class="table-card">
       <div class="batch-toolbar">
         <span>已选择 {{ selectedIds.length }} 张</span>
+        <span class="order-hint">
+          {{ canReorder ? '拖动卡片调整当前分组顺序' : '选择主题和设备后可调整顺序' }}
+        </span>
+        <el-button
+          type="primary"
+          plain
+          :loading="savingOrder"
+          :disabled="!canReorder || !orderChanged"
+          @click="saveOrder"
+          >保存顺序</el-button
+        >
         <el-button
           type="danger"
           plain
@@ -355,7 +422,17 @@ onMounted(() => loadBackgrounds())
         >
       </div>
       <div v-loading="loading" class="bg-grid">
-        <div v-for="bg in backgrounds" :key="bg.id" class="bg-item">
+        <div
+          v-for="bg in backgrounds"
+          :key="bg.id"
+          class="bg-item"
+          :class="{ 'is-dragging': draggedId === bg.id, 'is-sortable': canReorder }"
+          :draggable="canReorder"
+          @dragstart="handleDragStart($event, bg)"
+          @dragover.prevent
+          @drop="handleDrop($event, bg)"
+          @dragend="handleDragEnd"
+        >
           <video
             v-if="bg.media_type === 'video'"
             :src="resolveUrl(bg.url)"
@@ -513,6 +590,11 @@ onMounted(() => loadBackgrounds())
   color: var(--admin-text-secondary, #909399);
   font-size: 13px;
 }
+.order-hint {
+  flex: 1;
+  margin-left: 12px;
+  color: var(--admin-text-secondary, #909399);
+}
 .image-picker {
   display: flex;
   align-items: center;
@@ -551,6 +633,15 @@ onMounted(() => loadBackgrounds())
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--admin-border-color, #e4e7ed);
+}
+.bg-item.is-sortable {
+  cursor: grab;
+}
+.bg-item.is-sortable:active {
+  cursor: grabbing;
+}
+.bg-item.is-dragging {
+  opacity: 0.45;
 }
 .bg-check {
   position: absolute;

@@ -170,4 +170,7 @@ async def reorder(
     _: User = Depends(require_admin),
 ):
     """批量调整背景图排序（管理员）"""
-    await reorder_backgrounds(db, data.ids)
+    try:
+        await reorder_backgrounds(db, data.ids, data.theme, data.device)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

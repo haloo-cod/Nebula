@@ -31,6 +31,10 @@ class MomentCreate(BaseModel):
     images: list[str] = []
 
 
+class MomentUpdate(MomentCreate):
+    """已发布说说可编辑字段。"""
+
+
 class MomentCommentCreate(BaseModel):
     content: str
 

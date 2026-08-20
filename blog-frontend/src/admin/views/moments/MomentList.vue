@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 说说管理 — 列表页
- * 展示所有说说，支持新建、删除
+ * 展示所有说说，支持新建、编辑、删除
  */
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -9,6 +9,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
+import EmojiPicker from '@/admin/components/EmojiPicker.vue'
 
 /** 说说项（匹配后端 MomentResponse） */
 interface MomentItem {
@@ -32,6 +33,7 @@ interface MomentComment {
 
 /** 新建说说的表单数据 */
 const showCreateDialog = ref(false)
+const editingId = ref<number | null>(null)
 const createForm = ref({
   content: '',
   mood: '',
@@ -62,7 +64,20 @@ const { loading, data, pagination, loadData, handlePageChange, handleSizeChange,
 
 /** 打开新建弹窗 */
 function openCreate() {
+  editingId.value = null
   createForm.value = { content: '', mood: '', tags: '', images: '' }
+  showCreateDialog.value = true
+}
+
+/** 打开已发布说说的编辑弹窗。 */
+function openEdit(moment: MomentItem) {
+  editingId.value = moment.id
+  createForm.value = {
+    content: moment.content,
+    mood: moment.mood,
+    tags: moment.tags.join(', '),
+    images: moment.images.join('\n'),
+  }
   showCreateDialog.value = true
 }
 
@@ -116,7 +131,7 @@ function handleImagesSelected(images: PickerImage[]) {
 
 /** 将图库选择的图片追加到说说图片列表。 */
 
-/** 提交新建说说 */
+/** 创建或保存说说。 */
 async function submitCreate() {
   if (!createForm.value.content.trim()) {
     ElMessage.warning('请输入说说内容')
@@ -141,8 +156,13 @@ async function submitCreate() {
             .filter(Boolean)
         : [],
     }
-    await api.post('/api/v1/moments', payload, true)
-    ElMessage.success('发布成功')
+    if (editingId.value === null) {
+      await api.post('/api/v1/moments', payload, true)
+      ElMessage.success('发布成功')
+    } else {
+      await api.put(`/api/v1/moments/${editingId.value}`, payload, true)
+      ElMessage.success('说说已更新')
+    }
     showCreateDialog.value = false
     loadData()
   } catch (err: unknown) {
@@ -155,6 +175,7 @@ async function submitCreate() {
 
 /** 心情 emoji 映射 */
 function moodEmoji(mood: string): string {
+  if (!mood) return ''
   const map: Record<string, string> = {
     开心: '😊',
     平静: '😌',
@@ -165,7 +186,7 @@ function moodEmoji(mood: string): string {
     满足: '😋',
     期待: '✨',
   }
-  return mood ? (map[mood] || '📝') + ' ' + mood : ''
+  return map[mood] || mood
 }
 
 onMounted(() => loadData())
@@ -195,7 +216,8 @@ onMounted(() => loadData())
           </div>
           <div class="moment-mobile-actions">
             <el-button type="primary" link size="small" @click="openComments(row)">评论</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')">
+             <el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
+             <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')">
               删除
             </el-button>
           </div>
@@ -239,6 +261,7 @@ onMounted(() => loadData())
             <el-button type="primary" link size="small" @click="openComments(row)">
               评论
             </el-button>
+            <el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
             <el-button type="danger" link size="small" @click="handleDelete(row, '这条说说')"
               >删除</el-button
             >
@@ -260,8 +283,8 @@ onMounted(() => loadData())
       </div>
     </el-card>
 
-    <!-- 新建说说弹窗 -->
-    <el-dialog v-model="showCreateDialog" title="发说说" width="500px">
+    <!-- 新建/编辑说说弹窗 -->
+    <el-dialog v-model="showCreateDialog" :title="editingId === null ? '发说说' : '编辑说说'" width="500px">
       <el-form label-position="top">
         <el-form-item label="内容">
           <el-input
@@ -272,7 +295,7 @@ onMounted(() => loadData())
           />
         </el-form-item>
         <el-form-item label="心情">
-          <el-input v-model="createForm.mood" placeholder="如：开心、思考、灵感" />
+          <EmojiPicker v-model="createForm.mood" />
         </el-form-item>
         <el-form-item label="标签（逗号分隔）">
           <el-input v-model="createForm.tags" placeholder="标签1, 标签2" />
@@ -296,7 +319,9 @@ onMounted(() => loadData())
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="submitCreate">发布</el-button>
+        <el-button type="primary" :loading="creating" @click="submitCreate">
+          {{ editingId === null ? '发布' : '保存' }}
+        </el-button>
       </template>
     </el-dialog>
 

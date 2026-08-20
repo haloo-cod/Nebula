@@ -3,9 +3,7 @@
     <!-- 头部:相对时间 + 心情标签 -->
     <div class="moment-card__head">
       <span class="moment-card__time">{{ relativeTime(moment.date) }}</span>
-      <span v-if="moment.mood" class="moment-card__mood"
-        >{{ moodEmoji(moment.mood) }} {{ moment.mood }}</span
-      >
+      <span v-if="moment.mood" class="moment-card__mood">{{ moodDisplay(moment.mood) }}</span>
     </div>
 
     <!-- 正文:最多 2 行,超出省略 -->
@@ -133,7 +131,13 @@ function moodEmoji(mood: string): string {
     满足: '😋',
     期待: '✨',
   }
-  return map[mood] || '📝'
+  return map[mood] || mood || '📝'
+}
+
+/** 兼容旧的文字心情，并避免新 Emoji 被重复渲染。 */
+function moodDisplay(mood: string): string {
+  const emoji = moodEmoji(mood)
+  return emoji === mood ? mood : `${emoji} ${mood}`
 }
 </script>
 

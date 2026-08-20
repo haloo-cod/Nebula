@@ -149,16 +149,27 @@ async def delete_background(db: AsyncSession, bg_id: int) -> bool:
     return True
 
 
-async def reorder_backgrounds(db: AsyncSession, ids: list[int]) -> None:
+async def reorder_backgrounds(
+    db: AsyncSession,
+    ids: list[int],
+    theme: str,
+    device: str,
+) -> None:
     """
     批量更新排序：ids 列表的顺序即为新的 sort_order（0, 1, 2, ...）
     """
+    if len(ids) != len(set(ids)):
+        raise ValueError("排序列表包含重复背景图")
+
+    result = await db.execute(
+        select(Background).where(Background.theme == theme, Background.device == device)
+    )
+    group = list(result.scalars().all())
+    group_by_id = {bg.id: bg for bg in group}
+    if set(ids) != set(group_by_id):
+        raise ValueError("排序列表必须包含当前主题和设备分组的全部背景图")
+
     for order, bg_id in enumerate(ids):
-        result = await db.execute(
-            select(Background).where(Background.id == bg_id)
-        )
-        bg = result.scalar_one_or_none()
-        if bg:
-            bg.sort_order = order
+        group_by_id[bg_id].sort_order = order
 
     await db.commit()

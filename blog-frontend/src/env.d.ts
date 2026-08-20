@@ -75,6 +75,9 @@ declare module 'i18n-jsautotranslate' {
   export default translate
 }
 
+// Emoji 选择器仅注册自定义元素，项目侧只需声明其模块存在。
+declare module 'emoji-picker-element'
+
 // 将 translate 实例挂到 window 上(见 main.ts),这里声明对应的全局类型
 interface Window {
   translate?: typeof import('i18n-jsautotranslate').default
