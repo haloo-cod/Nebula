@@ -12,6 +12,7 @@ from app.schemas.moment import (
     MomentCreate,
     MomentListResponse,
     MomentResponse,
+    MomentUpdate,
 )
 from app.services.moment import (
     add_moment_comment,
@@ -22,6 +23,7 @@ from app.services.moment import (
     get_moment_comments,
     get_moments,
     like_moment,
+    update_moment,
 )
 
 router = APIRouter(prefix="/moments", tags=["说说"])
@@ -70,6 +72,25 @@ async def remove_moment(
     success = delete_moment(moment_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="说说不存在")
+
+
+@router.put("/{moment_id}", response_model=MomentResponse)
+async def edit_moment(
+    moment_id: int,
+    body: MomentUpdate,
+    _: User = Depends(require_admin),
+):
+    """编辑已发布说说，保留互动数据。"""
+    moment = update_moment(
+        moment_id,
+        content=body.content,
+        mood=body.mood,
+        tags=body.tags,
+        images=body.images,
+    )
+    if not moment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="说说不存在")
+    return moment
 
 
 @router.post("/{moment_id}/like")

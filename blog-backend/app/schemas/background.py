@@ -63,5 +63,21 @@ class BackgroundListResponse(BaseModel):
 
 
 class BackgroundReorderRequest(BaseModel):
-    """批量调整排序"""
+    """批量调整同一主题和设备分组的排序。"""
     ids: list[int]  # 按顺序排列的背景图 ID 列表
+    theme: str
+    device: str
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme_for_reorder(cls, v: str) -> str:
+        if v not in ("dark", "light"):
+            raise ValueError("theme 必须为 'dark' 或 'light'")
+        return v
+
+    @field_validator("device")
+    @classmethod
+    def validate_device_for_reorder(cls, v: str) -> str:
+        if v not in ("desktop", "mobile"):
+            raise ValueError("device 必须为 'desktop' 或 'mobile'")
+        return v

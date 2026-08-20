@@ -117,6 +117,29 @@ def delete_moment(moment_id: int) -> bool:
     return False
 
 
+def update_moment(
+    moment_id: int,
+    content: str,
+    mood: str = "",
+    tags: list[str] | None = None,
+    images: list[str] | None = None,
+) -> dict | None:
+    """更新说说内容，保留发布时间、点赞、评论和点赞记录。"""
+    lock = FileLock(str(LOCK_FILE))
+    with lock:
+        data = _read_all()
+        for moment in data:
+            if moment.get("id") != moment_id:
+                continue
+            moment["content"] = content
+            moment["mood"] = mood
+            moment["tags"] = tags or []
+            moment["images"] = images or []
+            _write_all(data)
+            return {key: value for key, value in moment.items() if key != "liked_ips"}
+    return None
+
+
 def like_moment(moment_id: int, visitor_ip: str) -> int:
     """点赞说说（同一 IP 只记一次），返回最新点赞数"""
     lock = FileLock(str(LOCK_FILE))
