@@ -3,7 +3,10 @@
     <!-- 头部:相对时间 + 心情标签 -->
     <div class="moment-card__head">
       <span class="moment-card__time">{{ relativeTime(moment.date) }}</span>
-      <span v-if="moment.mood" class="moment-card__mood">{{ moodDisplay(moment.mood) }}</span>
+      <span v-if="moment.mood || moment.moodText" class="moment-card__mood">
+        <span v-if="moment.mood">{{ moment.mood }}</span>
+        <span v-if="moment.moodText">{{ moment.moodText }}</span>
+      </span>
     </div>
 
     <!-- 正文:最多 2 行,超出省略 -->
@@ -119,26 +122,6 @@ function relativeTime(dateStr: string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-/** 心情 → emoji 映射 */
-function moodEmoji(mood: string): string {
-  const map: Record<string, string> = {
-    开心: '😊',
-    平静: '😌',
-    灵感: '💡',
-    感动: '🥹',
-    疲惫: '😴',
-    思考: '🤔',
-    满足: '😋',
-    期待: '✨',
-  }
-  return map[mood] || mood || '📝'
-}
-
-/** 兼容旧的文字心情，并避免新 Emoji 被重复渲染。 */
-function moodDisplay(mood: string): string {
-  const emoji = moodEmoji(mood)
-  return emoji === mood ? mood : `${emoji} ${mood}`
-}
 </script>
 
 <style scoped>

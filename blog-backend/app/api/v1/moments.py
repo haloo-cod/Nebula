@@ -57,6 +57,7 @@ async def create_new_moment(
     moment = create_moment(
         content=body.content,
         mood=body.mood,
+        mood_text=body.mood_text,
         tags=body.tags,
         images=body.images,
     )
@@ -85,6 +86,7 @@ async def edit_moment(
         moment_id,
         content=body.content,
         mood=body.mood,
+        mood_text=body.mood_text,
         tags=body.tags,
         images=body.images,
     )

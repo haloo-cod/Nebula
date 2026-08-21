@@ -17,6 +17,7 @@ interface MomentItem {
   date: string
   content: string
   mood: string
+  mood_text: string
   tags: string[]
   images: string[]
   likes: number
@@ -37,6 +38,7 @@ const editingId = ref<number | null>(null)
 const createForm = ref({
   content: '',
   mood: '',
+  moodText: '',
   tags: '',
   images: '',
 })
@@ -65,7 +67,7 @@ const { loading, data, pagination, loadData, handlePageChange, handleSizeChange,
 /** 打开新建弹窗 */
 function openCreate() {
   editingId.value = null
-  createForm.value = { content: '', mood: '', tags: '', images: '' }
+  createForm.value = { content: '', mood: '', moodText: '', tags: '', images: '' }
   showCreateDialog.value = true
 }
 
@@ -75,6 +77,7 @@ function openEdit(moment: MomentItem) {
   createForm.value = {
     content: moment.content,
     mood: moment.mood,
+    moodText: moment.mood_text || '',
     tags: moment.tags.join(', '),
     images: moment.images.join('\n'),
   }
@@ -143,6 +146,7 @@ async function submitCreate() {
     const payload = {
       content: createForm.value.content,
       mood: createForm.value.mood || '',
+      mood_text: createForm.value.moodText.trim(),
       tags: createForm.value.tags
         ? createForm.value.tags
             .split(',')
@@ -173,22 +177,6 @@ async function submitCreate() {
   }
 }
 
-/** 心情 emoji 映射 */
-function moodEmoji(mood: string): string {
-  if (!mood) return ''
-  const map: Record<string, string> = {
-    开心: '😊',
-    平静: '😌',
-    灵感: '💡',
-    感动: '🥹',
-    疲惫: '😴',
-    思考: '🤔',
-    满足: '😋',
-    期待: '✨',
-  }
-  return map[mood] || mood
-}
-
 onMounted(() => loadData())
 </script>
 
@@ -209,7 +197,9 @@ onMounted(() => loadData())
         <div v-for="row in data" :key="row.id" class="moment-mobile-card">
           <div class="moment-mobile-content">{{ row.content }}</div>
           <div class="moment-mobile-meta">
-            <span v-if="row.mood">{{ moodEmoji(row.mood) }}</span>
+            <span v-if="row.mood || row.mood_text">
+              {{ [row.mood, row.mood_text].filter(Boolean).join(' ') }}
+            </span>
             <span>{{ row.images.length }} 张图</span>
             <span>{{ row.likes }} 赞</span>
             <span>{{ row.date.replace('T', ' ').slice(0, 16) }}</span>
@@ -242,7 +232,7 @@ onMounted(() => loadData())
         </el-table-column>
         <el-table-column prop="mood" label="心情" width="100">
           <template #default="{ row }">
-            <span>{{ moodEmoji(row.mood) }}</span>
+            <span>{{ [row.mood, row.mood_text].filter(Boolean).join(' ') }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="images" label="图片" width="80">
@@ -294,8 +284,20 @@ onMounted(() => loadData())
             placeholder="说点什么..."
           />
         </el-form-item>
-        <el-form-item label="心情">
-          <EmojiPicker v-model="createForm.mood" />
+        <el-form-item label="心情" class="mood-form-item">
+          <div class="mood-editor">
+            <div class="mood-picker-row">
+              <EmojiPicker v-model="createForm.mood" />
+              <span class="mood-picker-hint">选择一个表情</span>
+            </div>
+            <el-input
+              v-model="createForm.moodText"
+              class="mood-text-input"
+              placeholder="给这份心情加一句话（可选）"
+              maxlength="100"
+              show-word-limit
+            />
+          </div>
         </el-form-item>
         <el-form-item label="标签（逗号分隔）">
           <el-input v-model="createForm.tags" placeholder="标签1, 标签2" />
@@ -393,6 +395,53 @@ onMounted(() => loadData())
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.mood-form-item :deep(.el-form-item__content) {
+  display: block;
+}
+
+.mood-editor {
+  width: 100%;
+}
+
+.mood-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.mood-picker-hint {
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+
+.mood-text-input {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.mood-text-input :deep(.el-input__wrapper) {
+  min-height: 38px;
+  border-radius: 9px;
+  background: var(--admin-input-bg, #fafafa);
+  box-shadow: 0 0 0 1px var(--admin-border-color, #dcdfe6) inset;
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.mood-text-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--el-color-primary-light-5) inset;
+}
+
+.mood-text-input :deep(.el-input__wrapper.is-focus) {
+  background: var(--admin-panel-bg, #ffffff);
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset, 0 0 0 3px var(--el-color-primary-light-9);
+}
+
+.mood-text-input :deep(.el-input__count) {
+  color: var(--admin-text-secondary, #a8abb2);
+  font-size: 11px;
 }
 
 .image-count {

@@ -82,7 +82,13 @@ def get_moment_by_id(moment_id: int) -> dict | None:
     return None
 
 
-def create_moment(content: str, mood: str = "", tags: list[str] | None = None, images: list[str] | None = None) -> dict:
+def create_moment(
+    content: str,
+    mood: str = "",
+    mood_text: str = "",
+    tags: list[str] | None = None,
+    images: list[str] | None = None,
+) -> dict:
     """发布说说"""
     lock = FileLock(str(LOCK_FILE))
     with lock:
@@ -92,6 +98,7 @@ def create_moment(content: str, mood: str = "", tags: list[str] | None = None, i
             "date": datetime.now().isoformat(timespec="seconds"),
             "content": content,
             "mood": mood,
+            "mood_text": mood_text,
             "tags": tags or [],
             "images": images or [],
             "likes": 0,
@@ -121,6 +128,7 @@ def update_moment(
     moment_id: int,
     content: str,
     mood: str = "",
+    mood_text: str = "",
     tags: list[str] | None = None,
     images: list[str] | None = None,
 ) -> dict | None:
@@ -133,6 +141,7 @@ def update_moment(
                 continue
             moment["content"] = content
             moment["mood"] = mood
+            moment["mood_text"] = mood_text
             moment["tags"] = tags or []
             moment["images"] = images or []
             _write_all(data)

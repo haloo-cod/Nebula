@@ -140,6 +140,7 @@ export interface Moment {
   date: string // ISO 日期时间,如 '2026-07-10T13:37:15'
   content: string // 纯文本正文
   mood?: string // 心情标签,如 '开心'、'疲惫'、'灵感'
+  moodText?: string // 用户手动填写的心情文字
   tags: string[]
   images: string[] // 图片 URL 列表
   likes: number // 点赞数

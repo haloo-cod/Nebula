@@ -3,7 +3,7 @@
     <div v-if="images.length > 0" class="carousel-viewport">
       <div class="carousel-track" ref="trackRef" :style="trackStyle">
         <!-- 尾部克隆：最后一张 -->
-        <img :src="images[images.length - 1]" class="carousel-slide clone" loading="lazy" />
+        <img :src="images[images.length - 1]" class="carousel-slide clone" loading="eager" />
         <!-- 真实图片 -->
         <img
           v-for="(img, i) in images"
@@ -11,10 +11,10 @@
           :src="img"
           :alt="`slide ${i + 1}`"
           class="carousel-slide"
-          loading="lazy"
+          :loading="i < 2 ? 'eager' : 'lazy'"
         />
         <!-- 头部克隆：第一张 -->
-        <img :src="images[0]" class="carousel-slide clone" loading="lazy" />
+        <img :src="images[0]" class="carousel-slide clone" loading="eager" />
       </div>
     </div>
     <div v-else class="carousel-empty">暂无轮播图片</div>
@@ -50,6 +50,9 @@ const autoPlayTimer = ref<number | null>(null)
 const transitioning = ref(false)
 const trackRef = ref<HTMLElement | null>(null)
 const INTERVAL = 4000
+const TRANSITION_DURATION = 500
+const TRANSITION_FALLBACK_DELAY = TRANSITION_DURATION + 100
+let transitionFallbackTimer: number | null = null
 
 // 真实图片从 index=1 开始（前面有一个尾部克隆）
 const OFFSET = 1
@@ -63,6 +66,7 @@ function goTo(index: number) {
   if (transitioning.value) return
   transitioning.value = true
   currentIndex.value = index
+  scheduleTransitionFallback()
   resetAutoPlay()
 }
 
@@ -70,11 +74,25 @@ function next() {
   if (transitioning.value) return
   transitioning.value = true
   currentIndex.value += 1
+  scheduleTransitionFallback()
   resetAutoPlay()
 }
 
-// 使用 transitionend 事件确保动画完成后才重置，避免瞬间跳回
-function onTransitionEnd() {
+function clearTransitionFallback() {
+  if (transitionFallbackTimer !== null) {
+    window.clearTimeout(transitionFallbackTimer)
+    transitionFallbackTimer = null
+  }
+}
+
+function scheduleTransitionFallback() {
+  clearTransitionFallback()
+  transitionFallbackTimer = window.setTimeout(finishTransition, TRANSITION_FALLBACK_DELAY)
+}
+
+// transitionend 可能因页面重排或组件不可见而丢失，超时回调负责兜底解锁。
+function finishTransition() {
+  clearTransitionFallback()
   if (currentIndex.value === images.value.length) {
     transitioning.value = false
     currentIndex.value = 0
@@ -84,6 +102,14 @@ function onTransitionEnd() {
   }
 }
 
+function onTransitionEnd(event: TransitionEvent) {
+  if (event.propertyName === 'transform') finishTransition()
+}
+
+function onTransitionCancel(event: TransitionEvent) {
+  if (event.propertyName === 'transform') finishTransition()
+}
+
 function resetAutoPlay() {
   if (autoPlayTimer.value) clearInterval(autoPlayTimer.value)
   autoPlayTimer.value = window.setInterval(next, INTERVAL)
@@ -91,10 +117,15 @@ function resetAutoPlay() {
 
 onMounted(async () => {
   trackRef.value?.addEventListener('transitionend', onTransitionEnd)
+  trackRef.value?.addEventListener('transitioncancel', onTransitionCancel)
+  // 即使 API 不可用，也应让本地 fallback 图片自动播放。
+  resetAutoPlay()
   // 尝试从后端 API 加载轮播图列表
   try {
     const slides = await fetchCarouselSlides()
     if (slides.length > 0) {
+      clearTransitionFallback()
+      transitioning.value = false
       images.value = slides
       // 重置索引避免越界
       currentIndex.value = 0
@@ -107,7 +138,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   trackRef.value?.removeEventListener('transitionend', onTransitionEnd)
+  trackRef.value?.removeEventListener('transitioncancel', onTransitionCancel)
   if (autoPlayTimer.value) clearInterval(autoPlayTimer.value)
+  clearTransitionFallback()
 })
 </script>
 
