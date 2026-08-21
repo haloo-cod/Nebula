@@ -12,6 +12,7 @@ export interface MomentResponse {
   date: string
   content: string
   mood: string
+  mood_text: string
   tags: string[]
   images: string[]
   likes: number
@@ -37,6 +38,7 @@ export async function fetchMoments(
     date: m.date,
     content: m.content,
     mood: m.mood,
+    moodText: m.mood_text || '',
     tags: m.tags,
     images: m.images.map(resolveUrl),
     likes: m.likes,

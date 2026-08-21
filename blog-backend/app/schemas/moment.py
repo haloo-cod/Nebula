@@ -18,6 +18,7 @@ class MomentResponse(BaseModel):
     date: str
     content: str
     mood: str = ""
+    mood_text: str = ""
     tags: list[str] = []
     images: list[str] = []
     likes: int = 0
@@ -27,6 +28,7 @@ class MomentResponse(BaseModel):
 class MomentCreate(BaseModel):
     content: str
     mood: str = ""
+    mood_text: str = ""
     tags: list[str] = []
     images: list[str] = []
 

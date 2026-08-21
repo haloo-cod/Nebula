@@ -3,7 +3,10 @@
     <!-- 所有 slide 绝对定位叠放 -->
     <div v-for="(moment, i) in slides" :key="moment.id" class="slide" :class="slideClass(i)">
       <div class="slide-header">
-        <span v-if="moment.mood" class="slide-mood-label">{{ moodDisplay(moment.mood) }}</span>
+        <span v-if="moment.mood || moment.moodText" class="slide-mood-label">
+          <span v-if="moment.mood">{{ moment.mood }}</span>
+          <span v-if="moment.moodText">{{ moment.moodText }}</span>
+        </span>
         <span class="slide-time">{{ relativeTime(moment.date) }}</span>
       </div>
       <p class="slide-text">{{ moment.content }}</p>
@@ -54,28 +57,6 @@ onMounted(async () => {
   }
   resetTimer()
 })
-
-/** 心情 → emoji */
-function moodEmoji(mood?: string): string {
-  if (!mood) return ''
-  const map: Record<string, string> = {
-    开心: '😊',
-    平静: '😌',
-    灵感: '💡',
-    感动: '🥹',
-    疲惫: '😴',
-    思考: '🤔',
-    满足: '😋',
-    期待: '✨',
-  }
-  return map[mood] || mood
-}
-
-/** 兼容旧的文字心情，并避免新 Emoji 被重复渲染。 */
-function moodDisplay(mood: string): string {
-  const emoji = moodEmoji(mood)
-  return emoji === mood ? mood : `${emoji} ${mood}`
-}
 
 /** 相对时间 */
 function relativeTime(dateStr: string): string {
