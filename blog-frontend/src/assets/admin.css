@@ -231,7 +231,7 @@
 }
 
 #admin-app .el-button--primary {
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--admin-primary-color) 18%, transparent);
+  box-shadow: none;
 }
 
 #admin-app .el-button:focus-visible,

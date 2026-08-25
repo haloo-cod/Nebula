@@ -10,6 +10,7 @@ import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
+import EmojiPicker from '@/admin/components/EmojiPicker.vue'
 
 /** 关于页内容接口响应 */
 interface AboutContent {
@@ -24,6 +25,9 @@ const editorReady = ref(false)
 const error = ref('')
 const coverUrl = ref('')
 const showImagePicker = ref(false)
+const showMediaPicker = ref(false)
+const showEmojiPicker = ref(false)
+const selectedEmoji = ref('')
 let vditor: Vditor | null = null
 
 /** 初始化支持三种编辑模式、预览和图床上传的 Markdown 编辑器。 */
@@ -37,7 +41,14 @@ function initVditor(content: string) {
     mode: 'ir',
     theme: isDark ? 'dark' : 'classic',
     toolbar: [
-      'emoji',
+      {
+        name: 'full-emoji',
+        tip: '选择表情',
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/><path d="M8.5 14.5c1.8 2 5.2 2 7 0" fill="none" stroke="currentColor" stroke-linecap="round"/></svg>',
+        click: () => {
+          showEmojiPicker.value = true
+        },
+      },
       'headings',
       'bold',
       'italic',
@@ -53,6 +64,14 @@ function initVditor(content: string) {
       'inline-code',
       'link',
       'upload',
+      {
+        name: 'media-library',
+        tip: '从媒体库选择图片',
+        icon: '<svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13ZM6 6v12h12V6H6Zm1.5 9.5 2.7-3.2 2.1 2.4 1.6-1.9 2.6 3.2h-9ZM9 10.5A1.5 1.5 0 1 0 9 7.5a1.5 1.5 0 0 0 0 3Z"/></svg>',
+        click: () => {
+          showMediaPicker.value = true
+        },
+      },
       'table',
       '|',
       'undo',
@@ -146,6 +165,18 @@ function handleCoverSelected(image: PickerImage) {
   coverUrl.value = image.url
 }
 
+/** 将已上传图片插入 Markdown 编辑器当前光标位置。 */
+function handleMediaSelected(image: PickerImage) {
+  vditor?.insertMD(`![${image.original_name}](${resolveUrl(image.url)})`)
+}
+
+/** 将全量 Emoji 选择器选中的字符插入 Markdown。 */
+function handleEmojiSelected(emoji: string) {
+  if (!emoji) return
+  vditor?.insertMD(emoji)
+  selectedEmoji.value = ''
+}
+
 /** 后台主题切换时同步编辑区和预览区。 */
 function handleAdminThemeChange(event: Event) {
   const customEvent = event as CustomEvent<{ isDark: boolean }>
@@ -213,6 +244,21 @@ onBeforeUnmount(() => {
       title="选择关于页封面"
       @select="handleCoverSelected"
     />
+    <ImagePickerDialog
+      v-model="showMediaPicker"
+      title="从媒体库选择图片"
+      @select="handleMediaSelected"
+    />
+    <div class="editor-emoji-picker">
+      <EmojiPicker
+        v-model="selectedEmoji"
+        :open="showEmojiPicker"
+        hide-trigger
+        external-trigger-selector=".vditor-toolbar [data-type='full-emoji']"
+        @update:open="showEmojiPicker = $event"
+        @update:model-value="handleEmojiSelected"
+      />
+    </div>
   </div>
 </template>
 
@@ -280,6 +326,22 @@ onBeforeUnmount(() => {
 .vditor-container {
   min-height: 620px;
 }
+
+.vditor-container :deep(.vditor-toolbar [data-type='full-emoji'] svg) {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.editor-emoji-picker {
+  position: fixed;
+  top: 96px;
+  right: 32px;
+  z-index: 2000;
+}
 @media (max-width: 640px) {
   .page-header {
     align-items: flex-start;
@@ -290,6 +352,11 @@ onBeforeUnmount(() => {
   .cover-preview,
   .cover-empty {
     width: 100%;
+  }
+
+  .editor-emoji-picker {
+    top: 76px;
+    right: 16px;
   }
 }
 </style>
