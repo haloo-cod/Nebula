@@ -40,7 +40,7 @@ pip install -r requirements.txt
 | `python -m scripts.init_xxx` | 运行初始化脚本 |
 | `python -m scripts.init_xxx --force` | 强制覆盖重新初始化 |
 
-后端应用启动时会自动创建数据库表、执行兼容性字段迁移、准备运行时目录、清理过期归档和统计限流记录，并创建 `.env` 配置的默认管理员账户。初始化脚本主要用于导入或重置内容数据，不是每次启动的必需步骤。
+后端应用启动时会自动创建数据库表、执行兼容性字段迁移、准备运行时目录、清理过期归档和统计限流记录，并创建 `.env` 配置的默认管理员账户。初始化脚本主要用于导入或重置内容数据，不是每次启动的必需步骤。生产环境还会校验密钥、管理员密码、Cookie 安全配置和代理配置等安全参数。
 
 ---
 
@@ -92,7 +92,7 @@ src/views/my-page/my-page.vue
 }
 ```
 
-### 3. 添加页面文案
+### 3. 添加页面默认文案
 
 ```ts
 // src/data/site-text.ts
@@ -128,6 +128,8 @@ import { siteText } from '@/data/site-text'
 ```
 
 ---
+
+页面默认文案集中在 `src/data/site-text.ts`。后端 `SiteConfig` 目前只覆盖部分站点配置，不会自动覆盖所有页面标题和副标题。
 
 ## 新增 API 端点的标准流程
 

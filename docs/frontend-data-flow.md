@@ -168,14 +168,15 @@ import { siteText } from '@/data/site-text'
 </script>
 ```
 
-### 扩展路径（未来）
+### 当前使用范围
 
 ```
 site-text.ts (静态默认值)
-      ↓ 被覆盖
-SiteConfig API (管理员后台设置)
-      ↓ 注入
-页面模板 (优先使用 API 值)
+      ↓
+页面模板 (直接使用静态文案)
+
+SiteConfig API 当前主要用于少量可配置内容（例如关于页封面、友链交换信息、酒馆背景），
+尚未统一覆盖所有页面的 kicker/title/subtitle。
 ```
 
 ---
@@ -196,7 +197,10 @@ src/api/
 ├── friends.ts         # 友链 API
 ├── treasures.ts       # 藏宝阁 API
 ├── profile.ts         # 个人资料 API
-└── tavern.ts          # 深夜酒馆 API
+├── tavern.ts          # 深夜酒馆 API
+├── analytics.ts       # 访问统计与公开统计摘要
+├── content-stats.ts   # 内容统计
+└── files.ts           # 文件上传、列表和下载
 ```
 
 ### client.ts 公共功能

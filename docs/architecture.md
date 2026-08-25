@@ -13,7 +13,7 @@ Starlit Blog 是一个基于 **Vue 3 + FastAPI** 的全栈个人博客系统，�
 | Vue 3 | 3.5+ | UI 框架（Composition API + `<script setup>`） |
 | TypeScript | strict 模式 | 类型安全 |
 | Vite | 8 | 构建工具 |
-| Vue Router | 5 | 路由（Hash History 模式） |
+| Vue Router | 5 | 路由（HTML5 History 模式） |
 | Pinia | 3 | 状态管理 |
 | Tailwind CSS | v4 | 样式（CSS-first 配置，`@tailwindcss/vite` 插件） |
 | marked | v18 | Markdown 渲染 |
@@ -107,6 +107,10 @@ My_blog/
 │   │   │       ├── treasures.py   # 藏宝阁
 │   │   │       ├── profile.py     # 个人资料
 │   │   │       ├── tavern.py      # 深夜酒馆
+│   │   │       ├── users.py       # 用户管理
+│   │   │       ├── analytics.py   # 访问统计
+│   │   │       ├── content_stats.py # 内容统计
+│   │   │       ├── files.py       # 文件管理与下载
 │   │   │       └── about.py       # 关于页内容
 │   │   ├── models/                # SQLAlchemy ORM 模型
 │   │   ├── schemas/               # Pydantic 请求/响应模型
@@ -147,7 +151,7 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 
 ### 3. 认证体系
 
-- **统一账户**：支持用户名/邮箱密码注册和登录，注册后立即建立登录态
+- **统一账户**：支持用户名/邮箱密码注册和登录；是否需要邮箱验证由后端配置决定
 - **访问令牌**：短期 JWT 访问令牌保存在前端 `localStorage`，API 客户端在 401 时尝试刷新
 - **刷新会话**：后端通过 HttpOnly Refresh Cookie 保存可轮换、可撤销的刷新会话
 - **邮箱验证**：可选的邮箱验证流程，验证链接由后端签发并跳转到前端确认页
@@ -178,8 +182,38 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 | `/friends` | 友链 | 鱼缸动画 + 链接卡片 |
 | `/treasure` | 藏宝阁 | 分类筛选 + 分页 |
 | `/about` | 关于 | 个人介绍 + 活动热力图 + 时间线 |
-| `/midnight-tavern` | 深夜酒馆 | 匿名留言（彩蛋页，隐藏导航栏） |
+| `/midnight-tavern` | 深夜酒馆 | 登录后留言页（隐藏导航栏） |
 | `/study-room` | 自习室 | 番茄钟 + 日程 + 历史（localStorage） |
+| `/login` | 登录 | 用户名/邮箱密码登录或 GitHub OAuth |
+| `/register` | 注册 | 用户注册与可选邮箱验证 |
+| `/auth/callback` | OAuth 回调 | 恢复 GitHub 登录会话 |
+| `/verify-email` | 邮箱验证 | 确认邮箱验证令牌 |
+
+## 管理后台路由
+
+管理后台统一使用 `/admin` 前缀，由 `AdminLayout` 提供侧边栏和顶栏，并通过 `requiresAuth`、`requiresAdmin` 路由元信息限制访问。
+
+| 路径 | 功能 |
+|------|------|
+| `/admin/login` | 管理员登录 |
+| `/admin/dashboard` | 数据仪表盘 |
+| `/admin/analytics/visitors` | 访问记录 |
+| `/admin/posts` | 文章管理与 Markdown 编辑 |
+| `/admin/moments` | 说说管理 |
+| `/admin/books` | 图书管理 |
+| `/admin/files` | 文件管理 |
+| `/admin/comments` | 评论管理 |
+| `/admin/gallery` | 展览管理 |
+| `/admin/albums` | 相册管理 |
+| `/admin/friends` | 友链管理 |
+| `/admin/treasures` | 藏宝阁管理 |
+| `/admin/tavern` | 深夜酒馆管理 |
+| `/admin/carousel` | 首页轮播管理 |
+| `/admin/backgrounds` | 背景图管理 |
+| `/admin/about` | 关于页管理 |
+| `/admin/users` | 用户管理 |
+| `/admin/profile` | 个人资料管理 |
+| `/admin/site` | 站点配置管理 |
 
 ## 功能模块状态
 
@@ -201,5 +235,5 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 | 自习室 | —（localStorage） | ✅ | — |
 | 用户系统 | ✅ | ✅ | ✅（用户管理） |
 | 访问统计 | ✅ | ✅（自动记录公开导航） | ✅（仪表盘/访客列表） |
-| 站点配置 | 部分实现 | — | ✅（配置页面） |
+| 站点配置 | 部分实现 | 部分使用 | ✅（配置页面） |
 | 管理后台 | ✅（按模块提供管理接口） | ✅ | ✅ |
