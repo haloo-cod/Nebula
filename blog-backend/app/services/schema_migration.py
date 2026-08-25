@@ -108,12 +108,7 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
             await conn.execute(
                 text("ALTER TABLE book_download_jobs ADD COLUMN expire_days INTEGER NOT NULL DEFAULT 7")
             )
-        # 7 天策略上线前创建的已完成任务仍可能保留旧的 1 小时过期时间。
-        await conn.execute(
-            text(
-                "UPDATE book_download_jobs "
-                "SET expires_at = datetime(created_at, '+168 hours') "
-                "WHERE status = 'completed' AND expires_at IS NOT NULL"
-            )
-        )
+        # 不要在启动迁移中重算 expires_at。
+        # 该字段既保存创建归档时的默认到期时间，也保存管理员手动延期后的时间；
+        # 每次启动都按 created_at 重写会覆盖手动设置，并可能立即触发过期清理。
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_analytics_events_occurred_at ON analytics_events (occurred_at)"))
