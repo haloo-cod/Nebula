@@ -52,6 +52,11 @@ const visible = ref(false)
 const rendererFailed = ref(false)
 const ui = useUIStore()
 
+const emit = defineEmits<{
+  /** 液态玻璃已完成当前背景下的首帧绘制。 */
+  'render-ready': []
+}>()
+
 const props = withDefaults(
   defineProps<{
     cornerRadius?: number
@@ -382,7 +387,7 @@ function updateTrailUniforms() {
 // 背景纹理切换
 // ============================================================================
 
-async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
+async function syncBackgroundWithTheme(_theme: LiquidGlassTheme, forceReveal = false) {
   const url = currentBgUl.value
   if (!url || !instanceId) return
   const syncToken = ++backgroundSyncToken
@@ -390,11 +395,12 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   // 先隐藏 canvas（允许 reveal 时）
   const keepVisible =
     visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
-  if (ui.themeTransitioning && !keepVisible) {
+  if ((forceReveal || ui.themeTransitioning) && !keepVisible) {
     visible.value = false
     if (instanceId) {
       setInstanceFirstRenderCallback(instanceId, () => {
         visible.value = true
+        emit('render-ready')
       })
     }
   }
@@ -462,6 +468,19 @@ function handleContextRestored() {
   void syncBackgroundWithTheme(props.theme)
 }
 
+/** 在父组件重新显示面板前，重置首帧状态并等待新的有效绘制。 */
+function prepareReveal() {
+  if (!instanceId) return
+  visible.value = false
+  markInstanceReady(instanceId, false)
+  setInstanceFirstRenderCallback(instanceId, () => {
+    visible.value = true
+    emit('render-ready')
+  })
+  refreshRenderer()
+  void syncBackgroundWithTheme(props.theme, true)
+}
+
 onMounted(() => {
   const canvas = canvasRef.value
   const container = containerRef.value
@@ -488,6 +507,7 @@ onMounted(() => {
   renderedBackgroundUrl = bgUrl
   instanceId = registerInstance(canvas, ctx2d, uniforms, bgUrl, () => {
     visible.value = true
+    emit('render-ready')
   })
 
   // 注册 context lost/restored 回调
@@ -618,7 +638,7 @@ watch(
 )
 
 // 暴露 syncCanvasSize 供父组件在需要时手动触发(如 Transition 动画结束后)
-defineExpose({ syncCanvasSize, refreshRenderer })
+defineExpose({ syncCanvasSize, refreshRenderer, prepareReveal })
 </script>
 
 <style scoped>

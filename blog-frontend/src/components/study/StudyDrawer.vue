@@ -4,23 +4,29 @@
       <div v-show="modelValue" class="drawer-overlay" @click="close"></div>
     </Transition>
 
-    <Transition :name="slideTransitionName" @after-enter="refreshGlass">
+    <Transition
+      :name="slideTransitionName"
+      @after-enter="handleAfterEnter"
+      @after-leave="handleAfterLeave"
+    >
       <aside
         v-show="modelValue"
         class="study-drawer"
-        :class="[`study-drawer--${position}`]"
+        :class="`study-drawer--${position}`"
         :style="drawerStyle"
       >
         <LiquidGlass
           v-if="ui.liquidGlassEnabled"
           ref="glassRef"
           class="drawer-glass"
+          :class="{ 'drawer-glass--webgl-visible': webglVisible }"
           :theme="ui.theme"
           :corner-radius="24"
           :blur-radius="ui.liquidGlassBlur"
           :glass-thickness="46"
           :highlight-width="3.5"
           ripple-trail
+          @render-ready="handleRenderReady"
         >
           <div class="drawer-content">
             <button class="drawer-close" type="button" aria-label="关闭" @click="close">✕</button>
@@ -62,25 +68,70 @@ const emit = defineEmits<{
 }>()
 
 const ui = useUIStore()
-const glassRef = ref<{ refreshRenderer: () => void } | null>(null)
+const webglVisible = ref(false)
+const webglReady = ref(false)
+const handoffReady = ref(false)
+const slideTransitionName = computed(() =>
+  props.position === 'left' ? 'drawer-slide-left' : 'drawer-slide-right',
+)
+const glassRef = ref<{
+  refreshRenderer: () => void
+  prepareReveal: () => void
+} | null>(null)
 
-function refreshGlass() {
+function prepareGlass() {
+  webglVisible.value = !ui.liquidGlassEnabled
+  webglReady.value = false
+  handoffReady.value = false
+  if (!ui.liquidGlassEnabled) return
   void nextTick(() => {
-    glassRef.value?.refreshRenderer()
-    requestAnimationFrame(() => glassRef.value?.refreshRenderer())
+    if (!props.modelValue) return
+    glassRef.value?.prepareReveal()
   })
+}
+
+function handleRenderReady() {
+  if (!props.modelValue) return
+  webglReady.value = true
+  if (handoffReady.value) revealWebgl()
+}
+
+function revealWebgl() {
+  if (!props.modelValue || !webglReady.value) return
+  webglVisible.value = true
+}
+
+function handleAfterEnter() {
+  handoffReady.value = false
+  glassRef.value?.refreshRenderer()
+  requestAnimationFrame(() => {
+    if (!props.modelValue) return
+    glassRef.value?.refreshRenderer()
+    requestAnimationFrame(() => {
+      if (!props.modelValue) return
+      handoffReady.value = true
+      revealWebgl()
+    })
+  })
+}
+
+function handleAfterLeave() {
+  webglReady.value = false
+  handoffReady.value = false
+  webglVisible.value = !ui.liquidGlassEnabled
 }
 
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) refreshGlass()
+    if (open) prepareGlass()
+    else {
+      webglVisible.value = !ui.liquidGlassEnabled
+      webglReady.value = false
+      handoffReady.value = false
+    }
   },
   { immediate: true },
-)
-
-const slideTransitionName = computed(() =>
-  props.position === 'left' ? 'drawer-slide-left' : 'drawer-slide-right',
 )
 
 const drawerStyle = computed(() => ({
@@ -117,6 +168,41 @@ function close() {
   height: 100%;
   border-radius: 1.25rem;
   overflow: hidden;
+}
+
+.drawer-glass::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  content: '';
+  pointer-events: none;
+  opacity: 1;
+}
+
+.drawer-glass--webgl-visible::before {
+  opacity: 0.35;
+  transition: opacity 0.1s ease-out;
+}
+
+.drawer-glass :deep(.liquid-glass-canvas) {
+  opacity: 0;
+  transition: opacity 0.1s ease-out;
+}
+
+.drawer-glass--webgl-visible :deep(.liquid-glass-canvas--visible) {
+  opacity: 1;
+}
+
+.drawer-glass--webgl-visible {
+  pointer-events: auto;
 }
 
 .drawer-glass--fallback {
@@ -169,7 +255,7 @@ function close() {
   opacity: 0;
 }
 
-/* 左侧滑入 */
+/* 保留原生 Transition 的左右滑入，玻璃 canvas 在动画期间保持隐藏。 */
 .drawer-slide-left-enter-active,
 .drawer-slide-left-leave-active,
 .drawer-slide-right-enter-active,
@@ -182,7 +268,6 @@ function close() {
   transform: translateX(-100%);
 }
 
-/* 右侧滑入 */
 .drawer-slide-right-enter-from,
 .drawer-slide-right-leave-to {
   transform: translateX(100%);
