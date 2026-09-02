@@ -264,6 +264,7 @@ const vsSource = `
 `
 
 const fsSource = `
+    #extension GL_OES_standard_derivatives : enable
     precision mediump float;
     uniform sampler2D u_backgroundTexture;
     uniform vec2 u_resolution;
@@ -350,7 +351,10 @@ const fsSource = `
         vec2 glass_half_size_pixel = u_glassSize / 2.0;
 
         float dist_for_shape_boundary = sdRoundedBoxSmooth(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing);
-        if (dist_for_shape_boundary > 0.001) {
+        // 使用屏幕空间导数计算覆盖范围,让圆角边缘在不同 DPR 下保持平滑。
+        float edgeWidth = max(fwidth(dist_for_shape_boundary), 0.75);
+        float shapeAlpha = 1.0 - smoothstep(0.0, edgeWidth, dist_for_shape_boundary);
+        if (shapeAlpha <= 0.0) {
             discard;
         }
 
@@ -421,7 +425,8 @@ const fsSource = `
         float directionalFactor = (surfaceNormal3D.x * surfaceNormal3D.y + 1.0) * 0.5;
         float finalHighlightAlpha = highlight_alpha * directionalFactor;
 
-        gl_FragColor = mix(finalColor, vec4(1.0, 1.0, 1.0, 1.0), finalHighlightAlpha);
+        vec4 shadedColor = mix(finalColor, vec4(1.0, 1.0, 1.0, 1.0), finalHighlightAlpha);
+        gl_FragColor = vec4(shadedColor.rgb, shadedColor.a * shapeAlpha);
     }
 `
 
@@ -476,7 +481,14 @@ function initGL(): boolean {
 
   // 编译 shader
   const vs = createShader(gl, gl.VERTEX_SHADER, vsSource)
-  const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource)
+  // WebGL 1 的导数扩展不是强制能力,不支持时使用固定像素宽度仍保持可渲染。
+  const supportsDerivatives = Boolean(gl.getExtension('OES_standard_derivatives'))
+  const fragmentSource = supportsDerivatives
+    ? fsSource
+    : fsSource
+        .replace('#extension GL_OES_standard_derivatives : enable', '')
+        .replace('max(fwidth(dist_for_shape_boundary), 0.75)', '1.25')
+  const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource)
   if (!vs || !fs) return false
 
   program = gl.createProgram()!
