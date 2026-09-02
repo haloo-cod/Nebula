@@ -1,174 +1,132 @@
-# 首页 & 图书页液态玻璃开关机制
+# 液态玻璃开关机制
 
 ## 概述
 
-首页和图书页使用同一套模式：根据 `ui.liquidGlassEnabled` 的值，在 **WebGL 液态玻璃** 和 **CSS 毛玻璃** 之间切换。归档页现在也遵循这套语义。
+前端通过 Pinia 的 `useUIStore` 统一控制液态玻璃。开启时使用共享 WebGL 渲染器，关闭时使用 CSS 毛玻璃 fallback。两种状态都保留相同的内容组件和布局容器，因此开关只改变表面效果，不改变页面内容。
 
----
+相关实现：
 
-## 开关判断
+- `src/stores/ui.ts`：保存开关和模糊强度，并持久化到 `localStorage`。
+- `src/components/liquid-glass/LiquidGlass.vue`：单个 WebGL 玻璃实例的组件封装。
+- `src/components/liquid-glass/liquidGlassRenderer.ts`：共享 WebGL context、shader、纹理和渲染循环。
+- `src/components/liquid-glass/LazyLiquidGlass.vue`：大量卡片场景的视口懒加载和实例限流。
+- `src/components/panels/PanelFallbackGlass.vue`：CSS 毛玻璃 fallback。
 
-全站统一从 Pinia store 读取：
+## 开关状态
 
 ```ts
-// src/stores/ui.ts
-const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, false))
+const liquidGlassEnabled = ref(readStoredBoolean(LIQUID_GLASS_ENABLED_KEY, isDesktopOnInit))
+const liquidGlassBlur = ref(readStoredLiquidGlassBlur())
 ```
 
-- `true`：走 WebGL `LiquidGlass` 增强
-- `false`：走 CSS 毛玻璃 fallback
-- 用户通过 NavBar 切换，值持久化到 `localStorage`
+持久化键：
 
----
+- `blog-liquid-glass-enabled`
+- `blog-liquid-glass-blur`
 
-## 首页 (index.vue)
+默认行为：
 
-### 模板模式
+- 桌面端默认开启。
+- 移动端默认关闭，除非用户之前已经保存过开启状态。
+- `liquidGlassBlur` 的有效范围是 `0` 到 `12px`，默认值为 `0`。
+
+导航栏设置面板通过 `NavBar.vue` 调用：
+
+```ts
+ui.setLiquidGlassEnabled(enabled)
+ui.setLiquidGlassBlur(value)
+```
+
+## 组件切换模式
+
+普通面板采用以下模式：
 
 ```html
-<LiquidGlass v-if="ui.liquidGlassEnabled" ...>
-  <ContentPanel />              <!-- 内容组件 -->
+<LiquidGlass v-if="ui.liquidGlassEnabled">
+  <ContentPanel />
 </LiquidGlass>
 
-<PanelFallbackGlass v-else>    <!-- 共享毛玻璃壳组件 -->
+<PanelFallbackGlass v-else>
   <ContentPanel />
 </PanelFallbackGlass>
 ```
 
-首页有 **7 个面板** 使用这套模式：
+`LiquidGlass` 负责 WebGL 材质和画布，内容组件负责文字、图片和交互。`PanelFallbackGlass` 负责半透明背景、`backdrop-filter`、边框和阴影。
 
-| 位置 | 内容组件 | CSS 容器 |
-|------|----------|----------|
-| 左上 | `HomeProfilePanel` | `left-panel-glass` |
-| 右上 | `DataDashboard` | `right-panel-glass` |
-| 左下 | `Carousel` | `bottom-left` |
-| 右下上 | `CalendarPanel` | `bottom-right-top` |
-| 右下中 | `DigitalClockPanel` | `bottom-right-middle` |
-| 右下下 ×2 | 空占位 | `bottom-right-bottom-inner` |
+## 使用范围
 
-### 关键点
+当前开关已覆盖首页、博客、图书、归档、展览、说说、图片、友链、藏宝阁、自习室和关于页中的主要玻璃面板。
 
-- **首页用 `LiquidGlass`（非懒加载）**，因为它渲染的面板数量有限且始终可见
-- 开态时不依赖任何过渡组件，`LiquidGlass` 直接画 WebGL 效果
-- 关态统一的 `PanelFallbackGlass` 组件提供 CSS 毛玻璃表面
+### 首页
 
-### CSS 容器层
+首页位于 `src/views/index/index.vue`，使用非懒加载 `LiquidGlass`。当前首页面板数量有限，并且首屏通常可见，因此直接挂载实例：
 
-```html
-<div class="bottom-left">           <!-- 尺寸 + 定位 -->
-  <LiquidGlass class="panel-liquid-glass">  <!-- flex:1 填满 -->
-    <Carousel />
-  </LiquidGlass>
-  <PanelFallbackGlass v-else>      <!-- flex:1 填满 -->
-    <Carousel />
-  </PanelFallbackGlass>
-</div>
-```
+- 个人资料面板
+- 数据看板
+- 图片轮播
+- 日历
+- 数字时钟
+- 文章轮播
+- 说说轮播
 
-外层容器（如 `bottom-left`）负责尺寸和定位，内层 `LiquidGlass` / `PanelFallbackGlass` 通过 `flex:1` 填满。
+首页的外层 grid/flex 容器负责尺寸和定位，`LiquidGlass` 或 `PanelFallbackGlass` 负责填满容器。首页 fallback 使用 `static-blur`，用页面背景副本生成模糊层，减少动态 `backdrop-filter` 重采样。
 
-### PanelFallbackGlass 参数
+### 图书、博客和其他列表页
 
-```css
-.panel-fallback-glass {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 0 20px rgba(255, 255, 255, 0.06),
-    0 8px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-}
-```
-
----
-
-## 图书页 (books.vue)
-
-### 模板模式
+图书页、博客页、友链页、图片页、展览页等列表卡片一般直接使用：
 
 ```html
-<RouterLink class="book-link">
-  <LiquidGlass v-if="ui.liquidGlassEnabled" class="book-glass" ...>
-    <article class="book-card book-card--liquid">    <!-- 开态：透明内容 -->
-      <div class="book-cover" ... />
-      <div class="book-info" ... />
-    </article>
-  </LiquidGlass>
-
-  <PanelFallbackGlass v-else tag="article" class="book-card book-card-fallback">
-    <div class="book-cover" ... />                   <!-- 关态：直接内容 -->
-    <div class="book-info" ... />
-  </PanelFallbackGlass>
-</RouterLink>
+<LiquidGlass v-if="ui.liquidGlassEnabled">
+  <!-- 内容卡片，开态应保持透明 -->
+</LiquidGlass>
+<PanelFallbackGlass v-else>
+  <!-- 同一份内容卡片 -->
+</PanelFallbackGlass>
 ```
 
-### 关键点
+当内容卡片由 `LiquidGlass` 包裹时，卡片自身不要重复设置背景、边框、阴影或 `backdrop-filter`，否则会削弱 WebGL 材质效果。
 
-- **图书页用非懒加载 `LiquidGlass`**，因为每页最多 16 本书，无明显性能压力
-- `PanelFallbackGlass` 通过 `tag="article"` 直接变成 `<article>` 根元素，外层类 `book-card` 提供布局
-- `book-card` 负责 `display:flex`、`padding`、`border-radius` 等卡片容器语义
-- `PanelFallbackGlass` 负责毛玻璃表面（`background`、`backdrop-filter`、`border`、`box-shadow`）
+### 归档页和说说页
 
-### 开态透明处理
+这类页面可能同时存在大量卡片，使用 `LazyLiquidGlass`：
 
-```css
-.book-card--liquid {
-  border: none;
-  background: transparent;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-```
+- `IntersectionObserver` 判断卡片是否接近视口。
+- 只有接近视口且获得名额时才挂载 `LiquidGlass`。
+- 未接近视口、未开启开关或等待名额时显示 fallback 内容。
+- 全局最多同时激活 `6` 个真实液态玻璃实例。
 
-开态时 `.book-card--liquid` 清空所有背景/边框/阴影，
-让外层 `LiquidGlass` 的 WebGL 效果完整接管视觉。
+不要将归档页的大量卡片改成直接挂载 `LiquidGlass`，否则会增加 canvas、纹理和渲染循环压力。
 
-### PanelFallbackGlass 作为卡片根
+### 特殊布局
 
-```html
-<!-- 编译后的 DOM -->
-<article class="panel-fallback-glass book-card book-card-fallback">
-  <!-- 内容 -->
-</article>
-```
+部分抽屉、时间轴卡片或绝对定位卡片需要自身控制根节点的布局属性。这类组件可以继续保留本地容器样式，但玻璃表面应优先复用 `LiquidGlass` 或 `PanelFallbackGlass`，不要复制出第三套公共表面参数。
 
-`panel-fallback-glass` 提供毛玻璃表面，
-`book-card` 提供 flex 布局 + 内边距，
-`book-card-fallback` 提供 hover 过渡。
+## WebGL 关闭时的行为
 
-这是首页和图书页关态视觉一致的根本原因：**同一个组件、同一套表面参数**。
+关闭开关不会卸载页面背景，也不会影响页面内容。普通组件切换到 `PanelFallbackGlass`；`LazyLiquidGlass` 释放自己的激活名额。
 
----
+CSS fallback 的公共表面定义位于 `src/components/panels/PanelFallbackGlass.vue`，全局 CSS 变量位于 `src/assets/base.css`：
 
-## 首页 vs 图书页 vs 归档页 对比
+- `--glass-bg`
+- `--glass-bg-subtle`
+- `--glass-bg-strong`
+- `--glass-border`
+- `--glass-highlight`
+- `--glass-shadow`
+- `--glass-blur`
 
-| | 首页 | 图书页 | 归档页 |
-|---|---|---|---|
-| 开态组件 | `LiquidGlass` | `LiquidGlass` | `LazyLiquidGlass` |
-| 关态组件 | `PanelFallbackGlass` | `PanelFallbackGlass` | 本地 `.archive-panel` |
-| 懒加载 | 否 | 否 | 是（最多 6 个 WebGL） |
-| 卡片容器 | 外层容器 | `book-card` 类 | `.archive-panel` 类 |
-| 毛玻璃参数 | 共享组件 | 共享组件 | 本地 CSS（与共享组件参数一致） |
-| 内容组件 | `HomeProfilePanel` 等 | 内联 | `ArchivePostCard` |
+如果只需要调整关闭状态的视觉效果，优先修改 `PanelFallbackGlass.vue` 或 `base.css`，不要修改 WebGL shader 参数。
 
----
+## 性能边界
 
-## 为什么归档页不用 PanelFallbackGlass
+共享渲染器已经包含以下约束：
 
-归档页的卡片是 **280×310px 的绝对定位元素**，放在横向滚动的时间轴舞台上。
-与首页/图书页的静态 grid/flex 布局不同，归档卡片需要：
+- 全站共享一个 WebGL context。
+- 图片纹理按 URL 缓存并可在启动时预热。
+- 无活跃涟漪时降低渲染频率。
+- 滚动期间提高渲染频率。
+- 归档类页面最多激活 6 个 `LiquidGlass`。
+- 视频背景复用 `PageBackground.vue` 中真实显示的 video 元素。
+- 处理 WebGL context lost/restored。
 
-1. **`display: flex; flex-direction: column`** 作为卡片根容器
-2. **`padding: 0.45rem`** 匹配卡片内容布局
-3. **`position: relative`** 为 `backdrop-filter` 创建渲染层
-4. **`z-index: 5`** 提层超越 SVG 河流过滤层
-
-这些布局语义是归档页特有的，不应塞进共享组件 `PanelFallbackGlass`。
-归档页的 `.archive-panel` 毛玻璃参数与 `PanelFallbackGlass` **完全一致**，
-只是额外叠加了归档特有的布局属性。
+修改实例上限、纹理上传或首帧逻辑前，应使用 `PerfMonitor.vue` 观察真实设备上的 FPS、draw calls、纹理上传和 context 状态。

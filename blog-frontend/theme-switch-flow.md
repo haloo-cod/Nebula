@@ -1,258 +1,134 @@
-主题切换完整链路
-================
+# 主题与液态玻璃切换流程
 
-1. 用户点击或拉动 NavBar 里的主题开关。
+## 当前数据来源
 
-2. NavBar.vue 调用 ui.toggleTheme()。
+主题和背景不再由页面组件分别硬编码。统一数据流如下：
 
-3. ui.ts 先设置主题切换遮罩状态:
+```text
+NavBar
+  → useUIStore.toggleTheme()
+  → theme
+  → currentBackground / currentBgUrl
+  → PageBackground + LiquidGlass
+```
+
+`src/stores/ui.ts` 按以下维度选择背景：
+
+- 主题：`dark` / `light`
+- 设备：`desktop` / `mobile`
+- 当前分组中的背景索引
+
+背景列表初始来自 `src/data/backgrounds.ts` 的本地静态资源；`App.vue` 挂载后会从后端加载背景列表并替换对应分组。每个背景项保留 `mediaType`、`posterUrl`、`mimeType` 和 `fileSize` 等媒体元数据。
+
+## 主题切换链路
+
+1. 用户点击 `NavBar.vue` 的主题按钮，或完成主题开关的拖拽操作。
+
+2. `NavBar.vue` 调用 `ui.toggleTheme()`。
+
+3. `useUIStore.toggleTheme()` 设置：
+
+   ```ts
    themeTransitioning = true
    themeTransitionRevealStarted = false
+   ```
 
-4. App.vue 顶层显示 .theme-overlay 全屏毛玻璃遮罩。
+4. `App.vue` 显示全屏 `.theme-overlay`。遮罩使用半透明底色和 `backdrop-filter`，暂时遮住背景、CSS 变量切换和 WebGL 更新。
 
-5. ui.ts 等待 1 帧:
-   await waitForNextFrames(1)
+5. store 等待一帧，确保遮罩已经被浏览器绘制。
 
-   这一步确保遮罩已经真正被浏览器 paint 到屏幕上。
-   后续背景切换、CSS 变量切换、WebGL 纹理上传都会发生在遮罩之下。
+6. store 修改 `theme`。主题 watcher 同步：
 
-6. ui.ts 切换 theme:
-   theme = light / dark
+   - `document.documentElement[data-theme]`
+   - 普通 CSS 毛玻璃变量
+   - `PageBackground` 的背景资源
+   - 所有 `LiquidGlass` 的主题预设
 
-7. theme 变化触发以下同步更新:
-   - document.documentElement[data-theme] 更新
-   - PageBackground 背景图切换
-   - 普通毛玻璃 CSS 变量切换
-   - 首页 6 个 LiquidGlass 的 props.theme 更新
+7. `PageBackground.vue` 通过 `currentBackground` 切换显示资源。图片和视频都会先预热，资源准备完成前继续显示旧背景，避免切换瞬间黑屏。
 
-8. 每个 LiquidGlass watcher 执行:
-   applyThemePreset(theme)
-   syncBackgroundWithTheme(theme)
+8. 每个 `LiquidGlass.vue` 监听到主题或背景 URL 变化后：
 
-9. syncBackgroundWithTheme() 先设置:
-   visible = false
+   - 选择桌面端或移动端主题预设。
+   - 检查共享纹理缓存。
+   - 缓存未命中时加载图片或预加载视频纹理。
+   - 更新纹理宽高比和实例背景 URL。
+   - 将实例重新标记为可渲染。
 
-   这一步复用首次进入页面时 LiquidGlass 的透明起始状态。
+9. 如果需要重新 reveal，组件会先设置 `visible = false`，并注册首帧回调。
 
-10. LiquidGlass 从模块级图片缓存里拿当前主题对应背景图:
-    dark  -> test3.jpg
-    light -> test6.png
+10. 共享渲染器完成纹理准备和首帧绘制后，执行顺序必须是：
 
-11. 每个 LiquidGlass 把自己的 WebGL 纹理上传任务塞入共享队列:
-    enqueueTextureUpload(...)
+    ```text
+    上传新纹理
+      → drawFrame()
+      → visible = true
+    ```
 
-12. liquidGlassQueue.ts 每帧只执行一个纹理上传任务。
+    先绘制再显示，避免 canvas 中残留上一主题的像素导致闪烁。
 
-    这样可以避免 6 个 LiquidGlass 面板在同一帧集中执行 gl.texImage2D(),
-    降低主题切换时的主线程/GPU 同步压力。
+11. 第一个新的纹理上传完成后，store 设置 `themeTransitionRevealStarted = true`，全屏遮罩开始淡出。
 
-13. 某个面板的上传任务执行时:
-    - gl.texImage2D(...) 上传新背景纹理
-    - bgLoaded = true
-    - drawFrame()
-    - visible = true
+12. 其他玻璃实例继续由共享渲染器处理并逐步显示。等待纹理上传阶段结束后再等待两帧，给背景层重合成和最后一帧渲染留出缓冲。
 
-14. drawFrame() 必须在 visible=true 之前执行。
+13. store 清理：
 
-    原因: texImage2D 上传新纹理后,canvas 里仍然保留上一帧旧像素。
-    如果立刻 visible=true,opacity 淡入最开始会闪一下旧纹理。
-    先 drawFrame() 可以把新纹理真正画进 canvas,再开始淡入。
-
-15. 当前面板获得 .liquid-glass-canvas--visible,class 后从 opacity:0 淡入到 opacity:1。
-
-16. 共享队列里的第一个纹理任务完成后,waitForFirstTextureUploadSettled() resolve。
-
-17. ui.ts 设置:
-    themeTransitionRevealStarted = true
-
-18. App.vue 的 .theme-overlay 开始淡出。
-
-19. 剩余 LiquidGlass 面板继续按队列逐个上传纹理、逐个淡入。
-
-20. 队列全部排空后,waitForTextureUploadQueueIdle() resolve。
-
-21. ui.ts 再等待 2 帧:
-    await waitForNextFrames(2)
-
-    这一步给最后一帧 LiquidGlass 渲染和背景层 recomposite 留缓冲。
-
-22. ui.ts 关闭主题切换状态:
+    ```ts
     themeTransitioning = false
     themeTransitionRevealStarted = false
+    ```
 
-23. 主题切换流程结束。
+## 没有液态玻璃实例时
 
+液态玻璃开关开启并不代表当前页面一定存在正在渲染的 `LiquidGlass`。例如：
 
-当前效果设计
-============
+- 当前页面只有 CSS 面板。
+- `LazyLiquidGlass` 卡片还没有接近视口。
+- 当前页面没有任何玻璃组件。
 
-- 全屏毛玻璃遮罩一定先出现。
-- 第一个 LiquidGlass 面板 ready 后遮罩开始退场。
-- 剩余 LiquidGlass 面板继续逐个上传、逐个淡入。
-- 每个 LiquidGlass 都复用首次进入页面的流程:
-  visible=false -> 纹理上传 -> drawFrame -> visible=true
-- 每个 LiquidGlass 面板的 WebGL 背景纹理会跟随主题切换。
+因此主题切换等待纹理就绪时必须有超时兜底。`liquidGlassQueue.ts` 的 `waitForNextTextureUploadSettled()` 用于兼容这个流程：没有新的纹理批次时，超时后正常放行，不能让主题遮罩永久停留。
 
+## 背景纹理与页面背景的一致性
 
-如果要改背景图,需要改哪里
-========================
+页面背景和 WebGL 纹理都从 `useUIStore.currentBackground` 读取，不要在 `PageBackground.vue` 或 `LiquidGlass.vue` 中重新维护主题背景 URL 映射。
 
-当前背景图有两套用途,必须保持一致:
+新增或替换背景时应检查：
 
-1. 页面真实背景图
+1. `src/data/backgrounds.ts` 的本地 fallback 分组。
+2. 后端背景列表接口返回的 `theme`、`device` 和媒体元数据。
+3. `PageBackground.vue` 对图片、视频、poster 和 reduced-motion 的处理。
+4. `LiquidGlass.vue` 对 `isVideoBackground()` 的判断。
+5. 必要时调整 `src/assets/base.css` 的普通 CSS 毛玻璃变量。
+6. 必要时调整 `LiquidGlass.vue` 中的 `glassPresets` 和 `mobileGlassPresets`。
 
-   文件: src/components/PageBackground.vue
+视频背景尤其不能丢失 `mediaType` 或 MIME 信息，否则液态玻璃可能把视频当成图片加载。页面上真实显示的 video 会通过 `bindVideoElement()` 复用给 WebGL 渲染器，避免隐藏 video 和页面背景播放进度不一致。
 
-   当前导入:
-   import darkBg from '@/assets/img/test3.jpg'
-   import lightBg from '@/assets/img/test6.png'
+## LiquidGlass 参数入口
 
-   当前映射:
-   light -> test6.png
-   dark  -> test3.jpg
+`src/components/liquid-glass/LiquidGlass.vue` 的 props 可以覆盖部分默认参数：
 
-   如果要更换页面背景图,先改这里。
+- `cornerRadius`
+- `blurRadius`
+- `glassThickness`
+- `ior`
+- `highlightWidth`
+- `overlayColor`
+- `allowReveal`
+- `realtimeOffset`
+- `theme`
+- `rippleTrail`
+- `rippleStrength`
+- `rippleRadius`
+- `rippleDuration`
 
-2. LiquidGlass WebGL 采样用背景图
+默认情况下 `realtimeOffset` 必须保持 `false`。只有需要在横向滚动时实时跟随位置的归档卡片才显式开启它，否则会让每帧布局读取扩大。
 
-   文件: src/components/LiquidGlass.vue
+## 修改时必须保留的约束
 
-   当前导入:
-   import darkBgUrl from '@/assets/img/test3.jpg'
-   import lightBgUrl from '@/assets/img/test6.png'
-
-   当前映射:
-   const backgroundUrls = {
-     dark: darkBgUrl,
-     light: lightBgUrl,
-   }
-
-   如果只改 PageBackground.vue,页面背景会变,但 LiquidGlass 折射采样仍然用旧图。
-   所以改主题背景时,PageBackground.vue 和 LiquidGlass.vue 这两处必须同步改。
-
-3. 主题参数本身
-
-   文件: src/assets/base.css
-
-   用途: 普通毛玻璃变量,例如 --glass-bg、--glass-border、--glass-blur。
-
-   如果背景图变亮/变暗很多,可能还要同步调整 :root[data-theme='light'] 里的 --glass-* 变量。
-
-4. LiquidGlass 物理参数
-
-   文件: src/components/LiquidGlass.vue
-
-   位置: glassPresets.dark / glassPresets.light
-
-   用途: 控制 WebGL 液态玻璃的厚度、折射率、边缘高光、覆盖色等。
-
-如果换图后 LiquidGlass 太重、太亮或太暗,改这里。
-
-
-迭代版本 v2: LazyLiquidGlass 与安全等待
-=========================================
-
-本节只记录 v1 之后新增的约束和修正,不覆盖前面的原始链路。
-
-1. 归档页引入 LazyLiquidGlass。
-
-   文件: src/components/LazyLiquidGlass.vue
-
-   用途:
-   - 只在卡片接近视口时挂载真实 LiquidGlass。
-   - 不接近视口或等待名额时使用 fallback 玻璃样式。
-   - 全局最多同时激活 6 个真实 LiquidGlass 实例。
-
-2. LazyLiquidGlass 的限制是性能边界。
-
-   归档页可能有大量文章卡片,不能让每张卡片都同时创建 WebGL canvas。
-   因此 MAX_ACTIVE_LIQUID_GLASS 当前保持为 6。
-
-   如果未来要调整这个数字,需要同时观察:
-   - 主题切换时 gl.texImage2D 上传是否集中卡顿。
-   - 横向滚动时主线程是否被多个 RAF 占满。
-   - 低配设备是否出现 WebGL context 丢失。
-
-3. LiquidGlass 新增 realtimeOffset。
-
-   文件: src/components/LiquidGlass.vue
-
-   默认值:
-   realtimeOffset = false
-
-   旧页面必须继续走默认值,避免每帧读取 getBoundingClientRect()。
-   只有归档页横向滚动卡片需要显式开启 realtime-offset。
-
-4. realtimeOffset 的工作方式。
-
-   - 普通模式:滚动事件直接同步 canvasOffset,保持旧逻辑。
-   - 实时模式:滚动事件只标记 dirty。
-   - RAF render() 中仅当 realtimeOffset=true 且 dirty 时才同步 canvasOffset。
-
-   这样归档页横向滚动时折射采样坐标能跟上位置变化,
-   但不会在没有滚动/尺寸变化时每帧强制读取布局。
-
-5. 主题切换等待逻辑更新。
-
-   文件:
-   - src/components/liquidGlassQueue.ts
-   - src/stores/ui.ts
-
-   v1 中 ui.ts 等待 waitForFirstTextureUploadSettled()。
-   v2 改为等待 waitForNextTextureUploadSettled()。
-
-6. 为什么要改等待逻辑。
-
-   引入 LazyLiquidGlass 后,"液态玻璃开关开启" 不再等于
-   "当前页面一定有真实 LiquidGlass 实例会立刻入队上传纹理"。
-
-   例如:
-   - 当前页面没有 LiquidGlass。
-   - 当前页面只有 LazyLiquidGlass fallback。
-   - 卡片还没进入 IntersectionObserver 范围。
-
-   如果继续无条件等待旧的首个纹理完成信号,主题遮罩可能一直卡住。
-
-7. waitForNextTextureUploadSettled() 的语义。
-
-   - 记录调用时的 textureUploadGeneration。
-   - 只等待调用之后产生的新批次首个纹理上传完成。
-   - 如果没有新批次产生,超时后自动放行。
-
-   这只是主题切换期间的安全兜底,平时不会运行。
-
-8. v2 后的主题切换顺序。
-
-   1. ui.toggleTheme() 拉起全屏遮罩。
-   2. 等 1 帧,确保遮罩先 paint。
-   3. 创建 firstTextureReady = waitForNextTextureUploadSettled()。
-   4. 切换 theme。
-   5. 已挂载的真实 LiquidGlass watcher 执行:
-      applyThemePreset(theme)
-      syncBackgroundWithTheme(theme)
-   6. syncBackgroundWithTheme() 仍然执行:
-      visible=false -> loadBgImage -> enqueueTextureUpload
-   7. 队列仍然每帧只执行一个 gl.texImage2D。
-   8. 上传任务内仍然必须保持:
-      gl.texImage2D(...) -> bgLoaded=true -> drawFrame() -> visible=true
-   9. firstTextureReady resolve 后遮罩开始退场。
-   10. waitForTextureUploadQueueIdle() 等待队列排空。
-   11. 再等 2 帧后关闭 themeTransitioning。
-
-9. 如果没有真实 LiquidGlass 入队。
-
-   firstTextureReady 会在超时后放行。
-   主题遮罩正常退场,避免页面进入永久 transitioning 状态。
-
-   这不会破坏已有 LiquidGlass 的防闪逻辑:
-   只要真实 LiquidGlass 后续入队,它自己的上传任务仍会先 drawFrame(),再 visible=true。
-
-10. 后续修改注意事项。
-
-   - 不要把 realtimeOffset 默认值改成 true。
-   - 不要移除 LazyLiquidGlass 的并发上限。
-   - 不要让归档页每张卡片都直接挂载 LiquidGlass。
-   - 不要把 drawFrame() 移到 visible=true 后面。
-   - 不要绕过 enqueueTextureUpload() 直接批量上传纹理。
-   - 不要让 ui.ts 无超时地等待一个可能不存在的纹理批次。
+- 不要在页面组件中重新硬编码 dark/light 背景 URL。
+- 不要把所有归档卡片改成直接挂载 `LiquidGlass`。
+- 不要移除 `LazyLiquidGlass` 的最多 6 个激活实例限制。
+- 不要把 `drawFrame()` 放到 `visible = true` 之后。
+- 不要绕过共享纹理缓存批量上传大量背景。
+- 不要让主题切换无限等待不存在的纹理批次。
+- 不要把 `realtimeOffset` 默认改成 `true`。
+- 修改 shader、纹理、实例注册或 context 恢复逻辑后，应检查 `PerfMonitor.vue` 的指标。

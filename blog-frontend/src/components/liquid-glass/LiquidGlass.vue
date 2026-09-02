@@ -2,6 +2,7 @@
   <div
     class="liquid-glass"
     ref="containerRef"
+    :style="{ '--liquid-glass-corner-radius': `${props.cornerRadius}px` }"
     :class="{ 'liquid-glass--css-fallback': rendererFailed }"
   >
     <canvas
@@ -34,7 +35,6 @@ import {
   onContextLost,
   onContextRestored,
   offContextCallbacks,
-  isRendererAvailable,
   loadImage,
   uploadTexture,
   preloadVideoTexture,
@@ -260,16 +260,21 @@ function applyThemePreset(theme: 'light' | 'dark') {
   uniforms.heightTransitionWidth = p.heightTransitionWidth
   uniforms.sminSmoothing = p.sminSmoothing
   uniforms.blurRadius = getEffectiveBlurRadius(theme)
-  uniforms.highlightWidth = p.highlightWidth
+  uniforms.highlightWidth = toCanvasPixels(p.highlightWidth)
   uniforms.overlayColor = [...p.overlayColor, 1.0] as [number, number, number, number]
 }
 
 /** 初始化所有 uniform 值 */
 function initUniforms() {
-  uniforms.cornerRadius = props.cornerRadius
+  uniforms.cornerRadius = toCanvasPixels(props.cornerRadius)
   uniforms.trailRadius = props.rippleRadius
   uniforms.trailStrength = props.rippleTrail ? props.rippleStrength : 0
   applyThemePreset(props.theme)
+}
+
+/** 将 CSS 像素参数转换为当前 canvas 使用的物理像素。 */
+function toCanvasPixels(value: number): number {
+  return value * (window.devicePixelRatio || 1) * getRenderScale()
 }
 
 // ============================================================================
@@ -292,6 +297,11 @@ function syncCanvasSize() {
   const scale = getRenderScale()
   const pw = Math.max(1, Math.round(w * dpr * scale))
   const ph = Math.max(1, Math.round(h * dpr * scale))
+
+  // 圆角和边缘高光必须与 canvas 尺寸使用同一套物理像素单位。
+  uniforms.cornerRadius = toCanvasPixels(props.cornerRadius)
+  const presets = isMobileViewport() ? mobileGlassPresets : glassPresets
+  uniforms.highlightWidth = toCanvasPixels(presets[props.theme].highlightWidth)
 
   canvas.width = pw
   canvas.height = ph
@@ -493,15 +503,6 @@ onMounted(() => {
     return
   }
 
-  // 检查渲染器是否可用
-  if (!isRendererAvailable()) {
-    // 渲染器可能在首次调用时初始化,先尝试注册
-  }
-
-  // 初始化 uniforms
-  initUniforms()
-  syncCanvasSize()
-
   // 注册到共享渲染器
   const bgUrl = currentBgUl.value
   renderedBackgroundUrl = bgUrl
@@ -509,6 +510,10 @@ onMounted(() => {
     visible.value = true
     emit('render-ready')
   })
+
+  // registerInstance 会初始化 WebGL 并检测 renderScale,因此尺寸和物理像素参数必须在注册后计算。
+  initUniforms()
+  syncCanvasSize()
 
   // 注册 context lost/restored 回调
   onContextLost(handleContextLost)
@@ -646,7 +651,7 @@ defineExpose({ syncCanvasSize, refreshRenderer, prepareReveal })
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: var(--liquid-glass-corner-radius, 16px);
   overflow: hidden;
 }
 
@@ -657,6 +662,7 @@ defineExpose({ syncCanvasSize, refreshRenderer, prepareReveal })
   height: 100%;
   z-index: 0;
   pointer-events: none;
+  border-radius: inherit;
   opacity: 0;
   transition: opacity 0.06s ease-out;
 }
