@@ -3,7 +3,6 @@
     class="liquid-glass"
     ref="containerRef"
     :style="{ '--liquid-glass-corner-radius': `${props.cornerRadius}px` }"
-    :class="{ 'liquid-glass--css-fallback': rendererFailed }"
   >
     <canvas
       ref="canvasRef"
@@ -41,6 +40,7 @@ import {
   hasTexture,
   getTextureAspect,
   getRenderScale,
+  getEdgeAaWidth,
   MAX_TRAIL_POINTS,
   type GlassUniforms,
 } from '@/components/liquid-glass/liquidGlassRenderer'
@@ -49,7 +49,6 @@ import { isVideoBackground } from '@/data/backgrounds'
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const visible = ref(false)
-const rendererFailed = ref(false)
 const ui = useUIStore()
 
 const emit = defineEmits<{
@@ -232,6 +231,7 @@ const uniforms: GlassUniforms = {
   blurRadius: 0,
   overlayColor: [0, 0, 0, 1],
   highlightWidth: 0,
+  edgeAaWidth: 1,
   trailPoints: Array.from(
     { length: MAX_TRAIL_POINTS },
     () => [0, 0, 1, 0] as [number, number, number, number],
@@ -297,6 +297,7 @@ function syncCanvasSize() {
   const scale = getRenderScale()
   const pw = Math.max(1, Math.round(w * dpr * scale))
   const ph = Math.max(1, Math.round(h * dpr * scale))
+  uniforms.edgeAaWidth = getEdgeAaWidth(dpr, scale)
 
   // 圆角和边缘高光必须与 canvas 尺寸使用同一套物理像素单位。
   uniforms.cornerRadius = toCanvasPixels(props.cornerRadius)
@@ -499,7 +500,7 @@ onMounted(() => {
   // 获取 2D context（用于接收渲染器的 drawImage）
   ctx2d = canvas.getContext('2d')
   if (!ctx2d) {
-    rendererFailed.value = true
+    console.error('[LiquidGlass] 2D canvas context is unavailable')
     return
   }
 
@@ -676,12 +677,5 @@ defineExpose({ syncCanvasSize, refreshRenderer, prepareReveal })
   z-index: 1;
   width: 100%;
   height: 100%;
-}
-
-.liquid-glass--css-fallback {
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border-subtle);
 }
 </style>

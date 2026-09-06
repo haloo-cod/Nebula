@@ -18,8 +18,11 @@
 import {
   buildStaticUniformKey,
   countActiveTrailPoints,
+  getEdgeAaWidth,
   shouldBlurBackground,
 } from './rendererMetrics'
+
+export { getEdgeAaWidth } from './rendererMetrics'
 
 const MAX_TRAIL_POINTS = 12
 
@@ -45,6 +48,8 @@ export interface GlassUniforms {
   blurRadius: number
   overlayColor: [number, number, number, number]
   highlightWidth: number
+  /** 以 framebuffer 物理像素表示的最小圆角覆盖率宽度。 */
+  edgeAaWidth: number
   trailPoints: Array<[number, number, number, number]>
   trailRadius: number
   trailStrength: number
@@ -89,15 +94,13 @@ export interface GlassInstance {
   onFirstRender: (() => void) | null
   /** 是否已执行过首次渲染回调 */
   hasRenderedOnce: boolean
-  /** 当前实例静态 uniform 的缓存键。 */
-  staticUniformKey: string
 }
 
 // ============================================================================
 // 模块状态
 // ============================================================================
 
-let gl: WebGLRenderingContext | null = null
+let gl: WebGL2RenderingContext | null = null
 let offscreenCanvas: HTMLCanvasElement | null = null
 let program: WebGLProgram | null = null
 let positionBuffer: WebGLBuffer | null = null
@@ -105,6 +108,11 @@ let posLoc = 0
 let animationId = 0
 let contextLost = false
 let initialized = false
+let rendererError = ''
+// 共享 program 的静态 uniform 缓存键。uniform 属于共享 program，
+// 必须按“当前 GPU 上已写入的值”比较，而不是按实例比较——否则多实例交替
+// 渲染时，A 会误以为自己已上传而跳过，实际 program 里仍是 B 的参数。
+let lastStaticUniformKey = ''
 
 // Uniform locations（共享 program 的 uniform 位置）
 interface UniformLocations {
@@ -125,6 +133,7 @@ interface UniformLocations {
   blurRadius: WebGLUniformLocation | null
   overlayColor: WebGLUniformLocation | null
   highlightWidth: WebGLUniformLocation | null
+  edgeAaWidth: WebGLUniformLocation | null
   trailPoints: Array<WebGLUniformLocation | null>
   trailRadius: WebGLUniformLocation | null
   trailStrength: WebGLUniformLocation | null
@@ -151,6 +160,7 @@ function createEmptyLocs(): UniformLocations {
     blurRadius: null,
     overlayColor: null,
     highlightWidth: null,
+    edgeAaWidth: null,
     trailPoints: [],
     trailRadius: null,
     trailStrength: null,
@@ -230,16 +240,17 @@ if (typeof window !== 'undefined') {
 // Shader 源码
 // ============================================================================
 
-const vsSource = `
-    precision mediump float;
-    attribute vec2 a_position;
+const vsSource = `#version 300 es
+    precision highp float;
+    precision highp int;
+    in vec2 a_position;
     uniform vec2 u_resolution;
     uniform vec2 u_mousePos;
     uniform vec2 u_glassSize;
     uniform vec2 u_canvasOffset;
     uniform float u_texAspect;
-    varying vec2 v_screenTexCoord;
-    varying vec2 v_shapeCoord;
+    out vec2 v_screenTexCoord;
+    out vec2 v_shapeCoord;
     void main() {
         gl_Position = vec4(a_position * 2.0 * vec2(1.0, -1.0), 0.0, 1.0);
         vec2 screenPos = u_canvasOffset + u_mousePos + a_position * u_glassSize;
@@ -263,9 +274,8 @@ const vsSource = `
     }
 `
 
-const fsSource = `
-    #extension GL_OES_standard_derivatives : enable
-    precision mediump float;
+const fsSource = `#version 300 es
+    precision highp float;
     uniform sampler2D u_backgroundTexture;
     uniform vec2 u_resolution;
     uniform vec2 u_glassSize;
@@ -280,11 +290,13 @@ const fsSource = `
     uniform float u_blurRadius;
     uniform vec4 u_overlayColor;
     uniform float u_highlightWidth;
+    uniform float u_edgeAaWidth;
     uniform vec4 u_trailPoints[${MAX_TRAIL_POINTS}];
     uniform float u_trailRadius;
     uniform float u_trailStrength;
-    varying vec2 v_screenTexCoord;
-    varying vec2 v_shapeCoord;
+    in vec2 v_screenTexCoord;
+    in vec2 v_shapeCoord;
+    out vec4 fragColor;
 
     float smin_polynomial(float a, float b, float k) {
         if (k <= 0.0) return min(a, b);
@@ -351,9 +363,30 @@ const fsSource = `
         vec2 glass_half_size_pixel = u_glassSize / 2.0;
 
         float dist_for_shape_boundary = sdRoundedBoxSmooth(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing);
-        // 使用屏幕空间导数计算覆盖范围,让圆角边缘在不同 DPR 下保持平滑。
-        float edgeWidth = max(fwidth(dist_for_shape_boundary), 0.75);
-        float shapeAlpha = 1.0 - smoothstep(0.0, edgeWidth, dist_for_shape_boundary);
+        // 覆盖率策略：边界及内侧完全不透明（与生产版硬裁剪的视觉一致，
+        // 高光峰值正好在 dist=0 处，必须保持满 alpha 才有边缘体积感），
+        // 只向轮廓外侧做 4x 旋转网格超采样淡出。
+        // 每个子采样向内偏移 0.5 个像素，保证边界像素覆盖率为 1；
+        // 外侧过渡带放宽到约 2 个像素，低 renderScale 放大后也不出阶梯。
+        float edgeWidth = max(fwidth(dist_for_shape_boundary), u_edgeAaWidth);
+        float outerAaWidth = edgeWidth * 2.0;
+        const vec2 rgssOffsets[4] = vec2[4](
+            vec2(-0.375, -0.125),
+            vec2( 0.125, -0.375),
+            vec2( 0.375,  0.125),
+            vec2(-0.125,  0.375)
+        );
+        float shapeAlpha = 0.0;
+        for (int i = 0; i < 4; i++) {
+            float sampleDist = sdRoundedBoxSmooth(
+                current_p_pixel + rgssOffsets[i] * edgeWidth,
+                glass_half_size_pixel,
+                actualCornerRadius,
+                u_sminSmoothing
+            ) - edgeWidth * 0.5;
+            shapeAlpha += 1.0 - smoothstep(0.0, outerAaWidth, sampleDist);
+        }
+        shapeAlpha *= 0.25;
         if (shapeAlpha <= 0.0) {
             discard;
         }
@@ -383,7 +416,7 @@ const fsSource = `
         vec3 surfaceNormal3D = normalize(vec3(-delta_x * u_normalStrength, -delta_y * u_normalStrength, 1.0));
 
         if (u_showNormals == 1) {
-            gl_FragColor = vec4(surfaceNormal3D * 0.5 + 0.5, 1.0);
+            fragColor = vec4(surfaceNormal3D * 0.5 + 0.5, 1.0);
             return;
         }
 
@@ -399,34 +432,42 @@ const fsSource = `
 
         vec4 blurredColor;
         if (u_blurRadius <= 0.0) {
-            blurredColor = texture2D(u_backgroundTexture, refractedTexCoord);
+            blurredColor = texture(u_backgroundTexture, refractedTexCoord);
         } else {
             vec2 texelSize = 1.0 / u_resolution;
             float blurPixelRadius = u_blurRadius;
             blurredColor = vec4(0.0);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0, -1.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0, -1.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0, -1.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  0.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  0.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  0.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  1.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  1.0) * blurPixelRadius * texelSize);
-            blurredColor += texture2D(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2(-1.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 0.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 1.0, -1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  0.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2(-1.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 0.0,  1.0) * blurPixelRadius * texelSize);
+            blurredColor += texture(u_backgroundTexture, refractedTexCoord + vec2( 1.0,  1.0) * blurPixelRadius * texelSize);
             blurredColor /= 9.0;
         }
 
         float height_val = getCombinedHeight(current_p_pixel, glass_half_size_pixel, actualCornerRadius, u_sminSmoothing, u_heightTransitionWidth);
         vec4 finalColor = mix(blurredColor, u_overlayColor, height_val * 0.15);
 
+        // 保留生产版本的白色边缘混合高光；coverage 只控制最终透明度，避免圆角外侧出现硬边。
+        // 高光峰值仍位于 SDF 轮廓线上，法线方向因子继续保留边缘的体积感。
         float highlight_dist = abs(dist_for_shape_boundary);
-        float highlight_alpha = 1.0 - smoothstep(0.0, u_highlightWidth, highlight_dist);
-        highlight_alpha = max(0.0, highlight_alpha);
+        float highlight_alpha = 1.0 - smoothstep(
+            0.0,
+            u_highlightWidth,
+            highlight_dist
+        );
         float directionalFactor = (surfaceNormal3D.x * surfaceNormal3D.y + 1.0) * 0.5;
         float finalHighlightAlpha = highlight_alpha * directionalFactor;
-
-        vec4 shadedColor = mix(finalColor, vec4(1.0, 1.0, 1.0, 1.0), finalHighlightAlpha);
-        gl_FragColor = vec4(shadedColor.rgb, shadedColor.a * shapeAlpha);
+        vec4 shadedColor = mix(
+            finalColor,
+            vec4(1.0, 1.0, 1.0, 1.0),
+            finalHighlightAlpha
+        );
+        fragColor = vec4(shadedColor.rgb, shadedColor.a * shapeAlpha);
     }
 `
 
@@ -435,16 +476,20 @@ const fsSource = `
 // ============================================================================
 
 function createShader(
-  glCtx: WebGLRenderingContext,
+  glCtx: WebGL2RenderingContext,
   type: number,
   source: string,
 ): WebGLShader | null {
   const shader = glCtx.createShader(type)
-  if (!shader) return null
+  if (!shader) {
+    rendererError = 'WebGL2 shader allocation failed'
+    return null
+  }
   glCtx.shaderSource(shader, source)
   glCtx.compileShader(shader)
   if (!glCtx.getShaderParameter(shader, glCtx.COMPILE_STATUS)) {
-    console.error('[LiquidGlassRenderer] Shader compile error:', glCtx.getShaderInfoLog(shader))
+    rendererError = `WebGL2 shader compilation failed: ${glCtx.getShaderInfoLog(shader) ?? 'unknown error'}`
+    console.error('[LiquidGlassRenderer]', rendererError)
     glCtx.deleteShader(shader)
     return null
   }
@@ -453,11 +498,17 @@ function createShader(
 
 /** 初始化共享 WebGL 资源（上下文、shader、buffer） */
 function initGL(): boolean {
+  initialized = false
+  contextLost = false
   if (!offscreenCanvas) {
     // 使用隐藏的 HTMLCanvasElement 作为 offscreen（兼容性最好）
     offscreenCanvas = document.createElement('canvas')
     offscreenCanvas.style.display = 'none'
     document.body.appendChild(offscreenCanvas)
+    // context lost/restored 监听只注册一次：canvas 元素跨 initGL/reinitGL 复用，
+    // 若每次 init 都注册，context 多次恢复后回调会重复触发。
+    offscreenCanvas.addEventListener('webglcontextlost', handleContextLost)
+    offscreenCanvas.addEventListener('webglcontextrestored', handleContextRestored)
   }
 
   // 初始尺寸最小化,渲染时按需 resize 到实例尺寸
@@ -466,39 +517,41 @@ function initGL(): boolean {
   offscreenWidth = 1
   offscreenHeight = 1
 
-  gl = offscreenCanvas.getContext('webgl', {
+  gl = offscreenCanvas.getContext('webgl2', {
     premultipliedAlpha: false,
     alpha: true,
     preserveDrawingBuffer: true,
   })
   if (!gl) {
-    console.warn('[LiquidGlassRenderer] WebGL 不可用')
+    rendererError = 'WebGL2 is required but unavailable'
+    console.error(`[LiquidGlassRenderer] ${rendererError}`)
     return false
   }
+  rendererError = ''
 
-  // 新 WebGL context 中 uniform 状态为空,所有实例需要重新上传静态参数。
-  for (const inst of instances.values()) inst.staticUniformKey = ''
+  // 新 WebGL context 中 uniform 状态为空,需要重新上传静态参数。
+  lastStaticUniformKey = ''
 
   // 编译 shader
   const vs = createShader(gl, gl.VERTEX_SHADER, vsSource)
-  // WebGL 1 的导数扩展不是强制能力,不支持时使用固定像素宽度仍保持可渲染。
-  const supportsDerivatives = Boolean(gl.getExtension('OES_standard_derivatives'))
-  const fragmentSource = supportsDerivatives
-    ? fsSource
-    : fsSource
-        .replace('#extension GL_OES_standard_derivatives : enable', '')
-        .replace('max(fwidth(dist_for_shape_boundary), 0.75)', '1.25')
-  const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource)
-  if (!vs || !fs) return false
+  const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource)
+  if (!vs || !fs) {
+    rendererError = 'WebGL2 shader compilation failed'
+    return false
+  }
 
   program = gl.createProgram()!
   gl.attachShader(program, vs)
   gl.attachShader(program, fs)
   gl.linkProgram(program)
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('[LiquidGlassRenderer] Program link error:', gl.getProgramInfoLog(program))
+    rendererError = `WebGL2 program link failed: ${gl.getProgramInfoLog(program) ?? 'unknown error'}`
+    console.error('[LiquidGlassRenderer]', rendererError)
     return false
   }
+  // program 已链接,shader 对象可释放,避免 context 反复恢复时累积泄漏。
+  gl.deleteShader(vs)
+  gl.deleteShader(fs)
 
   // Position buffer（全 quad）
   const positions = [-0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5]
@@ -526,6 +579,7 @@ function initGL(): boolean {
     blurRadius: gl.getUniformLocation(program, 'u_blurRadius'),
     overlayColor: gl.getUniformLocation(program, 'u_overlayColor'),
     highlightWidth: gl.getUniformLocation(program, 'u_highlightWidth'),
+    edgeAaWidth: gl.getUniformLocation(program, 'u_edgeAaWidth'),
     trailPoints: Array.from({ length: MAX_TRAIL_POINTS }, (_, i) =>
       gl!.getUniformLocation(program!, `u_trailPoints[${i}]`),
     ),
@@ -533,19 +587,19 @@ function initGL(): boolean {
     trailStrength: gl.getUniformLocation(program, 'u_trailStrength'),
   }
 
-  // 注册 context lost/restored 事件
-  offscreenCanvas.addEventListener('webglcontextlost', handleContextLost)
-  offscreenCanvas.addEventListener('webglcontextrestored', handleContextRestored)
-
   // 检测 GPU 性能,自动设定渲染缩放比
   renderScale = detectRenderScale(gl)
+  const edgeAaWidth = getEdgeAaWidth(window.devicePixelRatio || 1, renderScale)
+  for (const inst of instances.values()) {
+    inst.uniforms.edgeAaWidth = edgeAaWidth
+  }
 
   initialized = true
   return true
 }
 
 /** 通过 WEBGL_debug_renderer_info 检测 GPU,集显自动降低渲染分辨率 */
-function detectRenderScale(glCtx: WebGLRenderingContext): number {
+function detectRenderScale(glCtx: WebGL2RenderingContext): number {
   const ext = glCtx.getExtension('WEBGL_debug_renderer_info')
   if (!ext) return 1.0
   const renderer = glCtx.getParameter(ext.UNMASKED_RENDERER_WEBGL) as string
@@ -563,14 +617,30 @@ export function getRenderScale(): number {
 
 /** 重新初始化（context restored 后调用） */
 function reinitGL(): boolean {
-  // 清理旧纹理引用（GL 对象已失效）
+  const previousTextures = new Map(textureMap)
   textureMap.clear()
   locs = createEmptyLocs()
   program = null
   positionBuffer = null
   gl = null
 
-  return initGL()
+  const initializedSuccessfully = initGL()
+  if (!initializedSuccessfully) {
+    initialized = false
+    return false
+  }
+
+  for (const [url, entry] of previousTextures) {
+    if (!entry.video) continue
+    entry.videoFrameReady = true
+    entry.videoUploadedFrame = undefined
+    if (!uploadVideoTexture(url, entry.video)) {
+      rendererError = `WebGL2 video texture restore failed: ${url}`
+      initialized = false
+      return false
+    }
+  }
+  return true
 }
 
 // ============================================================================
@@ -586,16 +656,20 @@ function handleContextLost(e: Event) {
 }
 
 function handleContextRestored() {
-  console.info('[LiquidGlassRenderer] WebGL context restored, reinitializing...')
-  if (reinitGL()) {
-    contextLost = false
-    // 重新上传所有已缓存的纹理图片
-    for (const [url] of textureMap) {
-      // 纹理需要从图片重新上传,通知外部
-      textureMap.delete(url)
-    }
-    for (const cb of contextRestoredCallbacks) cb()
+  console.info('[LiquidGlassRenderer] WebGL2 context restored, reinitializing...')
+  if (!reinitGL()) {
+    contextLost = true
+    initialized = false
+    console.error(
+      `[LiquidGlassRenderer] ${rendererError || 'WebGL2 context restoration failed'}`,
+    )
+    for (const cb of contextLostCallbacks) cb()
+    return
   }
+
+  contextLost = false
+  rendererError = ''
+  for (const cb of contextRestoredCallbacks) cb()
 }
 
 // ============================================================================
@@ -931,7 +1005,6 @@ export function registerInstance(
     ready: false,
     onFirstRender,
     hasRenderedOnce: false,
-    staticUniformKey: '',
   })
   return id
 }
@@ -1012,9 +1085,31 @@ export function offContextCallbacks(lostCb: () => void, restoredCb: () => void):
   contextRestoredCallbacks.delete(restoredCb)
 }
 
+/** 渲染器能力与错误状态快照。 */
+export interface RendererStatus {
+  /** 当前渲染器是否已初始化并可绘制。 */
+  available: boolean
+  /** 当前是否使用 WebGL2。 */
+  renderer: 'webgl2' | 'unavailable'
+  /** 最近一次初始化、编译或恢复错误。 */
+  error: string
+  /** WebGL context 是否处于丢失状态。 */
+  contextLost: boolean
+}
+
+/** 获取渲染器能力与错误状态。 */
+export function getRendererStatus(): RendererStatus {
+  return {
+    available: isRendererAvailable(),
+    renderer: isRendererAvailable() ? 'webgl2' : 'unavailable',
+    error: rendererError,
+    contextLost,
+  }
+}
+
 /** 检查渲染器是否可用 */
 export function isRendererAvailable(): boolean {
-  return initialized && !contextLost && gl !== null
+  return initialized && !contextLost && !rendererError && gl !== null && program !== null
 }
 
 // ============================================================================
@@ -1023,9 +1118,9 @@ export function isRendererAvailable(): boolean {
 
 /** 确保渲染器已初始化 */
 function ensureInitialized() {
-  if (initialized) return
+  if (initialized || rendererError) return
   if (!initGL()) {
-    console.warn('[LiquidGlassRenderer] 初始化失败')
+    console.error(`[LiquidGlassRenderer] ${rendererError || 'WebGL2 initialization failed'}`)
     return
   }
   // 启动渲染循环
@@ -1085,8 +1180,9 @@ function renderInstance(inst: GlassInstance): boolean {
     uniforms.blurRadius,
     uniforms.overlayColor,
     uniforms.highlightWidth,
+    uniforms.edgeAaWidth,
   ])
-  if (inst.staticUniformKey !== staticKey) {
+  if (lastStaticUniformKey !== staticKey) {
     gl.uniform1f(locs.texAspect!, uniforms.texAspect)
     gl.uniform1f(locs.cornerRadius!, uniforms.cornerRadius)
     gl.uniform1f(locs.ior!, uniforms.ior)
@@ -1099,7 +1195,8 @@ function renderInstance(inst: GlassInstance): boolean {
     gl.uniform1f(locs.blurRadius!, uniforms.blurRadius)
     gl.uniform4fv(locs.overlayColor!, uniforms.overlayColor)
     gl.uniform1f(locs.highlightWidth!, uniforms.highlightWidth)
-    inst.staticUniformKey = staticKey
+    gl.uniform1f(locs.edgeAaWidth!, uniforms.edgeAaWidth)
+    lastStaticUniformKey = staticKey
   }
   // WebGL uniforms belong to the shared program. Write this per-instance
   // value on every draw so one LiquidGlass cannot leak its blur radius into
@@ -1123,7 +1220,14 @@ function renderInstance(inst: GlassInstance): boolean {
 
   // 绘制
   gl.enable(gl.BLEND)
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+  // 颜色按直通 alpha 混合，alpha 通道单独使用 ONE，避免边缘覆盖率被再次乘以自身。
+  // 否则 shapeAlpha 在清屏透明画布上会变成 shapeAlpha²，既压暗外侧体积感又破坏抗锯齿过渡。
+  gl.blendFuncSeparate(
+    gl.SRC_ALPHA,
+    gl.ONE_MINUS_SRC_ALPHA,
+    gl.ONE,
+    gl.ONE_MINUS_SRC_ALPHA,
+  )
   gl.drawArrays(gl.TRIANGLES, 0, 6)
   metrics.drawCalls++
   gl.disable(gl.BLEND)
