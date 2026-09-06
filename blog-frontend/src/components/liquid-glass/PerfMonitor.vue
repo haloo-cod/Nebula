@@ -110,6 +110,18 @@
         </span>
       </div>
 
+      <div class="perf-row">
+        <span class="perf-label">Renderer</span>
+        <span class="perf-value" :class="rendererStatusClass">{{ rendererStatusText }}</span>
+      </div>
+      <div class="perf-row perf-row--wrap" v-if="rendererError">
+        <span class="perf-value perf-value--bad">{{ rendererError }}</span>
+      </div>
+      <div class="perf-row">
+        <span class="perf-label">圆角 AA</span>
+        <span class="perf-value">WebGL2 fwidth / coverage</span>
+      </div>
+
       <div class="perf-divider"></div>
 
       <div class="perf-row">
@@ -169,6 +181,7 @@ import {
   getRendererMetrics,
   getInstanceStats,
   getVideoTextureStats,
+  getRendererStatus,
   type RendererMetrics,
   type InstanceStats,
 } from '@/components/liquid-glass/liquidGlassRenderer'
@@ -288,6 +301,17 @@ const copyBoundsPerSec = ref(0)
 const videoState = ref('none')
 const resizesPerSec = ref(0)
 
+const rendererStatus = ref(getRendererStatus())
+const rendererStatusText = computed(() => {
+  if (rendererStatus.value.available) return 'WebGL2 可用'
+  if (rendererStatus.value.contextLost) return 'WebGL2 context lost'
+  return 'WebGL2 不可用'
+})
+const rendererStatusClass = computed(() =>
+  rendererStatus.value.available ? 'perf-value--good' : 'perf-value--bad',
+)
+const rendererError = computed(() => rendererStatus.value.error)
+
 let pollId = 0
 let prevMetrics = getRendererMetrics()
 let prevPollTime = performance.now()
@@ -312,6 +336,7 @@ function pollMetrics() {
 
   metrics.value = m
   stats.value = getInstanceStats()
+  rendererStatus.value = getRendererStatus()
   const videos = getVideoTextureStats()
   videoState.value = videos.length
     ? videos

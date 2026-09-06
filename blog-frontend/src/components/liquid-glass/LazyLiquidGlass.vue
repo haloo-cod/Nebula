@@ -2,10 +2,7 @@
   <div
     ref="rootRef"
     class="lazy-liquid-glass"
-    :class="{
-      'lazy-liquid-glass--active': shouldRenderLiquidGlass,
-      'lazy-liquid-glass--fallback': !shouldRenderLiquidGlass,
-    }"
+    :class="{ 'lazy-liquid-glass--active': shouldRenderLiquidGlass }"
   >
     <LiquidGlass
       v-if="shouldRenderLiquidGlass"
@@ -26,9 +23,6 @@
     >
       <slot />
     </LiquidGlass>
-    <div v-else class="lazy-liquid-glass__fallback">
-      <slot />
-    </div>
   </div>
 </template>
 
@@ -163,22 +157,12 @@ onUnmounted(() => {
 
 <style scoped>
 .lazy-liquid-glass,
-.lazy-liquid-glass__effect,
-.lazy-liquid-glass__fallback {
+.lazy-liquid-glass__effect {
   width: 100%;
   height: 100%;
 }
 
 .lazy-liquid-glass {
   display: block;
-}
-
-.lazy-liquid-glass__fallback {
-  border-radius: inherit;
-  overflow: hidden;
-}
-
-.lazy-liquid-glass--fallback .lazy-liquid-glass__fallback {
-  background: transparent;
 }
 </style>
