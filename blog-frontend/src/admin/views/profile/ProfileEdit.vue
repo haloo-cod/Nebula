@@ -46,6 +46,8 @@ const linkForm = ref({ label: '', icon: '', url: '', sort_order: 0 })
 const socialIconOptions = [
   { name: 'github', label: 'GitHub' },
   { name: 'bilibili', label: 'Bilibili' },
+  { name: 'wechat', label: '微信' },
+  { name: 'qq', label: 'QQ' },
   { name: 'youtube', label: 'YouTube' },
   { name: 'telegram', label: 'Telegram' },
   { name: 'twitter', label: 'Twitter / X' },

@@ -9,6 +9,8 @@ import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import { fetchFiles, type UploadedFile } from '@/api/files'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 
 /** 背景图项（匹配后端 BackgroundResponse） */
 interface BackgroundItem {
@@ -48,6 +50,7 @@ const deleting = ref(false)
 const savingOrder = ref(false)
 const draggedId = ref<number | null>(null)
 const orderChanged = ref(false)
+const { storageBackend } = useStorageBackend()
 
 const canReorder = computed(() => Boolean(filterTheme.value && filterDevice.value))
 
@@ -223,7 +226,7 @@ async function handleUpload() {
         const form = new FormData()
         form.append('file', videoFile.value)
         const uploaded = await api.post<{ url: string; mime_type: string; file_size: number }>(
-          '/api/v1/backgrounds/video-upload',
+          `/api/v1/backgrounds/video-upload?storage_backend=${storageBackend.value}`,
           form,
           true,
         )
@@ -530,6 +533,10 @@ onMounted(() => loadBackgrounds())
               videoStatus === 'error' ? '播放失败' : videoStatus === 'ready' ? '可播放' : '检测中'
             }}</span
           >
+          <div class="storage-row">
+            <StorageBackendSelect />
+            <span class="storage-hint">选择“本地视频”上传时生效（本地保留副本，R2 负责分发）</span>
+          </div>
         </el-form-item>
         <el-form-item v-else label="选择图片">
           <div class="image-picker">
@@ -619,6 +626,16 @@ onMounted(() => loadBackgrounds())
 .video-meta {
   display: block;
   margin-top: 6px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+}
+.storage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.storage-hint {
   color: var(--admin-text-secondary, #909399);
   font-size: 12px;
 }

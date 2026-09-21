@@ -16,6 +16,7 @@ class BookListItem(BaseModel):
     file_path: str
     sort_order: int
     created_at: datetime
+    storage_backend: str = "local"
 
     model_config = {"from_attributes": True}
 

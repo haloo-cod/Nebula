@@ -20,3 +20,5 @@ class Book(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
     # 相对于 uploads/books/ 的文件路径
     file_path: Mapped[str] = mapped_column(String(500), default="")
+    storage_backend: Mapped[str] = mapped_column(String(20), default="local")  # 'local' | 'r2'
+    r2_key: Mapped[str | None] = mapped_column(String(500), nullable=True)  # R2 对象键（EPUB 文件）

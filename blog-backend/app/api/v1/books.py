@@ -51,6 +51,7 @@ from app.services.book_download import archive_path, existing_archive_path, norm
 from app.models.treasure import Treasure
 from app.models.analytics import AnalyticsEvent
 from app.services.analytics import get_client_ip, hash_ip, utc_now
+from app.config import settings
 
 router = APIRouter(prefix="/books", tags=["图书"])
 
@@ -69,15 +70,34 @@ def _archive_name(value: str) -> str:
 
 
 def _book_path(book: Book):
-    """解析图书文件路径，并确保文件位于图书存储目录内。"""
+    """解析图书文件路径，并确保文件位于图书存储目录内。
+
+    R2 迁移后本地副本缺失时，先从 R2 回填到本地再返回，
+    保证 epub.js 随机读取与管理端封面操作继续可用。
+    """
     path = BOOKS_DIR / f"{book.slug}.epub"
     try:
         path.resolve().relative_to(BOOKS_DIR.resolve())
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="图书文件路径无效")
     if not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书文件不存在")
+        if book.storage_backend == "r2" and book.r2_key and settings.R2_ENABLED:
+            _refetch_book_from_r2(book, path)
+        if not path.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书文件不存在")
     return path
+
+
+def _refetch_book_from_r2(book: Book, target: Path) -> None:
+    """从 R2 拉回 EPUB 副本到本地缓存目录。失败静默，由调用方兜底 404。"""
+    try:
+        from app.services.r2_storage import get_r2_client
+
+        r2 = get_r2_client()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        r2.client.download_file(r2.bucket, book.r2_key, str(target))
+    except Exception:
+        target.unlink(missing_ok=True)
 
 
 def _epub_resource_name(resource_path: str) -> str:
@@ -434,11 +454,16 @@ async def list_books(
     page_size: int = Query(20, ge=1, le=100),
     keyword: str | None = Query(None, description="搜索关键词（标题/作者模糊匹配）"),
     sort: str = Query("newest", pattern="^(newest|oldest|custom)$"),
+    storage_backend: str | None = Query(
+        None, pattern="^(local|r2)$", description="按存储后端过滤（R2 迁移面板用）"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取图书列表（分页 + 搜索 + 排序）。"""
+    """获取图书列表（分页 + 搜索 + 排序 + 存储后端过滤）。"""
     stmt = select(Book)
 
+    if storage_backend:
+        stmt = stmt.where(Book.storage_backend == storage_backend)
     if keyword:
         pattern = f"%{keyword}%"
         stmt = stmt.where(
@@ -495,13 +520,21 @@ async def create_book(
     title: str = Form(""),
     author: str = Form(""),
     description: str = Form(""),
+    storage_backend: str = Query("local", pattern="^(local|r2)$"),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """上传 EPUB 并创建图书记录"""
+    """上传 EPUB 并创建图书记录
+
+    storage_backend=r2 时本地保存后同步转传 R2（EPUB 本地副本保留，
+    epub.js 随机读取与封面提取依赖本地文件）。
+    """
     if not file.filename or not file.filename.lower().endswith(".epub"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅支持 EPUB 文件")
+
+    if storage_backend == "r2" and not settings.R2_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="R2 未启用，无法使用 r2 存储")
 
     slug = slugify(file.filename)
     filename = f"{slug}.epub"
@@ -526,6 +559,16 @@ async def create_book(
         # 提取封面
         cover_url = extract_cover_image(internal_path, slug)
 
+        # 转传 R2（本地副本保留，供 epub.js 随机读取）
+        r2_key: str | None = None
+        if storage_backend == "r2":
+            from app.services.r2_storage import get_r2_client
+
+            r2_key = internal_path
+            get_r2_client().upload_local_file(
+                r2_key, BOOKS_DIR / filename, content_type="application/epub+zip"
+            )
+
         max_order = (await db.execute(select(func.max(Book.sort_order)))).scalar()
         book = Book(
             slug=slug,
@@ -535,6 +578,8 @@ async def create_book(
             cover_url=cover_url,
             file_path=f"/uploads/books/{filename}",
             sort_order=(max_order + 1) if max_order is not None else 0,
+            storage_backend=storage_backend,
+            r2_key=r2_key,
         )
         db.add(book)
         await db.commit()
@@ -656,8 +701,8 @@ async def delete_book(
     if not book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图书不存在")
 
-    # 删除 EPUB 文件
-    delete_book_files(slug)
+    # 删除 EPUB 文件（本地 + R2 副本）
+    delete_book_files(slug, storage_backend=book.storage_backend, r2_key=book.r2_key)
 
     await db.delete(book)
     await db.commit()

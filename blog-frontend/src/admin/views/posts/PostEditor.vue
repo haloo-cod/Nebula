@@ -11,6 +11,8 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { api, getToken, resolveUrl, BASE_URL } from '@/api/client'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import EmojiPicker from '@/admin/components/EmojiPicker.vue'
 
@@ -63,6 +65,7 @@ const tagInput = ref('')
 /** Vditor 实例 */
 let vditor: Vditor | null = null
 const editorRef = ref<HTMLDivElement | null>(null)
+const { storageBackend } = useStorageBackend()
 
 /** 初始化 Vditor 编辑器 */
 function initVditor(content = '') {
@@ -121,7 +124,8 @@ function initVditor(content = '') {
     value: content,
     upload: {
       // 图片上传配置：直接对接后端图床 API（需要完整 URL，Vditor 不走前端 proxy）
-      url: `${BASE_URL}/api/v1/images/upload`,
+      // 存储后端跟随全局选择器，通过 URL 查询参数传给后端
+      url: `${BASE_URL}/api/v1/images/upload?storage_backend=${storageBackend.value}`,
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
       fieldName: 'file',
       max: 10 * 1024 * 1024, // 10MB
@@ -369,6 +373,12 @@ onBeforeUnmount(() => {
 
     <!-- Markdown 编辑器 -->
     <el-card shadow="never" class="editor-card">
+      <template #header>
+        <div class="editor-card-header">
+          <span>正文内容</span>
+          <StorageBackendSelect />
+        </div>
+      </template>
       <div ref="editorRef" class="vditor-container"></div>
     </el-card>
     <div class="editor-emoji-picker">
@@ -473,6 +483,12 @@ onBeforeUnmount(() => {
 .editor-card {
   border-radius: 12px;
   overflow: visible !important;
+}
+
+.editor-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .editor-card :deep(.el-card__body) {

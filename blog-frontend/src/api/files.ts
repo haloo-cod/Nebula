@@ -4,6 +4,7 @@
  */
 
 import { api, BASE_URL, getToken } from './client'
+import type { StorageBackend } from './images'
 
 /** 后端通用文件记录 */
 export interface UploadedFile {
@@ -22,9 +23,18 @@ interface FileListResponse {
   total: number
 }
 
-/** 获取已上传文件列表 */
-export async function fetchFiles(): Promise<UploadedFile[]> {
-  const response = await api.get<FileListResponse>('/api/v1/files?page=1&page_size=200', true)
+/** 获取已上传文件列表（可按存储后端过滤） */
+export async function fetchFiles(
+  page = 1,
+  pageSize = 200,
+  storageBackend?: StorageBackend,
+): Promise<UploadedFile[]> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  })
+  if (storageBackend) params.set('storage_backend', storageBackend)
+  const response = await api.get<FileListResponse>(`/api/v1/files?${params}`, true)
   return response.items
 }
 
@@ -37,13 +47,14 @@ export function deleteUploadedFile(fileId: number): Promise<void> {
 export function uploadFile(
   file: File,
   onProgress?: (percent: number) => void,
+  storageBackend: StorageBackend = 'local',
 ): Promise<UploadedFile> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const formData = new FormData()
     formData.append('file', file)
 
-    xhr.open('POST', `${BASE_URL}/api/v1/files/upload`)
+    xhr.open('POST', `${BASE_URL}/api/v1/files/upload?storage_backend=${storageBackend}`)
     const token = getToken()
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
@@ -80,14 +91,19 @@ export function uploadFile(
 export async function uploadFiles(
   files: File[],
   onProgress?: (completed: number, total: number, current: string) => void,
+  storageBackend: StorageBackend = 'local',
 ): Promise<{ file: File; result?: UploadedFile; error?: string }[]> {
   const results: { file: File; result?: UploadedFile; error?: string }[] = []
   for (const [index, file] of files.entries()) {
     onProgress?.(index, files.length, file.name)
     try {
-      const result = await uploadFile(file, (percent) => {
-        onProgress?.(index + percent / 100, files.length, file.name)
-      })
+      const result = await uploadFile(
+        file,
+        (percent) => {
+          onProgress?.(index + percent / 100, files.length, file.name)
+        },
+        storageBackend,
+      )
       results.push({ file, result })
     } catch (error: unknown) {
       results.push({ file, error: error instanceof Error ? error.message : '上传失败' })

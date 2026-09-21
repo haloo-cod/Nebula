@@ -53,9 +53,11 @@ export async function fetchBooks(
   pageSize = 20,
   keyword = '',
   sort: BookSort = 'newest',
+  storageBackend?: 'local' | 'r2',
 ): Promise<{ items: Book[]; total: number }> {
   let path = `/api/v1/books?page=${page}&page_size=${pageSize}&sort=${sort}`
   if (keyword.trim()) path += `&keyword=${encodeURIComponent(keyword.trim())}`
+  if (storageBackend) path += `&storage_backend=${storageBackend}`
   const resp = await api.get<BookListResponse>(path)
   return {
     items: resp.items.map(toFrontendBook),

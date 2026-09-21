@@ -24,6 +24,7 @@ import {
   FolderOpened,
   Setting,
   DataAnalysis,
+  UploadFilled,
 } from '@element-plus/icons-vue'
 import { adminMenus } from './AdminMenu'
 
@@ -47,6 +48,7 @@ const iconMap: Record<string, unknown> = {
   FolderOpened,
   Setting,
   DataAnalysis,
+  UploadFilled,
 }
 
 defineProps<{

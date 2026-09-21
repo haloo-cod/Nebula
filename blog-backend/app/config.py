@@ -64,6 +64,14 @@ class Settings(BaseSettings):
         "image/svg+xml",
     ]
 
+    # ===== Cloudflare R2 对象存储 =====
+    R2_ENABLED: bool = False
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = ""
+    R2_PUBLIC_DOMAIN: str = ""  # 可选：自定义域名，如 'https://cdn.yourdomain.com'
+
     # ===== CORS =====
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     # 开发期局域网预览可临时启用，生产环境不要打开：

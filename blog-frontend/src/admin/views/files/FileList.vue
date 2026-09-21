@@ -3,8 +3,12 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Download, Refresh, Upload } from '@element-plus/icons-vue'
-import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { api, getToken, resolveUrl } from '@/api/client'
 import { uploadFiles, type UploadedFile } from '@/api/files'
+import { uploadImage } from '@/api/images'
+import { uploadDirectToR2 } from '@/api/r2Migration'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import { downloadWithProgress } from '@/utils/download'
 
 /** 图床图片记录。 */
@@ -48,6 +52,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const downloading = ref(false)
 const downloadProgress = ref(0)
 const downloadStatus = ref('')
+const { storageBackend } = useStorageBackend()
 
 function formatSize(size: number): string {
   if (size < 1024) return `${size} B`
@@ -131,31 +136,38 @@ async function handleUpload(event: Event) {
   uploadProgress.value = 0
   try {
     if (activeTab.value === 'files') {
-      const results = await uploadFiles(selectedFiles, (completed, total, current) => {
-        uploadProgress.value = Math.round((completed / total) * 100)
-        uploadStatus.value = current ? `正在上传 ${current}` : ''
-      })
-      await loadFiles()
-      const failed = results.filter((result) => result.error)
-      if (failed.length) {
-        ElMessage.warning(`${results.length - failed.length} 个成功，${failed.length} 个失败`)
+      // R2 存储时优先浏览器直传（不经服务器中转），失败自动回退
+      if (storageBackend.value === 'r2') {
+        await uploadFilesDirect(selectedFiles)
+      } else {
+        const results = await uploadFiles(
+          selectedFiles,
+          (completed, total, current) => {
+            uploadProgress.value = Math.round((completed / total) * 100)
+            uploadStatus.value = current ? `正在上传 ${current}` : ''
+          },
+          storageBackend.value,
+        )
+        const failed = results.filter((result) => result.error)
+        if (failed.length) {
+          ElMessage.warning(`${results.length - failed.length} 个成功，${failed.length} 个失败`)
+        }
       }
+      await loadFiles()
     } else {
       let success = 0
       let failed = 0
       for (const [index, file] of selectedFiles.entries()) {
         try {
           uploadStatus.value = `正在上传 ${file.name}`
-          const formData = new FormData()
-          formData.append('file', file)
-          const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-            body: formData,
-            credentials: 'include',
-          })
-          if (response.ok) success++
-          else failed++
+          if (storageBackend.value === 'r2') {
+            // 直传（图片记录无需尺寸字段，由后端登记时兜底为 0）
+            const record = await uploadDirectToR2(file, 'images')
+            if (!record) await uploadImage(file, 'r2')
+          } else {
+            await uploadImage(file, storageBackend.value)
+          }
+          success++
         } catch {
           failed++
         }
@@ -174,6 +186,26 @@ async function handleUpload(event: Event) {
     uploadStatus.value = ''
     input.value = ''
   }
+}
+
+/** 逐个文件浏览器直传 R2，进度按完成数计算。 */
+async function uploadFilesDirect(selectedFiles: File[]) {
+  let failed = 0
+  for (const [index, file] of selectedFiles.entries()) {
+    uploadStatus.value = `正在直传 ${file.name}`
+    try {
+      const record = await uploadDirectToR2(file, 'files', (percent) => {
+        uploadProgress.value = Math.round(
+          ((index + percent / 100) / selectedFiles.length) * 100,
+        )
+      })
+      if (!record) throw new Error('直传不可用')
+    } catch (err: unknown) {
+      failed++
+      ElMessage.error(`${file.name} 直传失败：${err instanceof Error ? err.message : '未知错误'}`)
+    }
+  }
+  if (failed) ElMessage.warning(`${selectedFiles.length - failed} 个成功，${failed} 个失败`)
 }
 
 async function downloadFile(file: UploadedFile) {
@@ -327,6 +359,7 @@ onMounted(loadFiles)
         >
           {{ activeTab === 'files' ? '上传文件' : '上传图片' }}
         </el-button>
+        <StorageBackendSelect v-if="activeTab !== 'archives'" />
         <input ref="fileInput" type="file" class="file-input" multiple @change="handleUpload" />
       </div>
     </div>

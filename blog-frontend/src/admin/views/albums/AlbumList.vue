@@ -6,7 +6,10 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ArrowLeft } from '@element-plus/icons-vue'
-import { api, getToken, resolveUrl, BASE_URL } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import { uploadImage } from '@/api/images'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 
 /** 相册列表项 */
@@ -38,6 +41,7 @@ interface AlbumDetail extends AlbumItem {
 
 // ============ 相册列表状态 ============
 const loading = ref(false)
+const { storageBackend } = useStorageBackend()
 const albums = ref<AlbumItem[]>([])
 const showAlbumDialog = ref(false)
 const isEditAlbum = ref(false)
@@ -168,20 +172,7 @@ async function handlePhotoUpload(event: Event) {
   try {
     for (const file of files) {
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        const token = getToken()
-        const uploadResp = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-          credentials: 'include',
-        })
-        if (!uploadResp.ok) {
-          const error = await uploadResp.json().catch(() => ({ detail: '图片上传失败' }))
-          throw new Error(error.detail || '图片上传失败')
-        }
-        const imageData = await uploadResp.json()
+        const imageData = await uploadImage(file, storageBackend.value)
         await api.post(
           `/api/v1/albums/${currentAlbum.value.id}/photos`,
           { image_id: imageData.id },
@@ -319,6 +310,7 @@ onMounted(() => loadAlbums())
           <el-button type="primary" :loading="uploading" @click="openPhotoPicker">
             <el-icon><Plus /></el-icon>上传照片
           </el-button>
+          <StorageBackendSelect />
           <el-button :disabled="uploading" @click="showPhotoPicker = true">
             从图片库选择
           </el-button>

@@ -112,3 +112,26 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
         # 该字段既保存创建归档时的默认到期时间，也保存管理员手动延期后的时间；
         # 每次启动都按 created_at 重写会覆盖手动设置，并可能立即触发过期清理。
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_analytics_events_occurred_at ON analytics_events (occurred_at)"))
+
+        # R2 对象存储字段：storage_backend 记录文件实际位置，r2_key 为对象键。
+        r2_columns = {
+            "uploaded_images": "ix_uploaded_images_storage_backend",
+            "uploaded_files": "ix_uploaded_files_storage_backend",
+            "backgrounds": "ix_backgrounds_storage_backend",
+            "books": "ix_books_storage_backend",
+        }
+        for table, index_name in r2_columns.items():
+            table_columns = await conn.run_sync(
+                lambda sync_conn, t=table: {
+                    column["name"] for column in inspect(sync_conn).get_columns(t)
+                }
+            )
+            if "storage_backend" not in table_columns:
+                await conn.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN storage_backend VARCHAR(20) NOT NULL DEFAULT 'local'")
+                )
+            if "r2_key" not in table_columns:
+                await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN r2_key VARCHAR(500)"))
+            await conn.execute(
+                text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} (storage_backend)")
+            )
