@@ -19,3 +19,5 @@ class UploadedFile(Base, TimestampMixin):
     url: Mapped[str] = mapped_column(String(500), default="")
     file_size: Mapped[int] = mapped_column(BigInteger, default=0)
     mime_type: Mapped[str] = mapped_column(String(200), default="")
+    storage_backend: Mapped[str] = mapped_column(String(20), default="local")  # 'local' | 'r2'
+    r2_key: Mapped[str | None] = mapped_column(String(500), nullable=True)  # R2 对象键

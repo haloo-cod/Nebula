@@ -5,10 +5,11 @@ FastAPI 应用入口
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import delete, select, text
+from fastapi.responses import StreamingResponse, FileResponse
+from sqlalchemy import delete, select, text, or_
 
 from app.api.v1.router import router as v1_router
 from app.config import settings, validate_production_settings
@@ -92,18 +93,112 @@ app = FastAPI(
 # 中间件
 setup_cors(app)
 
-# 仅公开图片目录；普通文件、EPUB 和 ZIP 必须通过鉴权 API 访问。
-static_images = CORSMiddleware(
-    app=StaticFiles(directory=str(settings.UPLOAD_DIR / "images")),
-    allow_origins=settings.CORS_ORIGINS,
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
-# 局域网开发需要开放图片跨域时，可将 allow_origins 改为 [] 并恢复：
-# allow_origin_regex=".*" if settings.CORS_ALLOW_ALL else None,
-# 生产环境不要启用任意 Origin + credentials。
-app.mount("/uploads/images", static_images, name="uploaded-images")
-app.mount("/uploads/backgrounds", StaticFiles(directory=str(settings.UPLOAD_DIR / "backgrounds")), name="uploaded-backgrounds")
+# 统一文件分发路由（支持本地和 R2 动态判断）
+@app.get("/uploads/{file_path:path}")
+async def serve_upload_file(file_path: str, db: AsyncSessionLocal = Depends(lambda: AsyncSessionLocal())):
+    """
+    统一文件分发：根据数据库 storage_backend 动态路由
+    - local → 本地磁盘
+    - r2 + 自定义域名 → 302 重定向到 R2 公开域名（浏览器直连 Cloudflare，不占服务器带宽）
+    - r2 无自定义域名 → 后端流式代理
+    """
+
+    def _r2_redirect(r2_key: str):
+        """配置了公开域名时直接重定向，让浏览器直连 R2/CDN。"""
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(
+            get_r2_client().get_public_url(r2_key), status_code=307
+        )
+
+    from app.models.image import UploadedImage
+    from app.models.file import UploadedFile
+    from app.models.background import Background
+
+    try:
+        # 1. 尝试从 UploadedImage 查找
+        result = await db.execute(
+            select(UploadedImage).where(
+                or_(
+                    UploadedImage.filename == file_path,
+                    UploadedImage.filename == f"images/{file_path}",
+                )
+            )
+        )
+        image = result.scalar_one_or_none()
+        if image:
+            if image.storage_backend == "r2" and image.r2_key and settings.R2_ENABLED:
+                from app.services.r2_storage import get_r2_client
+
+                if settings.R2_PUBLIC_DOMAIN:
+                    return _r2_redirect(image.r2_key)
+                r2 = get_r2_client()
+                stream = r2.download_stream(image.r2_key)
+                return StreamingResponse(stream, media_type=image.mime_type or "application/octet-stream")
+            else:
+                local_path = settings.UPLOAD_DIR / image.filename
+                if not local_path.is_file():
+                    raise HTTPException(status_code=404, detail="文件不存在")
+                return FileResponse(local_path, media_type=image.mime_type)
+
+        # 2. 尝试从 UploadedFile 查找
+        result = await db.execute(
+            select(UploadedFile).where(
+                or_(
+                    UploadedFile.filename == file_path,
+                    UploadedFile.filename == f"files/{file_path}",
+                )
+            )
+        )
+        file_record = result.scalar_one_or_none()
+        if file_record:
+            if file_record.storage_backend == "r2" and file_record.r2_key and settings.R2_ENABLED:
+                from app.services.r2_storage import get_r2_client
+
+                if settings.R2_PUBLIC_DOMAIN:
+                    return _r2_redirect(file_record.r2_key)
+                r2 = get_r2_client()
+                stream = r2.download_stream(file_record.r2_key)
+                return StreamingResponse(stream, media_type=file_record.mime_type or "application/octet-stream")
+            else:
+                local_path = settings.UPLOAD_DIR / file_record.filename
+                if not local_path.is_file():
+                    raise HTTPException(status_code=404, detail="文件不存在")
+                return FileResponse(local_path, media_type=file_record.mime_type)
+
+        # 3. 尝试从 Background 查找（视频）
+        if file_path.startswith("backgrounds/"):
+            result = await db.execute(
+                select(Background).where(Background.media_url == f"/uploads/{file_path}")
+            )
+            background = result.scalar_one_or_none()
+            if background:
+                if background.storage_backend == "r2" and background.r2_key and settings.R2_ENABLED:
+                    from app.services.r2_storage import get_r2_client
+
+                    if settings.R2_PUBLIC_DOMAIN:
+                        return _r2_redirect(background.r2_key)
+                    r2 = get_r2_client()
+                    stream = r2.download_stream(background.r2_key)
+                    return StreamingResponse(stream, media_type=background.mime_type or "video/mp4")
+                else:
+                    local_path = settings.UPLOAD_DIR / file_path
+                    if not local_path.is_file():
+                        raise HTTPException(status_code=404, detail="文件不存在")
+                    return FileResponse(local_path, media_type=background.mime_type or "video/mp4")
+
+        # 4. 兜底：直接尝试本地文件
+        local_path = settings.UPLOAD_DIR / file_path
+        if local_path.is_file():
+            return FileResponse(local_path)
+
+        raise HTTPException(status_code=404, detail="文件不存在")
+    finally:
+        await db.close()
+
+
+# 仅图片目录保留旧的静态挂载（作为降级方案）
+# 生产环境可逐步移除，全部走动态路由
 
 # API 路由
 app.include_router(v1_router)

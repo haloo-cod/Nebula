@@ -60,6 +60,7 @@ async def list_backgrounds(
             "device": bg.device,
             "sort_order": bg.sort_order,
             "created_at": bg.created_at,
+            "storage_backend": bg.storage_backend,
         }
         for bg, url in rows
     ]

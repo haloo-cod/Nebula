@@ -90,7 +90,7 @@ async def test_referenced_file_cannot_be_deleted(db_session, monkeypatch):
     await db_session.commit()
     deleted = False
 
-    def fake_delete(_):
+    def fake_delete(filename, storage_backend="local"):
         nonlocal deleted
         deleted = True
 
@@ -105,8 +105,12 @@ async def test_referenced_file_cannot_be_deleted(db_session, monkeypatch):
 @pytest.mark.asyncio
 async def test_unreferenced_file_can_be_deleted(db_session, monkeypatch):
     record = await add_file(db_session)
-    deleted_names = []
-    monkeypatch.setattr(files_api, "delete_file", deleted_names.append)
+    deleted_calls = []
+
+    def fake_delete(filename, storage_backend="local"):
+        deleted_calls.append((filename, storage_backend))
+
+    monkeypatch.setattr(files_api, "delete_file", fake_delete)
     await files_api.remove_file(record.id, db_session, None)
-    assert deleted_names == [record.filename]
+    assert deleted_calls == [(record.filename, record.storage_backend)]
     assert await db_session.get(UploadedFile, record.id) is None

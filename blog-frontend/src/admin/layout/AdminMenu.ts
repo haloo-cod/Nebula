@@ -32,4 +32,5 @@ export const adminMenus: AdminMenuItem[] = [
   { path: '/admin/users', title: '用户管理', icon: 'UserFilled' },
   { path: '/admin/profile', title: '个人资料', icon: 'User' },
   { path: '/admin/site', title: '站点配置', icon: 'Setting' },
+  { path: '/admin/storage/r2-migration', title: 'R2 迁移', icon: 'UploadFilled' },
 ]

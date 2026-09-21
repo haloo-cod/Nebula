@@ -26,10 +26,14 @@ router = APIRouter(prefix="/images", tags=["图床"])
 @router.post("/upload", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
 async def upload_image(
     file: UploadFile = File(...),
+    storage_backend: str = Query("local", pattern="^(local|r2)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """上传图片到图床"""
+    """
+    上传图片到图床
+    - storage_backend: 'local' | 'r2'（默认 'local'）
+    """
     # 验证 MIME 类型
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -37,11 +41,18 @@ async def upload_image(
             detail=f"不支持的文件类型: {file.content_type}",
         )
 
+    # R2 启用检查
+    if storage_backend == "r2" and not settings.R2_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="R2 存储未启用，请检查配置",
+        )
+
     # 生成路径
     relative_path, url = generate_upload_path(file.filename or "image.png")
 
-    # 保存文件
-    file_size = await save_upload_file(file, relative_path)
+    # 保存文件（根据 storage_backend 自动选择）
+    file_size = await save_upload_file(file, relative_path, storage_backend)
 
     if file_size > settings.MAX_IMAGE_SIZE:
         delete_file(relative_path)
@@ -71,6 +82,8 @@ async def upload_image(
         width=width,
         height=height,
         mime_type=file.content_type or "",
+        storage_backend=storage_backend,
+        r2_key=relative_path if storage_backend == "r2" else None,
     )
     db.add(record)
     await db.commit()
@@ -82,17 +95,24 @@ async def upload_image(
 async def list_images(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    storage_backend: str | None = Query(None, pattern="^(local|r2)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """获取图床图片列表（分页）"""
+    """获取图床图片列表（分页，可按存储后端过滤）"""
     offset = (page - 1) * page_size
 
-    total_result = await db.execute(select(func.count(UploadedImage.id)))
+    count_stmt = select(func.count(UploadedImage.id))
+    list_stmt = select(UploadedImage)
+    if storage_backend:
+        count_stmt = count_stmt.where(UploadedImage.storage_backend == storage_backend)
+        list_stmt = list_stmt.where(UploadedImage.storage_backend == storage_backend)
+
+    total_result = await db.execute(count_stmt)
     total = total_result.scalar() or 0
 
     result = await db.execute(
-        select(UploadedImage)
+        list_stmt
         .order_by(UploadedImage.created_at.desc())
         .offset(offset)
         .limit(page_size)
@@ -138,8 +158,8 @@ async def delete_image(
     if references:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"图片正在使用：{'、'.join(references)}，请先解除引用")
 
-    # 删除文件
-    delete_file(image.filename)
+    # 删除文件（支持本地和 R2）
+    delete_file(image.filename, storage_backend=image.storage_backend)
     # 删除记录
     await db.delete(image)
     await db.commit()

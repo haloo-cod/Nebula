@@ -3,7 +3,10 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
-import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import { uploadImage } from '@/api/images'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 
 /** 图床图片记录。 */
 export interface PickerImage {
@@ -32,6 +35,7 @@ const emit = defineEmits<{
 const images = ref<PickerImage[]>([])
 const loading = ref(false)
 const uploading = ref(false)
+const { storageBackend } = useStorageBackend()
 const uploadInput = ref<HTMLInputElement | null>(null)
 const keyword = ref('')
 const selectedId = ref<number | null>(null)
@@ -108,19 +112,7 @@ async function handleUpload(event: Event) {
   if (!file) return
   uploading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      body: formData,
-      credentials: 'include',
-    })
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ detail: '图片上传失败' }))
-      throw new Error(body.detail || '图片上传失败')
-    }
-    const image = (await response.json()) as PickerImage
+    const image = await uploadImage(file, storageBackend.value)
     await loadImages()
     selectedId.value = image.id
     ElMessage.success('图片上传成功，已选中')
@@ -158,6 +150,7 @@ watch(
       <el-button type="primary" plain :icon="Upload" :loading="uploading" @click="openUpload">
         上传新图片
       </el-button>
+      <StorageBackendSelect />
       <input
         ref="uploadInput"
         type="file"

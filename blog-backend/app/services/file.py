@@ -21,8 +21,16 @@ def generate_file_path(original_name: str) -> str:
     return f"files/{uuid.uuid4().hex}{suffixes}"
 
 
-async def save_file(file: UploadFile, relative_path: str) -> int:
-    """按块保存上传文件，返回文件大小，不对文件类型和大小设应用层限制。"""
+async def save_file(file: UploadFile, relative_path: str, storage_backend: str = "local") -> int:
+    """
+    按块保存上传文件，返回文件大小，不对文件类型和大小设应用层限制。
+    storage_backend: 'local' | 'r2'
+    """
+    if storage_backend == "r2" and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+
+        r2 = get_r2_client()
+        return await r2.upload_file(relative_path, file, content_type=file.content_type)
 
     full_path = settings.UPLOAD_DIR / relative_path
     full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,7 +54,14 @@ def get_file_path(relative_path: str) -> Path:
     return settings.UPLOAD_DIR / relative_path
 
 
-def delete_file(relative_path: str) -> None:
-    """删除磁盘上的上传文件。"""
+def delete_file(relative_path: str, storage_backend: str = "local") -> None:
+    """删除上传文件（本地磁盘或 R2）。"""
+
+    if storage_backend == "r2" and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+
+        r2 = get_r2_client()
+        r2.delete_file(relative_path)
+        return
 
     get_file_path(relative_path).unlink(missing_ok=True)

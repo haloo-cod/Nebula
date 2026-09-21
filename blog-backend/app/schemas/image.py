@@ -16,6 +16,8 @@ class ImageResponse(BaseModel):
     height: int
     mime_type: str
     created_at: datetime
+    storage_backend: str = "local"
+    r2_key: str | None = None
 
     model_config = {"from_attributes": True}
 

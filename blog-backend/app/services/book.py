@@ -45,10 +45,14 @@ async def save_epub_upload(file: UploadFile, filename: str) -> Path:
     return final_path
 
 
-def delete_book_files(slug: str) -> None:
-    """删除指定 slug 的 EPUB 及其提取封面。"""
+def delete_book_files(slug: str, storage_backend: str = "local", r2_key: str | None = None) -> None:
+    """删除指定 slug 的 EPUB 及其提取封面（本地 + R2 副本）。"""
 
     (BOOKS_DIR / f"{slug}.epub").unlink(missing_ok=True)
+    if storage_backend == "r2" and r2_key and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+
+        get_r2_client().delete_file(r2_key)
     if BOOK_COVERS_DIR.exists():
         for cover_path in BOOK_COVERS_DIR.glob(f"{slug}_cover.*"):
             cover_path.unlink(missing_ok=True)

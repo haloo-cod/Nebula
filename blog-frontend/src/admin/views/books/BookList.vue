@@ -15,8 +15,11 @@ import {
   Upload,
 } from '@element-plus/icons-vue'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { uploadImage } from '@/api/images'
 import type { BookSort } from '@/api/books'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import { downloadWithProgress } from '@/utils/download'
 
 /** 图书列表项（匹配后端 BookListItem） */
@@ -65,6 +68,7 @@ const uploadForm = ref({ title: '', author: '', description: '' })
 const showEditDialog = ref(false)
 const savingEdit = ref(false)
 const extractingCover = ref(false)
+const { storageBackend } = useStorageBackend()
 const coverInputRef = ref<HTMLInputElement | null>(null)
 const editingBook = ref<BookItem | null>(null)
 const editForm = ref({ title: '', author: '', description: '', cover_url: '', sort_order: 0 })
@@ -191,7 +195,7 @@ function uploadBook(task: BookUploadTask): Promise<void> {
     formData.append('author', isSingleUpload.value ? uploadForm.value.author : '')
     formData.append('description', isSingleUpload.value ? uploadForm.value.description : '')
 
-    xhr.open('POST', `${BASE_URL}/api/v1/books`)
+    xhr.open('POST', `${BASE_URL}/api/v1/books?storage_backend=${storageBackend.value}`)
     const token = getToken()
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.upload.addEventListener('progress', (event) => {
@@ -432,19 +436,7 @@ async function handleCoverUpload(event: Event) {
   if (!file) return
   savingEdit.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const token = getToken()
-    const response = await fetch(`${BASE_URL}/api/v1/images/upload`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    })
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ detail: '封面上传失败' }))
-      throw new Error(body.detail || '封面上传失败')
-    }
-    const image = (await response.json()) as { url: string }
+    const image = await uploadImage(file, storageBackend.value)
     editForm.value.cover_url = image.url
     ElMessage.success('封面已上传，保存后生效')
   } catch (err: unknown) {
@@ -747,6 +739,8 @@ onMounted(() => loadData())
           >选择 EPUB（可多选）</el-button
         >
         <span>已选择 {{ uploadQueue.length }} 本</span>
+        <StorageBackendSelect />
+        <span class="storage-hint">EPUB 始终保留服务器本地副本，R2 作为分发入口</span>
         <input
           ref="fileInputRef"
           type="file"
@@ -859,6 +853,7 @@ onMounted(() => loadData())
             <div v-else class="cover-preview cover-preview--empty">无封面</div>
             <div class="cover-actions">
               <el-button plain :icon="Upload" @click="openCoverPicker">上传封面</el-button>
+              <StorageBackendSelect />
               <el-button plain @click="openCoverCandidates">从 EPUB 选择</el-button>
               <el-button v-if="editForm.cover_url" @click="editForm.cover_url = ''"
                 >清空封面</el-button
@@ -1103,6 +1098,9 @@ onMounted(() => loadData())
   margin-bottom: 14px;
   color: var(--admin-text-secondary, #909399);
   font-size: 13px;
+}
+.storage-hint {
+  font-size: 12px;
 }
 .file-input {
   display: none;

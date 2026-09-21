@@ -9,6 +9,8 @@ import { RefreshRight } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import EmojiPicker from '@/admin/components/EmojiPicker.vue'
 
@@ -19,6 +21,7 @@ interface AboutContent {
 }
 
 const editorRef = ref<HTMLDivElement | null>(null)
+const { storageBackend } = useStorageBackend()
 const loading = ref(true)
 const saving = ref(false)
 const editorReady = ref(false)
@@ -86,7 +89,8 @@ function initVditor(content: string) {
     cache: { enable: false },
     value: content,
     upload: {
-      url: `${BASE_URL}/api/v1/images/upload`,
+      // 存储后端跟随全局选择器，通过 URL 查询参数传给后端
+      url: `${BASE_URL}/api/v1/images/upload?storage_backend=${storageBackend.value}`,
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
       fieldName: 'file',
       max: 10 * 1024 * 1024,
@@ -232,6 +236,12 @@ onBeforeUnmount(() => {
     </el-card>
 
     <el-card shadow="never" class="editor-card" v-loading="loading">
+      <template #header>
+        <div class="editor-card-header">
+          <span>正文内容</span>
+          <StorageBackendSelect />
+        </div>
+      </template>
       <el-result v-if="error" icon="error" title="内容加载失败" :sub-title="error">
         <template #extra>
           <el-button type="primary" :icon="RefreshRight" @click="loadContent">重新加载</el-button>
@@ -288,6 +298,11 @@ onBeforeUnmount(() => {
   min-height: 664px;
   border-radius: 12px;
   overflow: visible !important;
+}
+.editor-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .cover-card {
   border-radius: 12px;

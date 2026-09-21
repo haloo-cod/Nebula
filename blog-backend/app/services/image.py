@@ -1,6 +1,5 @@
 """
-图片上传 service — 本地文件存储
-未来切 R2 时替换此文件即可
+图片上传服务 — 支持本地存储和 R2
 """
 
 import uuid
@@ -25,21 +24,35 @@ def generate_upload_path(original_name: str) -> tuple[str, str]:
     return relative_path, f"/uploads/{relative_path}"
 
 
-async def save_upload_file(file: UploadFile, relative_path: str) -> int:
+async def save_upload_file(
+    file: UploadFile,
+    relative_path: str,
+    storage_backend: str = "local"
+) -> int:
     """
-    保存上传文件到本地磁盘
+    保存上传文件（支持本地或 R2）
     返回文件大小（bytes）
     """
-    full_path = settings.UPLOAD_DIR / relative_path
-    full_path.parent.mkdir(parents=True, exist_ok=True)
+    if storage_backend == "r2" and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+        r2 = get_r2_client()
+        return await r2.upload_file(relative_path, file, content_type=file.content_type)
+    else:
+        # 本地存储
+        full_path = settings.UPLOAD_DIR / relative_path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        content = await file.read()
+        full_path.write_bytes(content)
+        return len(content)
 
-    content = await file.read()
-    full_path.write_bytes(content)
-    return len(content)
 
-
-def delete_file(relative_path: str) -> None:
-    """删除本地文件"""
-    full_path = settings.UPLOAD_DIR / relative_path
-    if full_path.exists():
-        full_path.unlink()
+def delete_file(relative_path: str, storage_backend: str = "local") -> None:
+    """删除文件（支持本地/R2）"""
+    if storage_backend == "r2" and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+        r2 = get_r2_client()
+        r2.delete_file(relative_path)
+    else:
+        full_path = settings.UPLOAD_DIR / relative_path
+        if full_path.exists():
+            full_path.unlink()

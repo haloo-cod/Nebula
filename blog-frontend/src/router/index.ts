@@ -254,6 +254,11 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-site',
         component: () => import('../admin/views/site/SiteConfig.vue'),
       },
+      {
+        path: 'storage/r2-migration',
+        name: 'admin-r2-migration',
+        component: () => import('../admin/views/storage/R2Migration.vue'),
+      },
     ],
   },
 ]

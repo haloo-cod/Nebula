@@ -52,6 +52,7 @@ class BackgroundResponse(BaseModel):
     device: str
     sort_order: int
     created_at: datetime
+    storage_backend: str = "local"  # 视频背景的存储后端（R2 迁移面板用）
 
     model_config = {"from_attributes": True}
 

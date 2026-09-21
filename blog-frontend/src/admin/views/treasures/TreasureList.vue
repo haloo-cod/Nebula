@@ -8,6 +8,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Plus, Upload } from '@element-plus/icons-vue'
 import { api } from '@/api/client'
 import { deleteUploadedFile, fetchFiles, uploadFile, type UploadedFile } from '@/api/files'
+import { useStorageBackend } from '@/admin/composables/useStorageBackend'
+import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 
 /** 藏宝阁项（匹配后端 TreasureResponse） */
 interface TreasureItem {
@@ -41,6 +43,7 @@ interface BookArchiveJob {
 }
 
 const loading = ref(false)
+const { storageBackend } = useStorageBackend()
 const treasures = ref<TreasureItem[]>([])
 const categories = ref<string[]>([])
 const filterCategory = ref('')
@@ -183,9 +186,13 @@ async function handleFileUpload(event: Event) {
   uploadingFile.value = true
   uploadProgress.value = 0
   try {
-    const uploaded = await uploadFile(file, (percent) => {
-      uploadProgress.value = percent
-    })
+    const uploaded = await uploadFile(
+      file,
+      (percent) => {
+        uploadProgress.value = percent
+      },
+      storageBackend.value,
+    )
     uploadedFiles.value.unshift(uploaded)
     form.value.download_file = uploaded.url
     ElMessage.success('文件上传成功，已关联到当前资源')
@@ -416,6 +423,7 @@ onMounted(() => {
                 <el-icon><Upload /></el-icon>
                 {{ uploadingFile ? `上传中 ${uploadProgress}%` : '上传新文件' }}
               </el-button>
+              <StorageBackendSelect />
               <input
                 ref="fileInputRef"
                 type="file"

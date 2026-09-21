@@ -5,11 +5,13 @@
 from pathlib import Path
 from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.database import get_db
+from app.models.background import Background
 from app.models.user import User
 from app.schemas.background import (
     BackgroundCreate,
@@ -41,8 +43,30 @@ def _safe_video_path(filename: str) -> Path:
 
 
 @router.get("/media/{filename:path}")
-async def read_background_video(filename: str, request: Request):
-    """公开以内联方式读取本地视频，并支持浏览器 Range 分段请求。"""
+async def read_background_video(
+    filename: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """公开以内联方式读取视频，并支持浏览器 Range 分段请求。
+
+    存储路由：记录为 r2 时优先走 R2（配置公开域名则 307 重定向让浏览器
+    直连 CDN，否则后端流式代理），本地文件始终作为兜底。
+    """
+    if settings.R2_ENABLED:
+        result = await db.execute(
+            select(Background).where(Background.media_url == f"/api/v1/backgrounds/media/{filename}")
+        )
+        background = result.scalar_one_or_none()
+        if background and background.storage_backend == "r2" and background.r2_key:
+            from app.services.r2_storage import get_r2_client
+
+            r2 = get_r2_client()
+            if settings.R2_PUBLIC_DOMAIN:
+                return RedirectResponse(r2.get_public_url(background.r2_key), status_code=307)
+            media_type = background.mime_type or "video/mp4"
+            return StreamingResponse(r2.download_stream(background.r2_key), media_type=media_type)
+
     path = _safe_video_path(filename)
     size = path.stat().st_size
     start, end = 0, size - 1
@@ -92,10 +116,17 @@ async def read_background_video(filename: str, request: Request):
     return StreamingResponse(iterator(), status_code=status_code, headers=headers, media_type=mime)
 
 @router.post("/video-upload")
-async def upload_background_video(file: UploadFile = File(...), _: User = Depends(require_admin)):
+async def upload_background_video(
+    storage_backend: str = Query("local", pattern="^(local|r2)$"),
+    file: UploadFile = File(...),
+    _: User = Depends(require_admin),
+):
+    """上传背景视频。storage_backend=r2 时写盘后同步转传 R2（本地副本保留作兜底）。"""
     suffix = Path(file.filename or "").suffix.lower()
     if VIDEO_TYPES.get(file.content_type or "") != suffix:
         raise HTTPException(status_code=400, detail="仅支持 MIME 与扩展名匹配的 MP4、WebM 或 MOV 视频")
+    if storage_backend == "r2" and not settings.R2_ENABLED:
+        raise HTTPException(status_code=400, detail="R2 未启用，无法使用 r2 存储")
     relative = Path("backgrounds") / f"{uuid4().hex}{suffix}"
     target = settings.UPLOAD_DIR / relative
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -107,12 +138,24 @@ async def upload_background_video(file: UploadFile = File(...), _: User = Depend
                 if size > MAX_VIDEO_SIZE:
                     raise HTTPException(status_code=413, detail=f"视频不能超过 {MAX_VIDEO_SIZE // (1024 * 1024)}MB")
                 output.write(chunk)
+        if storage_backend == "r2":
+            from app.services.r2_storage import get_r2_client
+
+            get_r2_client().upload_local_file(
+                str(relative), target, content_type=file.content_type
+            )
     except Exception:
         target.unlink(missing_ok=True)
         raise
     finally:
         await file.close()
-    return {"url": f"/api/v1/backgrounds/media/{target.name}", "media_type": "video", "mime_type": file.content_type or "", "file_size": size}
+    return {
+        "url": f"/api/v1/backgrounds/media/{target.name}",
+        "media_type": "video",
+        "mime_type": file.content_type or "",
+        "file_size": size,
+        "storage_backend": storage_backend,
+    }
 
 
 @router.get("", response_model=BackgroundListResponse)

@@ -5,7 +5,7 @@
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse as DownloadResponse
+from fastapi.responses import FileResponse as DownloadResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.models.treasure import Treasure
 from app.models.user import User
 from app.schemas.file import FileListResponse, FileResponse
 from app.services.file import delete_file, generate_file_path, get_file_path, save_file
+from app.config import settings
 from app.services.analytics import get_client_ip, hash_ip, utc_now
 from app.models.analytics import AnalyticsEvent
 
@@ -26,20 +27,31 @@ router = APIRouter(prefix="/files", tags=["文件"])
 @router.post("/upload", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
+    storage_backend: str = Query("local", pattern="^(local|r2)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """上传任意类型文件，不设置应用层文件大小限制。"""
+    """
+    上传任意类型文件，不设置应用层文件大小限制
+    - storage_backend: 'local' | 'r2'（默认 'local'）
+    """
+    if storage_backend == "r2" and not settings.R2_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="R2 存储未启用",
+        )
 
     original_name = file.filename or "download"
     relative_path = generate_file_path(original_name)
-    file_size = await save_file(file, relative_path)
+    file_size = await save_file(file, relative_path, storage_backend)
 
     record = UploadedFile(
         filename=relative_path,
         original_name=original_name,
         file_size=file_size,
         mime_type=file.content_type or "application/octet-stream",
+        storage_backend=storage_backend,
+        r2_key=relative_path if storage_backend == "r2" else None,
     )
     db.add(record)
     try:
@@ -49,7 +61,7 @@ async def upload_file(
         await db.refresh(record)
     except Exception:
         await db.rollback()
-        delete_file(relative_path)
+        delete_file(relative_path, storage_backend=storage_backend)
         raise
     finally:
         await file.close()
@@ -61,15 +73,22 @@ async def upload_file(
 async def list_files(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    storage_backend: str | None = Query(None, pattern="^(local|r2)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """分页获取已上传的通用文件。"""
+    """分页获取已上传的通用文件，可按存储后端过滤。"""
 
-    total_result = await db.execute(select(func.count(UploadedFile.id)))
+    count_stmt = select(func.count(UploadedFile.id))
+    list_stmt = select(UploadedFile)
+    if storage_backend:
+        count_stmt = count_stmt.where(UploadedFile.storage_backend == storage_backend)
+        list_stmt = list_stmt.where(UploadedFile.storage_backend == storage_backend)
+
+    total_result = await db.execute(count_stmt)
     total = total_result.scalar() or 0
     result = await db.execute(
-        select(UploadedFile)
+        list_stmt
         .order_by(UploadedFile.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
@@ -104,7 +123,10 @@ async def download_file(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该文件未挂载到藏宝阁")
 
     path = get_file_path(record.filename)
-    if not path.is_file():
+    if not (
+        (record.storage_backend == "r2" and record.r2_key and settings.R2_ENABLED)
+        or path.is_file()
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件已丢失")
 
     ip_address = get_client_ip(request)
@@ -133,6 +155,17 @@ async def download_file(
         )
     )
     await db.commit()
+
+    if record.storage_backend == "r2" and record.r2_key and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+
+        r2 = get_r2_client()
+        stream = r2.download_stream(record.r2_key)
+        return StreamingResponse(
+            stream,
+            media_type=record.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{record.original_name}"'},
+        )
 
     return DownloadResponse(
         path=path,
@@ -168,6 +201,12 @@ async def stream_file_media(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="仅允许播放视频文件",
         )
+    if record.storage_backend == "r2" and record.r2_key and settings.R2_ENABLED:
+        from app.services.r2_storage import get_r2_client
+
+        r2 = get_r2_client()
+        stream = r2.download_stream(record.r2_key)
+        return StreamingResponse(stream, media_type=record.mime_type or "application/octet-stream")
     path = get_file_path(record.filename)
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件已丢失")
@@ -202,6 +241,6 @@ async def remove_file(
             detail="文件正在作为背景媒体使用，请先解除背景引用",
         )
 
-    delete_file(record.filename)
+    delete_file(record.filename, storage_backend=record.storage_backend)
     await db.delete(record)
     await db.commit()
