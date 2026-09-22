@@ -101,6 +101,7 @@ export interface PresignResponse {
   upload_url: string
   r2_key: string
   url: string
+  cache_control: string
   storage_backend: 'r2'
 }
 
@@ -135,6 +136,11 @@ export function registerUpload(req: RegisterUploadRequest): Promise<RegisteredUp
   return api.post<RegisteredUpload>('/api/v1/r2-migration/register-upload', req, true)
 }
 
+/** 为全部已迁移对象补写 Cache-Control 元数据（管理员，幂等）。 */
+export function backfillCache(): Promise<MigrateResponse> {
+  return api.post<MigrateResponse>('/api/v1/r2-migration/backfill-cache', {}, true)
+}
+
 /**
  * 浏览器直传文件到 R2：申请预签名 URL → PUT 直传 → 登记记录。
  *
@@ -156,11 +162,15 @@ export async function uploadDirectToR2(
     directory,
   })
 
-  // PUT 直传 R2（预签名 URL 已含认证，不能再带 Authorization 头）
+  // PUT 直传 R2（预签名 URL 已含认证，不能再带 Authorization 头）。
+  // Cache-Control 已参与签名，必须回传同值头，否则 R2 拒绝（403 SignatureDoesNotMatch）
   const ok = await new Promise<boolean>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', presigned.upload_url)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    if (presigned.cache_control) {
+      xhr.setRequestHeader('Cache-Control', presigned.cache_control)
+    }
     xhr.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable && onProgress) {
         onProgress(Math.round((event.loaded / event.total) * 100))

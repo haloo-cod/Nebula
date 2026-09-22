@@ -3,17 +3,17 @@
 """
 
 from datetime import timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse as DownloadResponse, StreamingResponse
+from fastapi.responses import FileResponse as DownloadResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_optional_current_user, require_admin
 from app.database import get_db
 from app.models.background import Background
 from app.models.file import UploadedFile
-from app.models.treasure import Treasure
 from app.models.user import User
 from app.schemas.file import FileListResponse, FileResponse
 from app.services.file import delete_file, generate_file_path, get_file_path, save_file
@@ -106,21 +106,18 @@ async def download_file(
     file_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_current_user),
 ):
-    """登录用户下载藏宝阁资源，并记录访问行为。"""
+    """公开下载文件并记录访问行为。
+
+    R2 自定义域名无法做鉴权，统一放开下载；需要鉴权的文件后续单独设计。
+    登录用户仍会解析（便于统计归属），但不再限制未挂载文件。
+    """
 
     result = await db.execute(select(UploadedFile).where(UploadedFile.id == file_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
-
-    if not user.is_admin:
-        mounted = await db.execute(
-            select(Treasure.id).where(Treasure.download_file == record.url).limit(1)
-        )
-        if mounted.scalar_one_or_none() is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该文件未挂载到藏宝阁")
 
     path = get_file_path(record.filename)
     if not (
@@ -150,7 +147,7 @@ async def download_file(
             user_agent=request.headers.get("user-agent", "")[:1000],
             ip_address=ip_address,
             ip_hash=ip_hash,
-            user_id=user.id,
+            user_id=user.id if user else None,
             occurred_at=utc_now(),
         )
     )
@@ -161,10 +158,18 @@ async def download_file(
 
         r2 = get_r2_client()
         stream = r2.download_stream(record.r2_key)
+        # RFC 5987：中文文件名放进 filename*；filename 用 ASCII 回退，
+        # 手拼头必须是 latin-1 可编码，否则 Starlette 抛 UnicodeEncodeError → 500
+        ascii_name = record.original_name.encode("latin-1", "ignore").decode("latin-1") or "download"
         return StreamingResponse(
             stream,
             media_type=record.mime_type or "application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{record.original_name}"'},
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{ascii_name}"; '
+                    f"filename*=UTF-8''{quote(record.original_name)}"
+                )
+            },
         )
 
     return DownloadResponse(
@@ -205,6 +210,8 @@ async def stream_file_media(
         from app.services.r2_storage import get_r2_client
 
         r2 = get_r2_client()
+        if settings.R2_PUBLIC_DOMAIN:
+            return RedirectResponse(r2.get_public_url(record.r2_key), status_code=307)
         stream = r2.download_stream(record.r2_key)
         return StreamingResponse(stream, media_type=record.mime_type or "application/octet-stream")
     path = get_file_path(record.filename)

@@ -338,14 +338,19 @@ async def get_migration_status(
 
     # 背景统计（仅统计背景表自有的视频文件；图片背景随图床统计，
     # 引用文件管理的视频随通用文件统计，避免重复计数）
-    video_filter = Background.media_type == "video"
+    # 口径与 _background_local_name 守卫一致：仅本站两种 URL 格式算自有视频，
+    # /api/v1/files/... 引用型与外链均不计入（前者随通用文件迁移，后者无法迁移）
+    own_video_filter = (Background.media_type == "video") & (
+        Background.media_url.startswith("/uploads/backgrounds/")
+        | Background.media_url.startswith("/api/v1/backgrounds/media/")
+    )
     total_backgrounds = (
-        await db.execute(select(func.count(Background.id)).where(video_filter))
+        await db.execute(select(func.count(Background.id)).where(own_video_filter))
     ).scalar() or 0
     migrated_backgrounds = (
         await db.execute(
             select(func.count(Background.id)).where(
-                video_filter, Background.storage_backend == "r2"
+                own_video_filter, Background.storage_backend == "r2"
             )
         )
     ).scalar() or 0
@@ -414,6 +419,7 @@ class PresignResponse(BaseModel):
     upload_url: str  # 预签名 PUT URL，浏览器直传 R2
     r2_key: str  # 上传成功后回填记录用的对象键
     url: str  # 记录的访问 URL（/uploads/{r2_key}）
+    cache_control: str  # PUT 时必须回传的 Cache-Control 头值（已参与签名）
     storage_backend: str = "r2"
 
 
@@ -445,12 +451,21 @@ async def presign_upload(
     else:
         r2_key = f"files/{uuid4().hex}{suffix}"
     r2 = _require_r2()
+    from app.services.r2_storage import R2_CACHE_CONTROL
+
     try:
-        upload_url = r2.presign_put(r2_key, content_type=req.content_type)
+        upload_url = r2.presign_put(
+            r2_key, content_type=req.content_type, cache_control=R2_CACHE_CONTROL
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"生成预签名 URL 失败：{str(e)}")
 
-    return PresignResponse(upload_url=upload_url, r2_key=r2_key, url=f"/uploads/{r2_key}")
+    return PresignResponse(
+        upload_url=upload_url,
+        r2_key=r2_key,
+        url=f"/uploads/{r2_key}",
+        cache_control=R2_CACHE_CONTROL,
+    )
 
 
 def _generate_image_key(original_name: str) -> str:
@@ -525,3 +540,59 @@ async def register_upload(
         "file_size": record.file_size,
         "mime_type": record.mime_type,
     }
+
+
+@router.post("/backfill-cache", response_model=MigrateResponse)
+async def backfill_cache_metadata(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """为全部已迁移（storage_backend='r2'）的对象补写 Cache-Control 元数据。
+
+    早期迁移/上传的对象未写缓存头，浏览器无法缓存（每次刷新全量重拉）。
+    通过服务端自复制（copy_source=自身 + REPLACE 元数据）逐个补写，
+    对象键名与内容不变。幂等：重复执行只是再次复制。
+    """
+    r2 = _require_r2()
+
+    # (表, 过滤条件, 取 r2_key 的列) — 与 migration-status 的统计口径一致
+    queries = [
+        (UploadedImage, UploadedImage.storage_backend == "r2", UploadedImage.r2_key),
+        (UploadedFile, UploadedFile.storage_backend == "r2", UploadedFile.r2_key),
+        (Background, Background.storage_backend == "r2", Background.r2_key),
+        (Book, Book.storage_backend == "r2", Book.r2_key),
+    ]
+
+    success_count = 0
+    failed_count = 0
+    failed_ids: list[int] = []
+    errors: list[str] = []
+
+    for model, where_clause, key_column in queries:
+        result = await db.execute(
+            select(model.id, key_column).where(
+                where_clause, key_column.isnot(None), key_column != ""
+            )
+        )
+        rows = result.all()
+        for row_id, r2_key in rows:
+            if not r2_key:
+                continue
+            try:
+                if r2.copy_cache_metadata(r2_key):
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    failed_ids.append(row_id)
+                    errors.append(f"{model.__name__} {row_id} 对象不存在：{r2_key}")
+            except Exception as e:
+                failed_count += 1
+                failed_ids.append(row_id)
+                errors.append(f"{model.__name__} {row_id} 补写失败：{str(e)}")
+
+    return MigrateResponse(
+        success_count=success_count,
+        failed_count=failed_count,
+        failed_ids=failed_ids,
+        errors=errors,
+    )

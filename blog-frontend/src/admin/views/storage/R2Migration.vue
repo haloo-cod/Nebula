@@ -13,6 +13,7 @@ import {
   migrateImages,
   migrateBackgrounds,
   migrateBooks,
+  backfillCache,
   type MigrationStatus,
   type MigrateResponse,
 } from '@/api/r2Migration'
@@ -72,6 +73,7 @@ type ResourceType = 'images' | 'files' | 'backgrounds' | 'books'
 
 const loading = ref(false)
 const migrating = ref(false)
+const backfilling = ref(false)
 const status = ref<MigrationStatus | null>(null)
 const activeTab = ref<ResourceType>('images')
 
@@ -179,7 +181,11 @@ async function loadPendingList() {
         true,
       )
       pendingLists.backgrounds = res.items.filter(
-        (item) => item.media_type === 'video' && item.storage_backend !== 'r2',
+        (item) =>
+          item.media_type === 'video' &&
+          item.storage_backend !== 'r2' &&
+          // 引用文件管理的视频（/api/v1/files/...）随通用文件迁移，此处排除避免重复展示
+          !item.url.startsWith('/api/v1/files/'),
       )
     } else {
       const res = await api.get<{ items: MigrationBook[]; total: number }>(
@@ -212,6 +218,28 @@ function reportMigrationResult(result: MigrateResponse, label: string) {
     ElMessage.warning(
       `${label}迁移：${result.success_count} 项成功，${result.failed_count} 项失败${detail ? `（${detail}…）` : ''}`,
     )
+  }
+}
+
+/** 为全部已迁移对象补写 Cache-Control 元数据（早期迁移的对象没有缓存头）。 */
+async function handleBackfillCache() {
+  try {
+    await ElMessageBox.confirm(
+      '将为所有已迁移到 R2 的对象补写 Cache-Control 缓存头（幂等，可重复执行）。对象较多时可能耗时较长，继续？',
+      '补写缓存头',
+      { type: 'info' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  backfilling.value = true
+  try {
+    const result = await backfillCache()
+    reportMigrationResult(result, '缓存头补写')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '缓存头补写失败')
+  } finally {
+    backfilling.value = false
   }
 }
 
@@ -327,7 +355,16 @@ onMounted(async () => {
         <h2>R2 存储迁移</h2>
         <p>将本地存储的图片、文件、背景视频和图书 EPUB 批量迁移到 Cloudflare R2 对象存储。</p>
       </div>
-      <el-button :icon="Refresh" :loading="loading" @click="loadStatus">刷新状态</el-button>
+      <div class="header-actions">
+        <el-button
+          :disabled="!status?.r2_enabled"
+          :loading="backfilling"
+          @click="handleBackfillCache"
+        >
+          补写缓存头
+        </el-button>
+        <el-button :icon="Refresh" :loading="loading" @click="loadStatus">刷新状态</el-button>
+      </div>
     </div>
 
     <el-alert
@@ -490,6 +527,11 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .page-header h2 {
   margin: 0;
