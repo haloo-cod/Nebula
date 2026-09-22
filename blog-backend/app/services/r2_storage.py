@@ -12,6 +12,11 @@ from fastapi import UploadFile
 
 from app.config import settings
 
+# 不可变对象键（含 uuid/hash 文件名）的统一浏览器缓存策略。
+# 键名永不复用 → 内容变化必然换键 → 可以放心用长 max-age。
+# 3 个月（7776000 秒）：兼顾长期缓存与策略调整的回旋余地。
+R2_CACHE_CONTROL = "public, max-age=7776000, immutable"
+
 
 class R2Storage:
     """R2 存储客户端"""
@@ -37,13 +42,12 @@ class R2Storage:
         返回文件大小（bytes）
         """
         content = await file.read()
-        extra_args = {"ContentType": content_type or file.content_type or "application/octet-stream"}
-
         self.client.put_object(
             Bucket=self.bucket,
             Key=key,
             Body=content,
-            **extra_args,
+            ContentType=content_type or file.content_type or "application/octet-stream",
+            CacheControl=R2_CACHE_CONTROL,
         )
         return len(content)
 
@@ -53,11 +57,11 @@ class R2Storage:
         返回文件大小
         """
         file_size = local_path.stat().st_size
-        extra_args = {}
+        extra_args: dict = {"CacheControl": R2_CACHE_CONTROL}
         if content_type:
             extra_args["ContentType"] = content_type
 
-        self.client.upload_file(str(local_path), self.bucket, key, ExtraArgs=extra_args or None)
+        self.client.upload_file(str(local_path), self.bucket, key, ExtraArgs=extra_args)
         return file_size
 
     def download_stream(self, key: str) -> BinaryIO:
@@ -93,19 +97,46 @@ class R2Storage:
         except ClientError:
             return False
 
-    def presign_put(self, key: str, content_type: str | None = None, expires_in: int = 3600) -> str:
+    def presign_put(
+        self,
+        key: str,
+        content_type: str | None = None,
+        expires_in: int = 3600,
+        cache_control: str | None = None,
+    ) -> str:
         """生成预签名 PUT URL，供浏览器不经服务器直传 R2。
 
         需要 CORS 允许浏览器发起 PUT（R2 控制台或 S3 API 配置）。
+        cache_control 参与签名：浏览器 PUT 时必须回传同值的 Cache-Control 头。
         """
         params: dict = {"Bucket": self.bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
+        if cache_control:
+            params["CacheControl"] = cache_control
         return self.client.generate_presigned_url(
             "put_object",
             Params=params,
             ExpiresIn=expires_in,
         )
+
+    def copy_cache_metadata(self, key: str) -> bool:
+        """为存量对象补写 Cache-Control 元数据（服务端自复制）。
+
+        用 copy_source=key 复制到自身并替换元数据；新对象键名不变、
+        ETag/Last-Modified 会变化，内容不变。对象不存在时返回 False。
+        """
+        try:
+            self.client.copy_object(
+                Bucket=self.bucket,
+                Key=key,
+                CopySource={"Bucket": self.bucket, "Key": key},
+                MetadataDirective="REPLACE",
+                CacheControl=R2_CACHE_CONTROL,
+            )
+            return True
+        except ClientError:
+            return False
 
 
 # 全局单例

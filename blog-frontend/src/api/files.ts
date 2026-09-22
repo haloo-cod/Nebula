@@ -15,6 +15,9 @@ export interface UploadedFile {
   file_size: number
   mime_type: string
   created_at: string
+  storage_backend?: StorageBackend
+  /** R2 公开直链（未迁移或未配置自定义域名时为 undefined） */
+  r2_url?: string | null
 }
 
 /** 文件分页列表响应 */
