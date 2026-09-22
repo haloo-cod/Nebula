@@ -684,7 +684,7 @@ const imageCache = new Map<string, Promise<ImageSource>>()
 
 /**
  * Image() 回退路径：onload → img.decode() 延迟解码,避免同步光栅化阻塞主线程。
- * url 应已带 _cors=1 后缀。
+ * url 应已带 _cors=2 后缀。
  */
 function loadImageFallback(corsUrl: string): Promise<HTMLImageElement> {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -708,14 +708,16 @@ function loadImageFallback(corsUrl: string): Promise<HTMLImageElement> {
  * 优先用 createImageBitmap(fetch blob):解码在浏览器内部线程完成,不阻塞主线程。
  * 不支持 createImageBitmap 或 fetch 失败时回退到 Image + decode()。
  *
- * 加 _cors=1 query 参数使 URL 与 CSS background-image 缓存 key 不同,
+ * 加 _cors=2 query 参数使 URL 与 CSS background-image 缓存 key 不同,
  * 避免浏览器用无 CORS 头的缓存响应导致 crossOrigin 请求失败。
+ * （曾为 _cors=1：旧 307 重定向会丢弃查询串且被 nginx 缓存 30 天,
+ *  升版本号迫使浏览器重新取回带查询串的新重定向。）
  */
 export function loadImage(url: string): Promise<ImageSource> {
   const cached = imageCache.get(url)
   if (cached) return cached
 
-  const corsUrl = url + (url.includes('?') ? '&' : '?') + '_cors=1'
+  const corsUrl = url + (url.includes('?') ? '&' : '?') + '_cors=2'
 
   let loader: Promise<ImageSource>
 

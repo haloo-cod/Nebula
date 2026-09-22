@@ -183,6 +183,7 @@ async def download_file(
 @router.get("/{file_id}/media", response_class=DownloadResponse)
 async def stream_file_media(
     file_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """公开以内联方式提供已选作背景媒体的文件；文件管理仍负责其生命周期。"""
@@ -211,7 +212,11 @@ async def stream_file_media(
 
         r2 = get_r2_client()
         if settings.R2_PUBLIC_DOMAIN:
-            return RedirectResponse(r2.get_public_url(record.r2_key), status_code=307)
+            url = r2.get_public_url(record.r2_key)
+            # 透传查询串，避免 CORS / no-cors 请求收敛到同一缓存键（同 main.py）
+            if request.url.query:
+                url = f"{url}?{request.url.query}"
+            return RedirectResponse(url, status_code=307)
         stream = r2.download_stream(record.r2_key)
         return StreamingResponse(stream, media_type=record.mime_type or "application/octet-stream")
     path = get_file_path(record.filename)

@@ -63,7 +63,11 @@ async def read_background_video(
 
             r2 = get_r2_client()
             if settings.R2_PUBLIC_DOMAIN:
-                return RedirectResponse(r2.get_public_url(background.r2_key), status_code=307)
+                url = r2.get_public_url(background.r2_key)
+                # 透传查询串，避免 CORS / no-cors 请求收敛到同一缓存键（同 main.py）
+                if request.url.query:
+                    url = f"{url}?{request.url.query}"
+                return RedirectResponse(url, status_code=307)
             media_type = background.mime_type or "video/mp4"
             return StreamingResponse(r2.download_stream(background.r2_key), media_type=media_type)
 

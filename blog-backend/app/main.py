@@ -5,7 +5,7 @@ FastAPI 应用入口
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse
@@ -95,7 +95,11 @@ setup_cors(app)
 
 # 统一文件分发路由（支持本地和 R2 动态判断）
 @app.get("/uploads/{file_path:path}")
-async def serve_upload_file(file_path: str, db: AsyncSessionLocal = Depends(lambda: AsyncSessionLocal())):
+async def serve_upload_file(
+    request: Request,
+    file_path: str,
+    db: AsyncSessionLocal = Depends(lambda: AsyncSessionLocal()),
+):
     """
     统一文件分发：根据数据库 storage_backend 动态路由
     - local → 本地磁盘
@@ -107,9 +111,12 @@ async def serve_upload_file(file_path: str, db: AsyncSessionLocal = Depends(lamb
         """配置了公开域名时直接重定向，让浏览器直连 R2/CDN。"""
         from fastapi.responses import RedirectResponse
 
-        return RedirectResponse(
-            get_r2_client().get_public_url(r2_key), status_code=307
-        )
+        url = get_r2_client().get_public_url(r2_key)
+        # 透传查询串（如液态玻璃的 _cors=2）：丢弃会让 CORS / no-cors 两类请求
+        # 收敛到同一 R2 URL，无 ACAO 的缓存响应会被 CORS fetch 复用而跨域失败。
+        if request.url.query:
+            url = f"{url}?{request.url.query}"
+        return RedirectResponse(url, status_code=307)
 
     from app.models.image import UploadedImage
     from app.models.file import UploadedFile
