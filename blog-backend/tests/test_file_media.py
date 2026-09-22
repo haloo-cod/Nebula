@@ -2,12 +2,18 @@
 
 import pytest
 import pytest_asyncio
+from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.v1 import files as files_api
 from app.models import Base
 from app.models.background import Background
 from app.models.file import UploadedFile
+
+
+def make_request(query_string: bytes = b"") -> Request:
+    """构造最小 Request 对象，用于绕开 FastAPI 直接调用路由处理函数。"""
+    return Request({"type": "http", "method": "GET", "query_string": query_string, "headers": []})
 
 
 @pytest_asyncio.fixture
@@ -42,7 +48,7 @@ async def test_public_media_requires_video_background_reference(db_session, tmp_
     monkeypatch.setattr(files_api, "get_file_path", lambda _: path)
 
     with pytest.raises(files_api.HTTPException) as error:
-        await files_api.stream_file_media(record.id, db_session)
+        await files_api.stream_file_media(record.id, make_request(), db_session)
     assert error.value.status_code == 404
 
     db_session.add(
@@ -54,7 +60,7 @@ async def test_public_media_requires_video_background_reference(db_session, tmp_
         )
     )
     await db_session.commit()
-    response = await files_api.stream_file_media(record.id, db_session)
+    response = await files_api.stream_file_media(record.id, make_request(), db_session)
     assert response.media_type == "video/mp4"
 
 
@@ -72,7 +78,7 @@ async def test_public_media_rejects_non_video_even_when_referenced(db_session):
     await db_session.commit()
 
     with pytest.raises(files_api.HTTPException) as error:
-        await files_api.stream_file_media(record.id, db_session)
+        await files_api.stream_file_media(record.id, make_request(), db_session)
     assert error.value.status_code == 415
 
 
