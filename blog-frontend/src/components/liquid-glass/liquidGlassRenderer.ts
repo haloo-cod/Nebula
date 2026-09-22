@@ -703,21 +703,62 @@ function loadImageFallback(corsUrl: string): Promise<HTMLImageElement> {
 }
 
 /**
+ * 给媒体 URL 追加 _cors 版本参数，把 CORS 请求与 no-cors 请求的缓存 key 隔开。
+ *
+ * R2 对不带 Origin 的响应不返回 Access-Control-Allow-Origin / Vary: Origin，
+ * 若 crossOrigin 请求与 no-cors 请求（BackgroundPicker 预览 <video>、CSS
+ * background-image 等）共用同一 URL，浏览器会把无 CORS 头的缓存响应复用给
+ * crossOrigin 请求，CORS 校验失败 → 视频 error 事件 / 图片 fetch 失败。
+ * （版本号曾为 _cors=1：旧 307 重定向会丢弃查询串且被缓存 30 天，
+ *  升到 2 迫使浏览器重新取回带查询串的新重定向；视频路径沿用 2 保持一致。）
+ */
+export function withCorsCacheKey(url: string): string {
+  return url + (url.includes('?') ? '&' : '?') + '_cors=2'
+}
+
+/**
+ * 视频源解析缓存：原始 URL → blob: URL。
+ *
+ * video 元素请求自动带 Range: bytes=0-，R2 对此回 206 部分响应；
+ * 浏览器 HTTP 缓存只存 200 完整响应，不存 206，因此每次背景切换都要
+ * 重新走网络（跨洲边缘节点拉几 MB 明显卡顿）。
+ * 这里改用 fetch（无 Range → R2 回 200 immutable）一次性取回整个视频，
+ * createObjectURL 生成的 blob: URL 从内存直读，后续切换零网络开销。
+ * blob: URL 直接赋给 video.src 也不会触发 CORS（同源 scheme）。
+ */
+const videoSourceCache = new Map<string, Promise<string>>()
+
+export function resolveVideoSource(url: string): Promise<string> {
+  const cached = videoSourceCache.get(url)
+  if (cached) return cached
+  const promise = fetch(withCorsCacheKey(url), { mode: 'cors' })
+    .then((res) => {
+      if (!res.ok) throw new Error(`video fetch failed: ${res.status}`)
+      return res.blob()
+    })
+    .then((blob) => URL.createObjectURL(blob))
+    // 失败不缓存：下次切换可重试（网络恢复/缓存清理后）。
+    .catch((error) => {
+      videoSourceCache.delete(url)
+      throw error
+    })
+  videoSourceCache.set(url, promise)
+  return promise
+}
+
+/**
  * 加载并缓存图片。
  *
  * 优先用 createImageBitmap(fetch blob):解码在浏览器内部线程完成,不阻塞主线程。
  * 不支持 createImageBitmap 或 fetch 失败时回退到 Image + decode()。
  *
- * 加 _cors=2 query 参数使 URL 与 CSS background-image 缓存 key 不同,
- * 避免浏览器用无 CORS 头的缓存响应导致 crossOrigin 请求失败。
- * （曾为 _cors=1：旧 307 重定向会丢弃查询串且被 nginx 缓存 30 天,
- *  升版本号迫使浏览器重新取回带查询串的新重定向。）
+ * 经 withCorsCacheKey 加 _cors=2 参数与 no-cors 缓存 key 隔离（详见该函数注释）。
  */
 export function loadImage(url: string): Promise<ImageSource> {
   const cached = imageCache.get(url)
   if (cached) return cached
 
-  const corsUrl = url + (url.includes('?') ? '&' : '?') + '_cors=2'
+  const corsUrl = withCorsCacheKey(url)
 
   let loader: Promise<ImageSource>
 
@@ -1418,7 +1459,11 @@ async function preloadVideoTextureInternal(url: string): Promise<boolean> {
   video.loop = true
   video.playsInline = true
   video.preload = 'auto'
-  video.src = url
+  // 先经 resolveVideoSource 取回完整 200 响应的 blob: URL（见其注释：
+  // video 元素自身的 Range 请求拿到的 206 不进浏览器缓存，切换背景会
+  // 反复走网络）。blob: 同源，crossOrigin 校验自然通过；纹理键仍用
+  // 原始 url，hasTexture / bindVideoElement 调用方不受影响。
+  video.src = await resolveVideoSource(url).catch(() => withCorsCacheKey(url))
   try {
     await new Promise<void>((resolve, reject) => {
       video.addEventListener('loadeddata', () => resolve(), { once: true })

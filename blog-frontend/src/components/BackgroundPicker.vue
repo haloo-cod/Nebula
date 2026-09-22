@@ -12,11 +12,12 @@
       </button>
       <video
         v-if="currentIsVideo"
-        :src="currentSrc"
+        :src="previewVideoSrc"
         muted
         loop
         autoplay
         playsinline
+        crossorigin="anonymous"
         class="picker-preview"
       />
       <img v-else :src="currentSrc" alt="当前背景" class="picker-preview" />
@@ -60,11 +61,12 @@
       >
         <video
           v-if="isVideoBackground(item)"
-          :src="item.src"
+          :src="thumbVideoSrc(item)"
           muted
           loop
           autoplay
           playsinline
+          crossorigin="anonymous"
           class="picker-thumb-img"
         />
         <img v-else :src="item.src" alt="" class="picker-thumb-img" />
@@ -77,6 +79,11 @@
 import { computed, ref } from 'vue'
 import { useUIStore } from '@/stores/ui'
 import { isVideoBackground } from '@/data/backgrounds'
+import { withCorsCacheKey } from '@/components/liquid-glass/liquidGlassRenderer'
+
+// 预览/缩略 video 与背景视频统一走 _cors=2 缓存键 + CORS 模式：
+// 1. 避免与 crossOrigin 请求的缓存键冲突（R2 对 no-cors 响应不回 ACAO）；
+// 2. 与 PageBackground / 渲染器命中同一份浏览器缓存，视频只下载一次。
 
 const ui = useUIStore()
 const expanded = ref(false)
@@ -101,6 +108,13 @@ const currentItem = computed(
   () => group.value[currentIndex.value] ?? { src: '', mediaType: 'image' as const },
 )
 const currentIsVideo = computed(() => isVideoBackground(currentItem.value))
+const previewVideoSrc = computed(() =>
+  currentIsVideo.value ? withCorsCacheKey(currentSrc.value) : '',
+)
+// 缩略图可能包含多个视频，逐个生成对应的 CORS 缓存键。
+function thumbVideoSrc(item: { src?: string }): string {
+  return item.src ? withCorsCacheKey(item.src) : ''
+}
 
 function select(index: number) {
   if (ui.isMobile) {
