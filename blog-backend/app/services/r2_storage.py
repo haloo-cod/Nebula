@@ -14,7 +14,8 @@ from app.config import settings
 
 # 不可变对象键（含 uuid/hash 文件名）的统一浏览器缓存策略。
 # 键名永不复用 → 内容变化必然换键 → 可以放心用长 max-age。
-R2_CACHE_CONTROL = "public, max-age=31536000, immutable"
+# 3 个月（7776000 秒）：兼顾长期缓存与策略调整的回旋余地。
+R2_CACHE_CONTROL = "public, max-age=7776000, immutable"
 
 
 class R2Storage:

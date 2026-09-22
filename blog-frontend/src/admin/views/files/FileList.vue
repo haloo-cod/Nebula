@@ -22,6 +22,9 @@ interface UploadedImage {
   height: number
   mime_type: string
   created_at: string
+  storage_backend?: 'local' | 'r2'
+  /** R2 公开直链（未迁移或未配置自定义域名时为 undefined） */
+  r2_url?: string | null
 }
 
 /** 图书 ZIP 打包历史。 */
@@ -126,6 +129,24 @@ async function copyUrl(url: string) {
   } catch {
     ElMessage.error('复制失败，请手动复制')
   }
+}
+
+/** URL 展示模式：relative = 站内相对路径（307 跳转）；direct = R2 直链。 */
+const showR2Url = ref(false)
+
+/** 按当前模式取记录的展示 URL：直链模式下无 r2_url（未迁移/未配域名）自动回退相对路径。 */
+function displayUrl(row: { url: string; r2_url?: string | null }): string {
+  return showR2Url.value && row.r2_url ? row.r2_url : resolveUrl(row.url)
+}
+
+/** el-table 插槽的 row 是宽松的 DefaultRow，这里显式收窄为记录类型。 */
+function fileRow(row: unknown): UploadedFile {
+  return row as UploadedFile
+}
+
+/** 图片表格行同样显式收窄。 */
+function imageRow(row: unknown): UploadedImage {
+  return row as UploadedImage
 }
 
 async function handleUpload(event: Event) {
@@ -360,6 +381,14 @@ onMounted(loadFiles)
           {{ activeTab === 'files' ? '上传文件' : '上传图片' }}
         </el-button>
         <StorageBackendSelect v-if="activeTab !== 'archives'" />
+        <el-switch
+          v-if="activeTab !== 'archives'"
+          v-model="showR2Url"
+          active-text="R2 直链"
+          inactive-text="站内路径"
+          size="small"
+          class="url-mode-switch"
+        />
         <input ref="fileInput" type="file" class="file-input" multiple @change="handleUpload" />
       </div>
     </div>
@@ -381,8 +410,10 @@ onMounted(loadFiles)
         <el-table-column label="URL" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="url-cell">
-              <span>{{ resolveUrl(row.url) }}</span>
-              <el-button link size="small" @click="copyUrl(row.url)">复制</el-button>
+              <span>{{ displayUrl(fileRow(row)) }}</span>
+              <el-button link size="small" @click="copyUrl(displayUrl(fileRow(row)))"
+                >复制</el-button
+              >
             </div>
           </template>
         </el-table-column>
@@ -423,8 +454,10 @@ onMounted(loadFiles)
         <el-table-column label="URL" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="url-cell">
-              <span>{{ resolveUrl(row.url) }}</span>
-              <el-button link size="small" @click="copyUrl(row.url)">复制</el-button>
+              <span>{{ displayUrl(imageRow(row)) }}</span>
+              <el-button link size="small" @click="copyUrl(displayUrl(imageRow(row)))"
+                >复制</el-button
+              >
             </div>
           </template>
         </el-table-column>
@@ -564,6 +597,9 @@ p {
 }
 .upload-actions .el-progress {
   width: 150px;
+}
+.url-mode-switch {
+  margin-right: 4px;
 }
 .upload-status,
 .url-cell span {
