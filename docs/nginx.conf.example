@@ -8,6 +8,28 @@
 #
 # 如果 HTTPS 由源站 Nginx 终止，请将 X-Forwarded-Proto https 改为 $scheme，
 # 并按实际环境补充 443、证书、HTTP -> HTTPS 跳转和证书续期配置。
+#
+# 按响应状态区分缓存时长：200 图片长缓存，307 重定向不缓存。
+# 注意：map 只能出现在 http{} 级别。宝塔站点 conf 被 include 进 http{}，
+# 因此 map 放在本文件最顶部（server 块之外），切勿放进 server{} 里，
+# 否则 nginx -t 直接报 "map" directive is not allowed here"。
+map $upstream_status $image_cache_control {
+    200   "public, max-age=2592000";
+    # 304 也要保留长缓存：浏览器条件请求命中时若盖 no-cache，
+    # 缓存条目会被降级为"每次都验证"，30 天长缓存失效。
+    304   "public, max-age=2592000";
+    307   "no-cache";
+    default "no-cache";
+}
+
+# 视频背景接口同理：200/206 视频可缓存一天，307 重定向到 R2 时 no-cache。
+map $upstream_status $media_cache_control {
+    200   "public, max-age=86400";
+    206   "public, max-age=86400";
+    304   "public, max-age=86400";
+    307   "no-cache";
+    default "no-cache";
+}
 
 server {
     listen 80;
@@ -45,7 +67,9 @@ server {
         proxy_set_header Range $http_range;
         proxy_set_header If-Range $http_if_range;
         proxy_hide_header Cache-Control;
-        add_header Cache-Control "public, max-age=86400" always;
+        # 307 重定向到 R2 时不能带长缓存（同 /uploads/images/ 的教训），
+        # 按状态码区分：200 视频缓存一天，307 no-cache。
+        add_header Cache-Control $media_cache_control always;
     }
 
     # FastAPI 图书列表实际注册为 /api/v1/books（不带结尾斜杠）。
@@ -87,6 +111,14 @@ server {
 
     # 公开图片资源，WebGL 液态玻璃纹理加载需要 CORS 响应头。
     # EPUB、普通文件和 ZIP 仍然通过后端鉴权下载。
+    #
+    # 缓存策略说明：
+    # - 200 图片响应可以长缓存（内容寻址文件名，30 天）。
+    # - 307 重定向（R2 迁移后的 storage_backend=r2 记录）绝不能带长缓存头。
+    #   曾用 add_header ... always + expires 30d：307 也被盖上 30 天
+    #   Cache-Control，Cloudflare 边缘把"丢弃查询串的旧 Location"缓存一个月，
+    #   导致液态玻璃 _cors 参数失效后 CORS 请求持续命中毒缓存。
+    #   因此按状态码区分（见文件顶部 http{} 级 map），307 返回 no-cache。
     location ^~ /uploads/images/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -94,10 +126,11 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+
+        proxy_hide_header Cache-Control;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
-        add_header Cache-Control "public, max-age=2592000" always;
-        expires 30d;
+        add_header Cache-Control $image_cache_control always;
     }
 
     # History 路由：页面深层 URL 刷新时回退到 index.html；API/上传路径已在上方优先匹配。

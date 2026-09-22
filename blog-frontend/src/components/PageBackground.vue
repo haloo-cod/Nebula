@@ -10,7 +10,7 @@
       v-else
       ref="videoRef"
       class="bg-video"
-      :src="displayedBackground.src"
+      :src="videoSrc"
       :poster="displayedBackground.posterUrl"
       muted
       loop
@@ -39,6 +39,8 @@ import {
   bindVideoElement,
   preloadTexture,
   preloadVideoTexture,
+  resolveVideoSource,
+  withCorsCacheKey,
 } from '@/components/liquid-glass/liquidGlassRenderer'
 
 // overlay:遮罩层不透明度(0~1),数值越大背景越暗
@@ -53,6 +55,27 @@ const reducedMotion = ref(false)
 const displayedBackground = shallowRef<BackgroundItem>(currentBackground.value)
 const background = computed(() => displayedBackground.value)
 const isVideo = computed(() => isVideoBackground(background.value))
+
+// 可见 video 的源：优先用 resolveVideoSource 的 blob: URL（整段视频已在
+// 内存，切换零网络）；解析完成前先指向带 _cors=2 的直连地址，避免首帧空白。
+const videoSrc = ref('')
+
+watch(
+  () => displayedBackground.value.src,
+  async (src) => {
+    if (!src || !isVideoBackground(displayedBackground.value)) {
+      videoSrc.value = src ?? ''
+      return
+    }
+    videoSrc.value = withCorsCacheKey(src)
+    try {
+      videoSrc.value = await resolveVideoSource(src)
+    } catch {
+      // fetch 失败保留 _cors=2 直连地址，交给 video 元素自行重试/报错降级。
+    }
+  },
+  { immediate: true },
+)
 
 const bgLayerStyle = computed(() => {
   const blur = backgroundBlurEnabled.value ? backgroundBlur.value : 0
