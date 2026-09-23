@@ -716,6 +716,10 @@ export function withCorsCacheKey(url: string): string {
   return url + (url.includes('?') ? '&' : '?') + '_cors=2'
 }
 
+function withFullVideoCacheKey(url: string): string {
+  return url + (url.includes('?') ? '&' : '?') + '_cors=2&video=full'
+}
+
 /**
  * 视频源解析缓存：原始 URL → blob: URL。
  *
@@ -731,9 +735,9 @@ const videoSourceCache = new Map<string, Promise<string>>()
 export function resolveVideoSource(url: string): Promise<string> {
   const cached = videoSourceCache.get(url)
   if (cached) return cached
-  const promise = fetch(withCorsCacheKey(url), { mode: 'cors' })
+  const promise = fetch(withFullVideoCacheKey(url), { mode: 'cors' })
     .then((res) => {
-      if (!res.ok) throw new Error(`video fetch failed: ${res.status}`)
+      if (res.status !== 200) throw new Error(`video fetch failed: ${res.status}`)
       return res.blob()
     })
     .then((blob) => URL.createObjectURL(blob))

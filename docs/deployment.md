@@ -230,6 +230,17 @@ sudo certbot --nginx -d example.com -d www.example.com
 
 防火墙只开放 SSH、HTTP 和 HTTPS；8000 端口不对公网开放。
 
+### R2 媒体存储
+
+媒体文件存储在 Cloudflare R2（自定义域，如 `r2.example.com`），后端 `/api/v1/files/{file_id}/media`
+以 **307 重定向**指向 R2 地址（重定向不缓存，同源入口保持可迁移性）。要点：
+
+- R2 存储桶需配置 CORS 允许站点域名（允许 `Origin: https://example.com`，方法 GET/HEAD）；
+- 浏览器在同源→跨域 307 后会转发原始 `Origin`，CORS 校验只发生在 R2 一跳，Nginx 无需为 CORS 额外配置；
+- 前端所有 CORS 模式媒体请求统一追加 `_cors=2` 查询参数做浏览器缓存键隔离
+  （防止 no-cors 响应毒化 CORS 缓存），视频另经 blob: URL 内存播放（见
+  [background-media.md](./background-media.md) 与 [r2-video-cors-cache.md](./r2-video-cors-cache.md)）。
+
 ---
 
 ## 数据初始化

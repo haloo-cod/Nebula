@@ -494,7 +494,12 @@ Authorization: Bearer eyJ...
 
 ## 静态文件访问
 
-上传的文件通过以下路径访问：
+媒体已迁移至 Cloudflare R2：上传后文件存入 R2 存储桶，`/uploads/*` 与
+`/api/v1/files/{file_id}/media` 等同源媒体入口均以 **307 重定向**指向 R2 自定义域地址
+（重定向不缓存）。浏览器会转发原始 `Origin` 到 R2，CORS 由 R2 桶策略放行；前端另以
+`_cors=2` 查询参数隔离浏览器缓存键（详见 [background-media.md](./background-media.md)）。
+
+历史同源路径（用于后台管理与兼容）：
 
 ```
 GET /uploads/images/2026/07/abc_photo.jpg     — 图床图片
