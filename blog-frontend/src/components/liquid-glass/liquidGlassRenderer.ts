@@ -825,12 +825,38 @@ export function uploadVideoTexture(url: string, video: HTMLVideoElement): boolea
   if (!gl || contextLost || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false
   const existing = textureMap.get(url)
   if (existing) {
-    if (existing.video && existing.video !== video) video.pause()
-    if (existing.video && existing.video !== video) return true
+    if (existing.video && existing.video !== video) {
+      const currentVideo = existing.video
+      const currentTime = currentVideo.currentTime
+      if (currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        try {
+          gl.bindTexture(gl.TEXTURE_2D, existing.texture)
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, currentVideo)
+        } catch {
+          metrics.videoUploadFailures++
+        }
+      }
+      if (Number.isFinite(currentTime) && currentTime < video.duration) {
+        try {
+          video.currentTime = currentTime
+        } catch {
+          // Metadata may not be ready yet; the next loaded frame will be used.
+        }
+      }
+      existing.video = video
+      existing.videoFrameReady = true
+      existing.videoUploadedFrame = undefined
+      existing.videoLastCallbackAt = performance.now()
+      existing.videoLastCallbackTime = video.currentTime
+      attachVideoFrameCallbacks(existing)
+      return true
+    }
     existing.video = video
     existing.videoFrameReady = true
     existing.videoLastCallbackAt = performance.now()
     existing.videoLastCallbackTime = video.currentTime
+    attachVideoFrameCallbacks(existing)
     return true
   }
   const texture = gl.createTexture()
@@ -870,7 +896,6 @@ export function bindVideoElement(url: string, video: HTMLVideoElement): boolean 
   if (existing?.video === video) return true
   if (existing?.video && existing.video !== video) {
     const previousTime = existing.video.currentTime
-    existing.video.pause()
     // Keep the visible element on the same timeline as the preloaded texture
     // video. Browsers may reject this until metadata is available, so the
     // normal loadeddata path can retry without failing the switch.
@@ -883,6 +908,16 @@ export function bindVideoElement(url: string, video: HTMLVideoElement): boolean 
         // The media element is not seekable yet.
       }
     }
+    if (existing.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      try {
+        gl.bindTexture(gl.TEXTURE_2D, existing.texture)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, existing.video)
+      } catch {
+        metrics.videoUploadFailures++
+      }
+    }
+    existing.video.pause()
   }
   if (existing) {
     existing.video = video

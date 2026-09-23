@@ -95,19 +95,21 @@ function playVideo() {
   videoFailed.value = false
   const video = videoRef.value
   if (!video) return
-  // 让 WebGL 纹理复用页面上真正显示的 video，避免隐藏副本与背景播放进度漂移。
-  if (!bindVideoElement(displayedBackground.value.src, video)) {
-    video.addEventListener(
-      'loadeddata',
-      () => {
-        bindVideoElement(displayedBackground.value.src, video)
-      },
-      { once: true },
-    )
+  const src = displayedBackground.value.src
+  const bindAndPlay = () => {
+    if (video !== videoRef.value || src !== displayedBackground.value.src) return
+    bindVideoElement(src, video)
+    void video.play().catch(() => {
+      if (video === videoRef.value && src === displayedBackground.value.src) {
+        videoFailed.value = true
+      }
+    })
   }
-  void video.play().catch(() => {
-    videoFailed.value = true
-  })
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    bindAndPlay()
+  } else {
+    video.addEventListener('loadeddata', bindAndPlay, { once: true })
+  }
 }
 
 let switchToken = 0
