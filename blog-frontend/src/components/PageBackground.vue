@@ -56,22 +56,24 @@ const displayedBackground = shallowRef<BackgroundItem>(currentBackground.value)
 const background = computed(() => displayedBackground.value)
 const isVideo = computed(() => isVideoBackground(background.value))
 
-// 可见 video 的源：优先用 resolveVideoSource 的 blob: URL（整段视频已在
-// 内存，切换零网络）；解析完成前先指向带 _cors=2 的直连地址，避免首帧空白。
+// 可见 video 使用完整下载后的 blob: URL，避免与 <video> 的 Range 请求共享缓存键。
 const videoSrc = ref('')
+let videoSourceToken = 0
 
 watch(
   () => displayedBackground.value.src,
   async (src) => {
+    const token = ++videoSourceToken
     if (!src || !isVideoBackground(displayedBackground.value)) {
       videoSrc.value = src ?? ''
       return
     }
-    videoSrc.value = withCorsCacheKey(src)
+    videoSrc.value = ''
     try {
-      videoSrc.value = await resolveVideoSource(src)
+      const resolvedSrc = await resolveVideoSource(src)
+      if (token === videoSourceToken) videoSrc.value = resolvedSrc
     } catch {
-      // fetch 失败保留 _cors=2 直连地址，交给 video 元素自行重试/报错降级。
+      if (token === videoSourceToken) videoSrc.value = withCorsCacheKey(src)
     }
   },
   { immediate: true },
@@ -93,19 +95,21 @@ function playVideo() {
   videoFailed.value = false
   const video = videoRef.value
   if (!video) return
-  // 让 WebGL 纹理复用页面上真正显示的 video，避免隐藏副本与背景播放进度漂移。
-  if (!bindVideoElement(displayedBackground.value.src, video)) {
-    video.addEventListener(
-      'loadeddata',
-      () => {
-        bindVideoElement(displayedBackground.value.src, video)
-      },
-      { once: true },
-    )
+  const src = displayedBackground.value.src
+  const bindAndPlay = () => {
+    if (video !== videoRef.value || src !== displayedBackground.value.src) return
+    bindVideoElement(src, video)
+    void video.play().catch(() => {
+      if (video === videoRef.value && src === displayedBackground.value.src) {
+        videoFailed.value = true
+      }
+    })
   }
-  void video.play().catch(() => {
-    videoFailed.value = true
-  })
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    bindAndPlay()
+  } else {
+    video.addEventListener('loadeddata', bindAndPlay, { once: true })
+  }
 }
 
 let switchToken = 0

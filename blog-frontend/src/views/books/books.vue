@@ -364,7 +364,7 @@ onMounted(() => {
 
 .book-link {
   display: block;
-  aspect-ratio: 1 / 1.8;
+  aspect-ratio: 1 / 1.74;
   color: inherit;
   text-decoration: none;
 }
@@ -410,7 +410,7 @@ onMounted(() => {
 
 @media (hover: hover) and (pointer: fine) {
   .book-link:hover .book-glass,
-  .book-link:hover .book-card {
+  .book-link:hover .book-card-fallback {
     transform: translateY(-3px);
     filter: drop-shadow(0 8px 24px rgba(80, 140, 255, 0.14));
   }
@@ -419,12 +419,12 @@ onMounted(() => {
 .book-cover {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1.6;
+  aspect-ratio: 1 / 1.43;
   overflow: hidden;
-  border-radius: 0.9rem;
+  border-radius: var(--liquid-glass-corner-radius, 16px);
   box-sizing: border-box;
-  padding: 0 0.3rem;
-  background-size: contain;
+  padding: 0.3rem 0.3rem 0;
+  background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
   background-origin: content-box;
@@ -454,7 +454,7 @@ onMounted(() => {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   flex: 1;
   padding: 0.42rem 0.18rem 0.12rem 0.3rem;
 }
@@ -506,12 +506,12 @@ onMounted(() => {
   }
 
   .book-link {
-    aspect-ratio: 1 / 1.6;
+    aspect-ratio: 1 / 1.7;
   }
 
   .book-cover {
-    aspect-ratio: 1 / 1.3;
-    border-radius: 0.6rem;
+    aspect-ratio: 1 / 1.43;
+    border-radius: var(--liquid-glass-corner-radius, 16px);
   }
 
   .book-name {
