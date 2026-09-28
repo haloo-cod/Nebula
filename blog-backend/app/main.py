@@ -104,8 +104,13 @@ async def serve_upload_file(
     统一文件分发：根据数据库 storage_backend 动态路由
     - local → 本地磁盘
     - r2 + 自定义域名 → 302 重定向到 R2 公开域名（浏览器直连 Cloudflare，不占服务器带宽）
+    - download=1 → R2 由后端代理，供后台同源 XHR 下载
     - r2 无自定义域名 → 后端流式代理
     """
+    # 显式下载参数用于新前端；Authorization 兼容仍在缓存旧脚本的后台页面。
+    proxy_r2 = request.query_params.get("download") == "1" or bool(
+        request.headers.get("authorization")
+    )
 
     def _r2_redirect(r2_key: str):
         """配置了公开域名时直接重定向，让浏览器直连 R2/CDN。"""
@@ -137,7 +142,7 @@ async def serve_upload_file(
             if image.storage_backend == "r2" and image.r2_key and settings.R2_ENABLED:
                 from app.services.r2_storage import get_r2_client
 
-                if settings.R2_PUBLIC_DOMAIN:
+                if settings.R2_PUBLIC_DOMAIN and not proxy_r2:
                     return _r2_redirect(image.r2_key)
                 r2 = get_r2_client()
                 stream = r2.download_stream(image.r2_key)
@@ -162,7 +167,7 @@ async def serve_upload_file(
             if file_record.storage_backend == "r2" and file_record.r2_key and settings.R2_ENABLED:
                 from app.services.r2_storage import get_r2_client
 
-                if settings.R2_PUBLIC_DOMAIN:
+                if settings.R2_PUBLIC_DOMAIN and not proxy_r2:
                     return _r2_redirect(file_record.r2_key)
                 r2 = get_r2_client()
                 stream = r2.download_stream(file_record.r2_key)
@@ -183,7 +188,7 @@ async def serve_upload_file(
                 if background.storage_backend == "r2" and background.r2_key and settings.R2_ENABLED:
                     from app.services.r2_storage import get_r2_client
 
-                    if settings.R2_PUBLIC_DOMAIN:
+                    if settings.R2_PUBLIC_DOMAIN and not proxy_r2:
                         return _r2_redirect(background.r2_key)
                     r2 = get_r2_client()
                     stream = r2.download_stream(background.r2_key)

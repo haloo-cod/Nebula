@@ -239,7 +239,13 @@ async function downloadResource(path: string, filename: string) {
   downloadProgress.value = 0
   downloadStatus.value = `正在下载 ${filename}`
   try {
-    await downloadWithProgress(resolveUrl(path), filename, {
+    const resourceUrl = resolveUrl(path)
+    // R2 公开域名不一定配置了浏览器 CORS；后台下载必须让站点后端代理响应，
+    // 保留同源 XHR 和下载进度。公开媒体访问仍继续使用 R2 重定向。
+    const downloadUrl = path.startsWith('/uploads/')
+      ? `${resourceUrl}${resourceUrl.includes('?') ? '&' : '?'}download=1`
+      : resourceUrl
+    await downloadWithProgress(downloadUrl, filename, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
       onProgress: (percent) => (downloadProgress.value = percent),
     })
