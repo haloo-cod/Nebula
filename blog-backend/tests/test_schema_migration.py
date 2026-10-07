@@ -1,9 +1,10 @@
-"""启动迁移不应覆盖图书归档的手动到期时间。"""
+"""启动迁移需保留已有数据，且支持多个 worker 并发启动。"""
 
+import asyncio
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models import Base
@@ -72,3 +73,40 @@ async def test_background_source_migration_preserves_media_and_storage(tmp_path)
         assert [{key: row[key] for key in before[0]} for row in after] == before
         assert after[0]["source_text"] == after[0]["source_url"] == ""
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_background_source_migration_serializes_workers(tmp_path):
+    """两个独立连接池同时迁移旧表，不重复加列且保留全部原有背景字段。"""
+    database_url = f"sqlite+aiosqlite:///{tmp_path / 'concurrent-background-source.db'}"
+    engines = [create_async_engine(database_url, connect_args={"timeout": 5}) for _ in range(2)]
+    try:
+        async with engines[0].begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with async_sessionmaker(engines[0], expire_on_commit=False)() as session:
+            session.add(Background(id=7, media_type="video", media_url="/api/v1/files/5/media",
+                                   theme="dark", device="desktop", sort_order=3,
+                                   storage_backend="r2", r2_key="backgrounds/test.mp4"))
+            await session.commit()
+        async with engines[0].begin() as connection:
+            await connection.execute(text("ALTER TABLE backgrounds DROP COLUMN source_text"))
+            await connection.execute(text("ALTER TABLE backgrounds DROP COLUMN source_url"))
+            before = (await connection.execute(text("SELECT * FROM backgrounds ORDER BY id"))).mappings().all()
+
+        @event.listens_for(engines[0].sync_engine, "before_cursor_execute")
+        def pause_before_adding_source(conn, cursor, statement, parameters, context, executemany):
+            """在检查与改表之间给另一个 worker 时间，稳定覆盖此前的并发竞态。"""
+            if statement.startswith("ALTER TABLE backgrounds ADD COLUMN source_text"):
+                conn.connection.dbapi_connection.run_async(lambda _: asyncio.sleep(0.15))
+
+        results = await asyncio.gather(
+            *(migrate_existing_schema(engine) for engine in engines), return_exceptions=True,
+        )
+        assert results == [None, None]
+        async with engines[0].connect() as connection:
+            after = (await connection.execute(text("SELECT * FROM backgrounds ORDER BY id"))).mappings().all()
+            assert [{key: row[key] for key in before[0]} for row in after] == before
+            assert after[0]["source_text"] == after[0]["source_url"] == ""
+    finally:
+        for engine in engines:
+            await engine.dispose()

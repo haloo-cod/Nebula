@@ -8,6 +8,10 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
     """幂等补齐现有 SQLite 数据库中后续版本增加的字段。"""
 
     async with engine.begin() as conn:
+        if conn.dialect.name == "sqlite":
+            # 先取得写锁再检查字段，避免多个 worker 同时读到旧结构并重复执行 ALTER。
+            # 显式事务也确保 SQLite 的建表、改表与数据迁移一起提交或回滚。
+            await conn.execute(text("BEGIN IMMEDIATE"))
         bg_columns = await conn.run_sync(
             lambda sync_conn: {column["name"] for column in inspect(sync_conn).get_columns("backgrounds")}
         )
