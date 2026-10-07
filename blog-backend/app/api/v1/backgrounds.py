@@ -18,12 +18,14 @@ from app.schemas.background import (
     BackgroundListResponse,
     BackgroundReorderRequest,
     BackgroundResponse,
+    BackgroundSourceUpdate,
 )
 from app.services.background import (
     create_background,
     delete_background,
     list_backgrounds,
     reorder_backgrounds,
+    update_background_source,
 )
 from app.config import settings
 
@@ -192,9 +194,25 @@ async def add_background(
             poster_url=data.poster_url,
             mime_type=data.mime_type,
             file_size=data.file_size,
+            source_text=data.source_text,
+            source_url=data.source_url,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return result
+
+
+@router.patch("/{bg_id}/source", response_model=BackgroundResponse)
+async def edit_background_source(
+    bg_id: int,
+    data: BackgroundSourceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """编辑或清空背景来源（管理员）。"""
+    result = await update_background_source(db, bg_id, data.source_text, data.source_url)
+    if result is None:
+        raise HTTPException(status_code=404, detail="背景图不存在")
     return result
 
 

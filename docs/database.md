@@ -121,6 +121,8 @@
 |------|------|------|------|
 | `id` | Integer | PK | — |
 | `image_id` | Integer | FK→uploaded_images | 关联图片 |
+| `source_text` | String(120) | NOT NULL, default='' | 背景来源文字，空值隐藏来源牌 |
+| `source_url` | String(2048) | NOT NULL, default='' | 可选完整 HTTP(S) 外链 |
 | `theme` | String(10) | — | `'dark'` 或 `'light'` |
 | `device` | String(10) | — | `'desktop'` 或 `'mobile'` |
 | `sort_order` | Integer | default=0 | 排序 |

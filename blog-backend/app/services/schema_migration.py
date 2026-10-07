@@ -53,6 +53,8 @@ async def migrate_existing_schema(engine: AsyncEngine) -> None:
             "poster_url": "VARCHAR(1000) NOT NULL DEFAULT ''",
             "mime_type": "VARCHAR(100) NOT NULL DEFAULT ''",
             "file_size": "INTEGER NOT NULL DEFAULT 0",
+            "source_text": "VARCHAR(120) NOT NULL DEFAULT ''",
+            "source_url": "VARCHAR(2048) NOT NULL DEFAULT ''",
         }.items():
             if field not in bg_columns:
                 await conn.execute(text(f"ALTER TABLE backgrounds ADD COLUMN {field} {definition}"))

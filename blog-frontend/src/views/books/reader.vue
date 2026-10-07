@@ -116,7 +116,7 @@
         </aside>
       </Transition>
 
-      <section class="book-stage" :class="{ 'book-stage--loading': loading || error }">
+      <section class="book-stage" data-background-credit-boundary :class="{ 'book-stage--loading': loading || error }">
         <button
           v-if="readingMode === 'paginated' && !loading && !error"
           class="page-turn page-turn-prev"

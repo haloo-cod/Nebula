@@ -56,6 +56,8 @@ async def list_backgrounds(
             "poster_url": bg.poster_url,
             "mime_type": bg.mime_type,
             "file_size": bg.file_size,
+            "source_text": bg.source_text,
+            "source_url": bg.source_url,
             "theme": bg.theme,
             "device": bg.device,
             "sort_order": bg.sort_order,
@@ -77,6 +79,8 @@ async def create_background(
     poster_url: str = "",
     mime_type: str = "",
     file_size: int = 0,
+    source_text: str = "",
+    source_url: str = "",
 ) -> dict:
     """
     创建背景图记录
@@ -103,6 +107,8 @@ async def create_background(
         poster_url=poster_url,
         mime_type=mime_type,
         file_size=file_size,
+        source_text=source_text,
+        source_url=source_url,
         theme=theme,
         device=device,
         sort_order=sort_order,
@@ -120,11 +126,28 @@ async def create_background(
         "poster_url": poster_url,
         "mime_type": mime_type,
         "file_size": file_size,
+        "source_text": bg.source_text,
+        "source_url": bg.source_url,
         "theme": bg.theme,
         "device": bg.device,
         "sort_order": bg.sort_order,
         "created_at": bg.created_at,
     }
+
+
+async def update_background_source(
+    db: AsyncSession, bg_id: int, source_text: str, source_url: str,
+) -> dict | None:
+    """修改指定背景的来源，保持背景 ID、媒体关联和顺序。"""
+    bg = await db.get(Background, bg_id)
+    if bg is None:
+        return None
+    bg.source_text = source_text
+    bg.source_url = source_url
+    bg.updated_at = utc_now()
+    await db.commit()
+    items = await list_backgrounds(db, theme=bg.theme, device=bg.device)
+    return next(item for item in items if item["id"] == bg_id)
 
 
 async def delete_background(db: AsyncSession, bg_id: int) -> bool:

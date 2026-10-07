@@ -1,5 +1,5 @@
 <template>
-  <main class="friends-page">
+  <main class="friends-page" data-background-credit-boundary>
     <!-- 页面标题 -->
     <header class="friends-header">
       <p class="friends-kicker">{{ siteText.friends.kicker }}</p>

@@ -33,8 +33,8 @@
       <!-- 圆点指示器 -->
       <div class="picker-dots">
         <button
-          v-for="(_, i) in group"
-          :key="i"
+          v-for="(item, i) in group"
+          :key="item.id ?? item.src"
           class="picker-dot"
           :class="{ 'picker-dot--active': i === currentIndex }"
           type="button"
@@ -53,7 +53,7 @@
     <div v-if="expanded" class="picker-grid">
       <button
         v-for="(item, i) in group"
-        :key="i"
+        :key="item.id ?? item.src"
         class="picker-thumb"
         :class="{ 'picker-thumb--active': i === currentIndex }"
         type="button"

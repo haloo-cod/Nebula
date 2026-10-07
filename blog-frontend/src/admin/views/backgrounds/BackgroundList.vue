@@ -11,21 +11,19 @@ import { fetchFiles, type UploadedFile } from '@/api/files'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
+import BackgroundSourceFields from '@/admin/components/BackgroundSourceFields.vue'
+import type { ApiBgItem as BackgroundItem } from '@/api/backgrounds'
+import { backgroundSourceError, type BackgroundSource } from '@/utils/backgroundSource'
+import { useUIStore } from '@/stores/ui'
 
-/** 背景图项（匹配后端 BackgroundResponse） */
-interface BackgroundItem {
-  id: number
-  url: string
-  theme: string
-  device: string
-  sort_order: number
-  created_at: string
-  media_type?: 'image' | 'video'
-  poster_url?: string
-  mime_type?: string
-  file_size?: number
-}
-
+const ui = useUIStore()
+const uploadSource = ref<BackgroundSource>({ source_text: '', source_url: '' })
+const editSource = ref<BackgroundSource>({ source_text: '', source_url: '' })
+const editingId = ref<number | null>(null)
+const showSourceDialog = ref(false)
+const savingSource = ref(false)
+const sourceError = ref('')
+let listRequest = 0
 const loading = ref(false)
 const backgrounds = ref<BackgroundItem[]>([])
 const filterTheme = ref('')
@@ -56,6 +54,7 @@ const canReorder = computed(() => Boolean(filterTheme.value && filterDevice.valu
 
 /** 加载背景图列表 */
 async function loadBackgrounds() {
+  const request = ++listRequest
   loading.value = true
   try {
     const params = new URLSearchParams()
@@ -66,12 +65,51 @@ async function loadBackgrounds() {
       `/api/v1/backgrounds${query}`,
       true,
     )
+    if (request !== listRequest) return
     backgrounds.value = res.items
     orderChanged.value = false
   } catch {
-    ElMessage.error('加载背景图失败')
+    if (request === listRequest) ElMessage.error('加载背景图失败')
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
+  }
+}
+
+/** 后台修改成功后同步本页列表和前台当前背景。 */
+async function refreshBackgrounds() {
+  await Promise.all([loadBackgrounds(), ui.loadBackgrounds()])
+}
+
+/** 编辑当前背景的来源文字和外链。 */
+function openSource(item: BackgroundItem) {
+  editingId.value = item.id
+  editSource.value = { source_text: item.source_text ?? '', source_url: item.source_url ?? '' }
+  sourceError.value = ''
+  showSourceDialog.value = true
+}
+
+/** 保存或清空来源，失败时保留输入。 */
+async function saveSource() {
+  if (savingSource.value || editingId.value === null) return
+  sourceError.value = backgroundSourceError(editSource.value)
+  if (sourceError.value) return
+  savingSource.value = true
+  try {
+    await api.patch<BackgroundItem>(
+      `/api/v1/backgrounds/${editingId.value}/source`,
+      {
+        source_text: editSource.value.source_text.trim(),
+        source_url: editSource.value.source_url.trim(),
+      },
+      true,
+    )
+    showSourceDialog.value = false
+    ElMessage.success('背景来源已保存')
+    await refreshBackgrounds()
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '背景来源保存失败')
+  } finally {
+    savingSource.value = false
   }
 }
 
@@ -111,13 +149,17 @@ async function saveOrder() {
   if (!canReorder.value || !orderChanged.value) return
   savingOrder.value = true
   try {
-    await api.put('/api/v1/backgrounds/reorder', {
-      ids: backgrounds.value.map((item) => item.id),
-      theme: filterTheme.value,
-      device: filterDevice.value,
-    }, true)
+    await api.put(
+      '/api/v1/backgrounds/reorder',
+      {
+        ids: backgrounds.value.map((item) => item.id),
+        theme: filterTheme.value,
+        device: filterDevice.value,
+      },
+      true,
+    )
     ElMessage.success('背景顺序已保存')
-    await loadBackgrounds()
+    await refreshBackgrounds()
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '背景顺序保存失败')
   } finally {
@@ -133,6 +175,8 @@ function handleFilterChange() {
 /** 打开上传弹窗 */
 function openUpload() {
   uploadForm.value = { theme: 'dark', device: 'desktop' }
+  uploadSource.value = { source_text: '', source_url: '' }
+  sourceError.value = ''
   mediaType.value = 'image'
   externalUrl.value = ''
   posterUrl.value = ''
@@ -189,6 +233,13 @@ function handleVideoPreview(event: Event) {
 
 /** 从媒体库选择图片，随后创建背景记录。 */
 async function handleUpload() {
+  if (uploading.value) return
+  sourceError.value = backgroundSourceError(uploadSource.value)
+  if (sourceError.value) return
+  const source: BackgroundSource = {
+    source_text: uploadSource.value.source_text.trim(),
+    source_url: uploadSource.value.source_url.trim(),
+  }
   const sourceCount = [
     externalUrl.value.trim(),
     videoFile.value,
@@ -241,6 +292,7 @@ async function handleUpload() {
       await api.post(
         '/api/v1/backgrounds',
         {
+          ...source,
           image_id: null,
           media_type: 'video',
           media_url: mediaUrl,
@@ -255,7 +307,7 @@ async function handleUpload() {
       )
       ElMessage.success('视频背景添加成功')
       showUploadDialog.value = false
-      await loadBackgrounds()
+      await refreshBackgrounds()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '视频背景添加失败'
       ElMessage.error(message)
@@ -284,6 +336,7 @@ async function handleUpload() {
         api.post(
           '/api/v1/backgrounds',
           {
+            ...source,
             image_id: image.id,
             theme: uploadForm.value.theme,
             device: uploadForm.value.device,
@@ -298,7 +351,7 @@ async function handleUpload() {
       failed ? `添加完成，${failed} 张失败` : `成功添加 ${images.length} 张`,
     )
     showUploadDialog.value = false
-    loadBackgrounds()
+    await refreshBackgrounds()
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : '上传失败')
   } finally {
@@ -338,9 +391,9 @@ async function handleBatchDelete() {
       failed ? `删除完成，${failed} 张失败` : '批量删除成功',
     )
     selectedIds.value = []
-    await loadBackgrounds()
-  } catch {
-    // 用户取消删除
+    await refreshBackgrounds()
+  } catch (error: unknown) {
+    if (error instanceof Error) ElMessage.error(error.message)
   } finally {
     deleting.value = false
   }
@@ -354,9 +407,9 @@ async function handleDelete(item: BackgroundItem) {
     })
     await api.delete(`/api/v1/backgrounds/${item.id}`)
     ElMessage.success('删除成功')
-    loadBackgrounds()
-  } catch {
-    /* 取消 */
+    await refreshBackgrounds()
+  } catch (error: unknown) {
+    if (error instanceof Error) ElMessage.error(error.message)
   }
 }
 
@@ -454,11 +507,13 @@ onMounted(() => loadBackgrounds())
             @change="toggleSelection(bg.id)"
           />
           <div class="bg-overlay">
+            <el-button size="small" @click.stop="openSource(bg)">来源</el-button>
             <el-button type="danger" size="small" @click="handleDelete(bg)">移除</el-button>
           </div>
-          <span class="bg-label"
+          <span class="bg-label" :title="bg.source_text || '未填写背景来源'"
             >{{ formatLabel(bg.theme, bg.device) }} ·
-            {{ bg.media_type === 'video' ? '视频' : '图片' }}</span
+            {{ bg.media_type === 'video' ? '视频' : '图片'
+            }}{{ bg.source_text ? ' · 已填来源' : '' }}</span
           >
         </div>
         <div v-if="!loading && backgrounds.length === 0" class="empty-state">暂无背景图</div>
@@ -550,10 +605,36 @@ onMounted(() => loadBackgrounds())
             </span>
           </div>
         </el-form-item>
+        <BackgroundSourceFields
+          v-model="uploadSource"
+          :disabled="uploading"
+          :error="sourceError"
+          :batch="mediaType === 'image' && selectedImages.length > 1"
+        />
       </el-form>
       <template #footer>
         <el-button @click="showUploadDialog = false">取消</el-button>
         <el-button type="primary" :loading="uploading" @click="handleUpload"> 确认上传 </el-button>
+      </template>
+    </el-dialog>
+    <el-dialog
+      v-model="showSourceDialog"
+      title="编辑背景来源"
+      width="400px"
+      :close-on-click-modal="!savingSource"
+      :close-on-press-escape="!savingSource"
+      :show-close="!savingSource"
+    >
+      <el-form label-position="top">
+        <BackgroundSourceFields
+          v-model="editSource"
+          :disabled="savingSource"
+          :error="sourceError"
+        />
+      </el-form>
+      <template #footer>
+        <el-button :disabled="savingSource" @click="showSourceDialog = false">取消</el-button>
+        <el-button type="primary" :loading="savingSource" @click="saveSource">保存</el-button>
       </template>
     </el-dialog>
     <ImagePickerDialog

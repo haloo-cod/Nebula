@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
+import BackgroundCredit from './components/BackgroundCredit.vue'
 import BackToTop from './components/BackToTop.vue'
 import FloatingPlayer from './components/music/FloatingPlayer.vue'
 import RainEffect from './components/RainEffect.vue'
@@ -85,6 +86,7 @@ onUnmounted(() => {
     <PageBackground v-if="showBackground" :overlay="backgroundOverlay" />
     <div class="app-content">
       <NavBar v-if="ui.showNavbar && !hideChrome" />
+      <BackgroundCredit v-if="ui.showNavbar && showBackground" />
       <RouterView />
       <BackToTop v-if="ui.showNavbar && !hideChrome" />
       <FloatingPlayer v-if="ui.showNavbar && !hideChrome" />

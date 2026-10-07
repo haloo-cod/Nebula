@@ -3,10 +3,31 @@
 """
 
 from datetime import datetime
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, field_validator
 
 
-class BackgroundCreate(BaseModel):
+class BackgroundSourceUpdate(BaseModel):
+    """背景来源字段，创建和编辑共用校验。编辑时必须同时提交两项。"""
+    source_text: str = Field(max_length=120)
+    source_url: str = Field(max_length=2048)
+
+    @field_validator("source_text", "source_url", mode="before")
+    @classmethod
+    def trim_source(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str) -> str:
+        if value:
+            if not value.lower().startswith(("http://", "https://")) or any(char.isspace() for char in value):
+                raise ValueError("来源链接必须是完整的 HTTP 或 HTTPS 地址")
+            # 只校验完整 HTTP(S) 地址，保留用户填写的路径与参数。
+            TypeAdapter(HttpUrl).validate_python(value)
+        return value
+
+
+class BackgroundCreate(BackgroundSourceUpdate):
     """创建背景图记录（管理员）"""
     image_id: int | None = None
     media_type: str = "image"
@@ -17,6 +38,8 @@ class BackgroundCreate(BaseModel):
     theme: str  # 'dark' | 'light'
     device: str  # 'desktop' | 'mobile'
     sort_order: int = 0
+    source_text: str = Field(default="", max_length=120)
+    source_url: str = Field(default="", max_length=2048)
 
     @field_validator("theme")
     @classmethod
@@ -47,6 +70,8 @@ class BackgroundResponse(BaseModel):
     poster_url: str = ""
     mime_type: str = ""
     file_size: int = 0
+    source_text: str = ""
+    source_url: str = ""
     url: str  # 图片访问路径（如 /uploads/images/backgrounds/dark-desktop-01.jpg）
     theme: str
     device: str

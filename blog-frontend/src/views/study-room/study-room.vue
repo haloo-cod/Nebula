@@ -19,7 +19,7 @@
     </button>
 
     <!-- 中央番茄钟面板 -->
-    <div class="study-wrapper">
+    <div class="study-wrapper" data-background-credit-boundary>
       <!-- 页面头部：定位到玻璃面板左上方 -->
       <header class="study-header">
         <span class="study-kicker">Study Room</span>
@@ -62,7 +62,7 @@
     </div>
 
     <!-- 历史摘要 -->
-    <div class="history-wrapper">
+    <div class="history-wrapper" data-background-credit-boundary>
       <HistorySummary :history="history" />
     </div>
   </div>

@@ -1,5 +1,5 @@
 <template>
-  <div class="moments-page">
+  <div class="moments-page" data-background-credit-boundary>
     <!-- 页头 -->
     <header class="moments-header post-rise-inner">
       <p class="moments-kicker">{{ siteText.moments.kicker }}</p>

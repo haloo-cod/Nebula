@@ -1,5 +1,5 @@
 <template>
-  <header class="liquid-glass-nav">
+  <header class="liquid-glass-nav" data-background-credit-navbar>
     <!-- 左侧：Logo + 翻译按钮 + 移动端主题切换 -->
     <div class="nav-left">
       <span class="logo">Starlitn'blog</span>
@@ -638,10 +638,7 @@ onUnmounted(() => {
   /* 液态玻璃边缘光晕 */
   border: 1px solid rgba(255, 255, 255, 0.12);
 
-  /* 内高光折射 + 外悬浮阴影 */
-  box-shadow:
-    0 4px 32px rgba(0, 0, 0, 0.25),
-    0 12px 60px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
 }
 
 .liquid-glass-nav::before {
