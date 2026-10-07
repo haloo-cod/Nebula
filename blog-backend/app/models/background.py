@@ -29,5 +29,7 @@ class Background(Base, TimestampMixin):
     theme: Mapped[str] = mapped_column(String(10))  # 'dark' | 'light'
     device: Mapped[str] = mapped_column(String(10))  # 'desktop' | 'mobile'
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    source_text: Mapped[str] = mapped_column(String(120), default="", server_default="", nullable=False)
+    source_url: Mapped[str] = mapped_column(String(2048), default="", server_default="", nullable=False)
     storage_backend: Mapped[str] = mapped_column(String(20), default="local")  # 'local' | 'r2'
     r2_key: Mapped[str | None] = mapped_column(String(500), nullable=True)  # R2 对象键（视频文件）

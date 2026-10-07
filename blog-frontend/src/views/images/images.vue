@@ -1,5 +1,5 @@
 <template>
-  <main class="gallery-images-page">
+  <main class="gallery-images-page" data-background-credit-boundary>
     <!-- 概览:相册网格 -->
     <template v-if="!currentAlbum">
       <RouterLink to="/" class="back-link">返回首页</RouterLink>

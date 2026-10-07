@@ -1,5 +1,5 @@
 <template>
-  <div class="archive-tree-page">
+  <div class="archive-tree-page" data-background-credit-boundary>
     <div class="archive-tree-stage" :style="{ height: `${stageHeight}px` }">
       <svg
         class="archive-tree-svg"

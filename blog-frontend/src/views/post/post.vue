@@ -1,5 +1,5 @@
 <template>
-  <div class="post-page">
+  <div class="post-page" data-background-credit-boundary>
     <GlassPanel class="post-panel">
       <div class="post-rise-inner">
         <div class="post-header">

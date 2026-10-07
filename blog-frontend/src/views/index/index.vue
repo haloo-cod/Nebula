@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="home-root" :class="{ 'home-locked': !showUIElements }">
     <!-- 面板区域（简介 + 占位） -->
-    <div v-if="showUIElements" class="home-panels">
+    <div v-if="showUIElements" class="home-panels" data-background-credit-boundary>
       <div class="home-panels-inner">
         <div class="left-panel-glass">
           <LiquidGlass
@@ -50,7 +50,7 @@
 
     <!-- 玻璃横条（标题） -->
     <div class="title-container" :class="containerClass">
-      <div class="title-glass" :class="{ 'title-glass--visible': showUIElements }">
+      <div class="title-glass" data-background-credit-boundary :class="{ 'title-glass--visible': showUIElements }">
         <h1 class="typewriter-title" translate="no">
           {{ typewriterDone ? fullTitle : displayed }}<span class="caret caret-blink">|</span>
         </h1>
@@ -58,7 +58,7 @@
     </div>
 
     <!-- 下方面板区域 -->
-    <div v-if="showUIElements" class="home-bottom">
+    <div v-if="showUIElements" class="home-bottom" data-background-credit-boundary>
       <div class="bottom-grid">
         <!-- 左侧：轮播图 -->
         <div class="bottom-left">

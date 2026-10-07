@@ -1,5 +1,5 @@
 <template>
-  <div class="treasure-page">
+  <div class="treasure-page" data-background-credit-boundary>
     <!-- 页面头部 -->
     <header class="treasure-header">
       <span class="treasure-kicker">{{ siteText.treasure.kicker }}</span>

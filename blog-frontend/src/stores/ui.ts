@@ -12,7 +12,8 @@ import {
 } from '@/data/backgrounds'
 import type { BackgroundItem } from '@/data/backgrounds'
 import { isVideoBackground } from '@/data/backgrounds'
-import { fetchBackgrounds } from '@/api/backgrounds'
+import { fetchBackgrounds, type ApiBgItem } from '@/api/backgrounds'
+import { createBackgroundSelection } from './backgroundSelection'
 
 /** 站点主题:dark=暗色(默认),light=亮色 */
 export type Theme = 'dark' | 'light'
@@ -98,14 +99,6 @@ function waitForNextFrames(count = 2): Promise<void> {
   })
 }
 
-/** 读取持久化的背景图索引 */
-function readStoredBgIndex(key: string, maxIndex: number): number {
-  if (typeof localStorage === 'undefined') return 0
-  const saved = Number(localStorage.getItem(key))
-  if (Number.isInteger(saved) && saved >= 0 && saved < maxIndex) return saved
-  return 0
-}
-
 /** 读取持久化的雨量(0=轻,1=中,2=重),缺省回退到 1(中) */
 function readStoredRainIntensity(): number {
   if (typeof localStorage === 'undefined') return 1
@@ -130,12 +123,15 @@ export const useUIStore = defineStore('ui', () => {
   const mobileDarkBgs = ref<BackgroundItem[]>([...defaultMobileDarkBgs])
   const mobileLightBgs = ref<BackgroundItem[]>([...defaultMobileLightBgs])
 
-  const darkBgIndex = ref(readStoredBgIndex(DARK_BG_KEY, darkBgs.value.length))
-  const lightBgIndex = ref(readStoredBgIndex(LIGHT_BG_KEY, lightBgs.value.length))
-  const mobileDarkBgIndex = ref(readStoredBgIndex(MOBILE_DARK_BG_KEY, mobileDarkBgs.value.length))
-  const mobileLightBgIndex = ref(
-    readStoredBgIndex(MOBILE_LIGHT_BG_KEY, mobileLightBgs.value.length),
-  )
+  const darkSelection = createBackgroundSelection(darkBgs, DARK_BG_KEY)
+  const lightSelection = createBackgroundSelection(lightBgs, LIGHT_BG_KEY)
+  const mobileDarkSelection = createBackgroundSelection(mobileDarkBgs, MOBILE_DARK_BG_KEY)
+  const mobileLightSelection = createBackgroundSelection(mobileLightBgs, MOBILE_LIGHT_BG_KEY)
+  const darkBgIndex = darkSelection.index
+  const lightBgIndex = lightSelection.index
+  const mobileDarkBgIndex = mobileDarkSelection.index
+  const mobileLightBgIndex = mobileLightSelection.index
+  let backgroundRequest = 0
   const rainEnabled = ref(readStoredBoolean(RAIN_ENABLED_KEY, false))
   const rainIntensity = ref(readStoredRainIntensity())
   const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
@@ -230,30 +226,6 @@ export const useUIStore = defineStore('ui', () => {
     }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LIQUID_GLASS_BLUR_KEY, String(value))
-    }
-  })
-
-  watch(darkBgIndex, (next) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(DARK_BG_KEY, String(next))
-    }
-  })
-
-  watch(lightBgIndex, (next) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIGHT_BG_KEY, String(next))
-    }
-  })
-
-  watch(mobileDarkBgIndex, (next) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(MOBILE_DARK_BG_KEY, String(next))
-    }
-  })
-
-  watch(mobileLightBgIndex, (next) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(MOBILE_LIGHT_BG_KEY, String(next))
     }
   })
 
@@ -372,6 +344,7 @@ export const useUIStore = defineStore('ui', () => {
    * 应在 App.vue 的 onMounted 中调用
    */
   async function loadBackgrounds() {
+    const request = ++backgroundRequest
     try {
       const [darkDesktop, lightDesktop, darkMobile, lightMobile] = await Promise.all([
         fetchBackgrounds('dark', 'desktop'),
@@ -380,41 +353,22 @@ export const useUIStore = defineStore('ui', () => {
         fetchBackgrounds('light', 'mobile'),
       ])
 
-      // 保留媒体元数据；视频若被降级成 image，LiquidGlass 会错误地用 Image 加载并导致黑屏。
-      darkBgs.value = darkDesktop.map((i) => ({
-        src: i.url,
-        mediaType: isVideoBackground(i) ? 'video' : 'image',
-        posterUrl: i.posterUrl,
-        mimeType: i.mimeType,
-        fileSize: i.fileSize,
-      }))
-      lightBgs.value = lightDesktop.map((i) => ({
-        src: i.url,
-        mediaType: isVideoBackground(i) ? 'video' : 'image',
-        posterUrl: i.posterUrl,
-        mimeType: i.mimeType,
-        fileSize: i.fileSize,
-      }))
-      mobileDarkBgs.value = darkMobile.map((i) => ({
-        src: i.url,
-        mediaType: isVideoBackground(i) ? 'video' : 'image',
-        posterUrl: i.posterUrl,
-        mimeType: i.mimeType,
-        fileSize: i.fileSize,
-      }))
-      mobileLightBgs.value = lightMobile.map((i) => ({
-        src: i.url,
-        mediaType: isVideoBackground(i) ? 'video' : 'image',
-        posterUrl: i.posterUrl,
-        mimeType: i.mimeType,
-        fileSize: i.fileSize,
-      }))
-
-      // 索引越界修正（API 返回的列表可能比 localStorage 存的索引短）
-      if (darkBgIndex.value >= darkBgs.value.length) darkBgIndex.value = 0
-      if (lightBgIndex.value >= lightBgs.value.length) lightBgIndex.value = 0
-      if (mobileDarkBgIndex.value >= mobileDarkBgs.value.length) mobileDarkBgIndex.value = 0
-      if (mobileLightBgIndex.value >= mobileLightBgs.value.length) mobileLightBgIndex.value = 0
+      if (request !== backgroundRequest) return
+      // 图片、视频和来源从同一个记录映射，始终共享稳定 ID。
+      const toItem = (item: ApiBgItem): BackgroundItem => ({
+        id: item.id,
+        src: item.url,
+        mediaType: isVideoBackground(item) ? 'video' : 'image',
+        posterUrl: item.posterUrl,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        sourceText: item.source_text ?? '',
+        sourceUrl: item.source_url ?? '',
+      })
+      darkSelection.replace(darkDesktop.map(toItem))
+      lightSelection.replace(lightDesktop.map(toItem))
+      mobileDarkSelection.replace(darkMobile.map(toItem))
+      mobileLightSelection.replace(lightMobile.map(toItem))
     } catch (error) {
       console.error('[UI] Failed to load backgrounds', error)
       // API 失败时保持 CSS 纯色背景，不依赖本地图片

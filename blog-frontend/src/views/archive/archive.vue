@@ -1,5 +1,5 @@
 <template>
-  <div class="page-wrap">
+  <div class="page-wrap" data-background-credit-boundary>
     <div class="timeline-wrap post-rise-inner">
       <div
         ref="viewportRef"

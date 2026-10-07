@@ -24,22 +24,25 @@ sample_code/
 dist/
 node_modules/
 coverage/
-*.db-shm
-*.db-wal
+
+# 本地数据库、事务文件与备份（数据独立管理）
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+/blog-backend/*.db.*
+/生产环境去敏数据库/
+
+# 本地设计参考图
+/演示.png
 
 # 本地 EPUB 导入临时数据与扫描报告
 .epub-import/
 .playwright-mcp/
 reader-sample.png
 reader-sample-chapter.png
-blog-backend/blog.db.before-import-locked
-blog-backend/blog.db-wal.before-import-locked
-blog-backend/blog.db-shm.before-import-locked
-blog-backend/blog.db.pre-import
-blog-backend/blog.db-wal.pre-import
-blog-backend/blog.db-shm.pre-import
-blog-backend/blog.db.before-import-locked-shm
-blog-backend/blog.db.before-import-locked-wal
 
 # macOS
 .DS_Store

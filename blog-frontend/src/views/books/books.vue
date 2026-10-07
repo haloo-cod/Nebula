@@ -1,5 +1,5 @@
 <template>
-  <div class="books-page">
+  <div class="books-page" data-background-credit-boundary>
     <div class="books-header">
       <p class="books-kicker">{{ siteText.books.kicker }}</p>
       <h1 class="books-title">{{ siteText.books.title }}</h1>

@@ -1,6 +1,9 @@
 /** 背景图条目 */
 export interface BackgroundItem {
+  id?: number
   src: string
+  sourceText?: string
+  sourceUrl?: string
   mediaType?: 'image' | 'video'
   posterUrl?: string
   mimeType?: string

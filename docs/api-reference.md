@@ -304,6 +304,7 @@ Authorization: Bearer eyJ...
 |------|------|------|------|
 | GET | `/backgrounds` | 公开 | 背景图列表（可按 theme/device 筛选） |
 | POST | `/backgrounds` | 管理员 | 添加背景图 |
+| PATCH | `/backgrounds/{id}/source` | 管理员 | 修改或清空背景来源 |
 | DELETE | `/backgrounds/{id}` | 管理员 | 删除背景图 |
 | PUT | `/backgrounds/reorder` | 管理员 | 调整排序 |
 
@@ -313,6 +314,12 @@ Authorization: Bearer eyJ...
 |------|------|------|
 | `theme` | string | `dark` 或 `light` |
 | `device` | string | `desktop` 或 `mobile` |
+
+创建背景时可传 `source_text`（最多 120 字符）和 `source_url`（最多 2048 字符），缺省为空。
+列表、创建和编辑响应均返回这两个字段。字段首尾空白会去除，非空链接必须是完整 HTTP/HTTPS 地址。
+
+`PATCH /backgrounds/{id}/source` 必须同时提交 `{ "source_text": "画师 · 作品", "source_url": "https://example.com/work" }`。
+空字符串可清空字段；成功返回背景记录，不存在返回 `404`，字段校验失败返回 `422`，未登录／非管理员返回 `401`／`403`。
 
 ---
 

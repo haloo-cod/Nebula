@@ -1,5 +1,6 @@
 import { api, resolveUrl } from './client'
 
+/** 后端背景记录，包含稳定 ID 和来源。 */
 export interface ApiBgItem {
   id: number
   url: string
@@ -11,17 +12,21 @@ export interface ApiBgItem {
   poster_url?: string
   mime_type?: string
   file_size?: number
+  source_text?: string
+  source_url?: string
   mediaType?: 'image' | 'video'
   posterUrl?: string
   mimeType?: string
   fileSize?: number
 }
 
+/** 背景列表响应。 */
 interface BgListResponse {
   items: ApiBgItem[]
   total: number
 }
 
+/** 获取某个主题和设备的背景记录。 */
 export async function fetchBackgrounds(theme: string, device: string): Promise<ApiBgItem[]> {
   const resp = await api.get<BgListResponse>(`/api/v1/backgrounds?theme=${theme}&device=${device}`)
   console.info('[Backgrounds] loaded', theme, device, resp.items)

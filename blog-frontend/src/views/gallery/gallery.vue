@@ -1,5 +1,5 @@
 <template>
-  <main class="gallery-page">
+  <main class="gallery-page" data-background-credit-boundary>
     <section id="gallery-projects" class="gallery-section">
       <div class="section-heading">
         <span class="gallery-kicker">{{ siteText.gallery.kicker }}</span>

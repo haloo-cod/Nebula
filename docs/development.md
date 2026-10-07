@@ -30,7 +30,10 @@ pip install -r requirements.txt
 | `pnpm preview` | 预览构建产物 |
 | `pnpm type-check` | TypeScript 类型检查（vue-tsc） |
 | `pnpm test:unit` | 运行单元测试（Vitest） |
+| `pnpm exec playwright test` | 运行浏览器回归测试（使用本机 Chrome） |
 | `pnpm format` | 代码格式化（oxfmt） |
+
+浏览器回归的来源与媒体使用模拟数据。截图、构建日志和追踪文件存放在 `.playwright-mcp/`，不入库。
 
 ### 后端
 
@@ -41,6 +44,9 @@ pip install -r requirements.txt
 | `python -m scripts.init_xxx --force` | 强制覆盖重新初始化 |
 
 后端应用启动时会自动创建数据库表、执行兼容性字段迁移、准备运行时目录、清理过期归档和统计限流记录，并创建 `.env` 配置的默认管理员账户。初始化脚本主要用于导入或重置内容数据，不是每次启动的必需步骤。生产环境还会校验密钥、管理员密码、Cookie 安全配置和代理配置等安全参数。
+
+本地 `.env`、SQLite 数据库及其备份、生产去敏数据库、上传文件和参考截图通过 `.gitignore` 排除，保留在开发机器。
+提交时保留 `.env.example`、源码、迁移逻辑、测试代码、依赖锁文件和文档。
 
 ---
 

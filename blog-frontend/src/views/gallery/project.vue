@@ -1,5 +1,5 @@
 <template>
-  <main class="project-page">
+  <main class="project-page" data-background-credit-boundary>
     <RouterLink to="/gallery" class="back-link">返回展览</RouterLink>
 
     <article v-if="project" class="project-doc glass-strong">

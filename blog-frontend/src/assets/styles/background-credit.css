@@ -1,0 +1,117 @@
+.background-credit {
+  --rope-base: #08090a;
+  --rope-highlight: rgba(255, 255, 255, 0.16);
+  position: fixed;
+  z-index: 40;
+  width: 0;
+  height: 0;
+  color: var(--text-primary);
+  pointer-events: none;
+}
+.background-credit-anchor {
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rope-base);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.background-credit-swing {
+  position: absolute;
+}
+.background-credit-rope {
+  position: absolute;
+  left: -80px;
+  top: -5px;
+  width: 160px;
+  height: 116px;
+  overflow: visible;
+  z-index: 4;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.credit-rope-core {
+  stroke: var(--rope-base);
+  stroke-width: 2.6;
+}
+.credit-rope-highlight {
+  stroke: var(--rope-highlight);
+  stroke-width: 0.6;
+  transform: translateX(-0.45px);
+}
+.background-credit--light {
+  --rope-base: #fff;
+  --rope-highlight: rgba(255, 255, 255, 0.65);
+}
+.background-credit-card {
+  position: absolute;
+  left: calc(var(--credit-width) / -2);
+  top: 0;
+  transform-origin: 50% 0;
+  transform: translate(var(--credit-card-x), var(--credit-card-y)) rotate(var(--credit-card-angle));
+  width: var(--credit-width);
+  height: var(--credit-height);
+  border-radius: 20px;
+  color: inherit;
+  text-decoration: none;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  pointer-events: auto;
+  -webkit-user-drag: none;
+}
+.background-credit-card:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 5px;
+}
+.is-dragging .background-credit-card {
+  cursor: grabbing;
+}
+.background-credit-surface {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.background-credit-copy {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: clamp(10px, calc(var(--credit-width) * 0.075), 18px);
+  text-align: center;
+}
+.background-credit-heading {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--text-secondary);
+}
+.background-credit-text {
+  min-height: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: clamp(12px, calc(var(--credit-width) * 0.065), 15px);
+  line-height: 1.45;
+  font-weight: 500;
+}
+.background-credit-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+@media (max-width: 768px) {
+  .background-credit {
+    display: none;
+  }
+}

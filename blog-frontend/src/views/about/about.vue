@@ -2,7 +2,7 @@
   <div class="about-page">
     <LiquidGlass
       v-if="ui.liquidGlassEnabled"
-      class="about-glass"
+      class="about-glass" data-background-credit-boundary
       :theme="ui.theme"
       :corner-radius="32"
       :blur-radius="ui.liquidGlassBlur"
@@ -37,7 +37,7 @@
       </div>
     </LiquidGlass>
 
-    <PanelFallbackGlass v-else tag="div" class="about-glass about-glass--fallback">
+    <PanelFallbackGlass v-else tag="div" class="about-glass about-glass--fallback" data-background-credit-boundary>
       <div class="about-inner">
         <AboutHero />
         <div class="about-toolbar">

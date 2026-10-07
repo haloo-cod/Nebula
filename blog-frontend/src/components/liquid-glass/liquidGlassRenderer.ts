@@ -36,6 +36,8 @@ export interface GlassUniforms {
   mousePos: [number, number]
   glassSize: [number, number]
   canvasOffset: [number, number]
+  /** 面板 CSS 旋转角度（弧度），缺省为零。 */
+  sampleRotation?: number
   texAspect: number // 纹理原始宽高比(width/height),用于 cover 模式 UV 校正
   cornerRadius: number
   ior: number
@@ -120,6 +122,7 @@ interface UniformLocations {
   mousePos: WebGLUniformLocation | null
   glassSize: WebGLUniformLocation | null
   canvasOffset: WebGLUniformLocation | null
+  sampleRotation: WebGLUniformLocation | null
   texAspect: WebGLUniformLocation | null
   backgroundTexture: WebGLUniformLocation | null
   cornerRadius: WebGLUniformLocation | null
@@ -147,6 +150,7 @@ function createEmptyLocs(): UniformLocations {
     mousePos: null,
     glassSize: null,
     canvasOffset: null,
+    sampleRotation: null,
     texAspect: null,
     backgroundTexture: null,
     cornerRadius: null,
@@ -248,12 +252,14 @@ const vsSource = `#version 300 es
     uniform vec2 u_mousePos;
     uniform vec2 u_glassSize;
     uniform vec2 u_canvasOffset;
+    uniform float u_sampleRotation;
     uniform float u_texAspect;
     out vec2 v_screenTexCoord;
     out vec2 v_shapeCoord;
     void main() {
         gl_Position = vec4(a_position * 2.0 * vec2(1.0, -1.0), 0.0, 1.0);
-        vec2 screenPos = u_canvasOffset + u_mousePos + a_position * u_glassSize;
+        float c = cos(u_sampleRotation), s = sin(u_sampleRotation);
+        vec2 screenPos = u_canvasOffset + u_mousePos + mat2(c, s, -s, c) * (a_position * u_glassSize);
         vec2 uv = screenPos / u_resolution;
 
         // Cover 模式:保持纹理宽高比,等比裁切覆盖视口
@@ -279,6 +285,7 @@ const fsSource = `#version 300 es
     uniform sampler2D u_backgroundTexture;
     uniform vec2 u_resolution;
     uniform vec2 u_glassSize;
+    uniform float u_sampleRotation;
     uniform float u_cornerRadius;
     uniform float u_ior;
     uniform float u_glassThickness;
@@ -425,6 +432,9 @@ const fsSource = `#version 300 es
         vec3 refractedOutOfGlass = refract(refractedIntoGlass, -surfaceNormal3D, u_ior);
 
         vec2 offset_in_pixels = refractedOutOfGlass.xy * u_glassThickness;
+        // 纹理 Y 轴与屏幕相反，因此折射偏移使用相反方向旋转。
+        float c = cos(u_sampleRotation), s = sin(u_sampleRotation);
+        offset_in_pixels = mat2(c, -s, s, c) * offset_in_pixels;
         vec2 offset = (offset_in_pixels / u_resolution) * u_displacementScale;
 
         vec2 refractedTexCoord = v_screenTexCoord + offset;
@@ -566,6 +576,7 @@ function initGL(): boolean {
     mousePos: gl.getUniformLocation(program, 'u_mousePos'),
     glassSize: gl.getUniformLocation(program, 'u_glassSize'),
     canvasOffset: gl.getUniformLocation(program, 'u_canvasOffset'),
+    sampleRotation: gl.getUniformLocation(program, 'u_sampleRotation'),
     texAspect: gl.getUniformLocation(program, 'u_texAspect'),
     backgroundTexture: gl.getUniformLocation(program, 'u_backgroundTexture'),
     cornerRadius: gl.getUniformLocation(program, 'u_cornerRadius'),
@@ -1248,6 +1259,7 @@ function renderInstance(inst: GlassInstance): boolean {
   gl.uniform2fv(locs.mousePos!, uniforms.mousePos)
   gl.uniform2fv(locs.glassSize!, uniforms.glassSize)
   gl.uniform2fv(locs.canvasOffset!, uniforms.canvasOffset)
+  gl.uniform1f(locs.sampleRotation!, uniforms.sampleRotation ?? 0)
   const staticKey = buildStaticUniformKey([
     uniforms.texAspect,
     uniforms.cornerRadius,

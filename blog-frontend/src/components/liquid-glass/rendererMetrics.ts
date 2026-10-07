@@ -21,3 +21,18 @@ export function getEdgeAaWidth(devicePixelRatio: number, renderScale: number): n
 export function buildStaticUniformKey(values: readonly unknown[]): string {
   return values.map((value) => (Array.isArray(value) ? value.join(',') : String(value))).join('|')
 }
+
+/** 旋转面板以实际中心和未变换尺寸采样；普通面板保持原有偏移。 */
+export function getGlassCanvasOffset(
+  rect: { left: number; top: number; width: number; height: number },
+  width: number,
+  height: number,
+  scale: number,
+  rotation = 0,
+): [number, number] {
+  if (rotation === 0) return [rect.left * scale, rect.top * scale]
+  return [
+    (rect.left + rect.width / 2 - width / 2) * scale,
+    (rect.top + rect.height / 2 - height / 2) * scale,
+  ]
+}

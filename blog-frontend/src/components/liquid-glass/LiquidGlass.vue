@@ -45,6 +45,7 @@ import {
   type GlassUniforms,
 } from '@/components/liquid-glass/liquidGlassRenderer'
 import { isVideoBackground } from '@/data/backgrounds'
+import { getGlassCanvasOffset } from './rendererMetrics'
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -66,6 +67,8 @@ const props = withDefaults(
     overlayColor?: [number, number, number]
     allowReveal?: boolean
     realtimeOffset?: boolean
+    /** CSS 旋转对应的背景采样角度（弧度）。 */
+    sampleRotation?: number
     theme?: 'light' | 'dark'
     rippleTrail?: boolean
     rippleStrength?: number
@@ -82,6 +85,7 @@ const props = withDefaults(
     overlayColor: () => [0.85, 0.9, 1.0] as [number, number, number],
     theme: 'dark',
     realtimeOffset: false,
+    sampleRotation: 0,
     rippleTrail: false,
     rippleStrength: 0.34,
     rippleRadius: 66,
@@ -219,6 +223,7 @@ const uniforms: GlassUniforms = {
   mousePos: [0, 0],
   glassSize: [0, 0],
   canvasOffset: [0, 0],
+  sampleRotation: 0,
   texAspect: 1,
   cornerRadius: 0,
   ior: 0,
@@ -315,8 +320,7 @@ function syncCanvasSize() {
   uniforms.mousePos = [pw / 2, ph / 2]
 
   // canvasOffset 仍需要 getBoundingClientRect(计算视口相对位置)
-  const rect = container.getBoundingClientRect()
-  uniforms.canvasOffset = [rect.left * dpr * scale, rect.top * dpr * scale]
+  syncCanvasOffset()
 
   // 清除 trail
   trailPoints = []
@@ -330,7 +334,14 @@ function syncCanvasOffset() {
   const dpr = window.devicePixelRatio || 1
   const scale = getRenderScale()
   uniforms.resolution = [window.innerWidth * dpr * scale, window.innerHeight * dpr * scale]
-  uniforms.canvasOffset = [rect.left * dpr * scale, rect.top * dpr * scale]
+  uniforms.sampleRotation = props.sampleRotation
+  uniforms.canvasOffset = getGlassCanvasOffset(
+    rect,
+    container.offsetWidth,
+    container.offsetHeight,
+    dpr * scale,
+    props.sampleRotation,
+  )
 }
 
 function refreshRenderer() {
