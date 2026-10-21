@@ -19,6 +19,7 @@ from app.schemas.friend import (
     FriendExchangeInfo,
 )
 from app.models.site_config import SiteConfig
+from app.services.friend_exchange import EXCHANGE_CONFIG_KEY, load_exchange_info
 from app.services.friend import (
     create_friend,
     delete_friend,
@@ -27,9 +28,6 @@ from app.services.friend import (
 )
 
 router = APIRouter(prefix="/friends", tags=["友链"])
-
-EXCHANGE_CONFIG_KEY = "friends_exchange_info"
-
 
 def default_exchange_info() -> FriendExchangeInfo:
     """返回交换友链的默认展示内容。"""
@@ -46,14 +44,7 @@ def default_exchange_info() -> FriendExchangeInfo:
 @router.get("/exchange-info", response_model=FriendExchangeInfo)
 async def get_exchange_info(db: AsyncSession = Depends(get_db)):
     """获取交换友链展示信息。"""
-    result = await db.execute(select(SiteConfig).where(SiteConfig.key == EXCHANGE_CONFIG_KEY))
-    config = result.scalar_one_or_none()
-    if not config or not config.value:
-        return default_exchange_info()
-    try:
-        return FriendExchangeInfo.model_validate(json.loads(config.value))
-    except (ValueError, TypeError):
-        return default_exchange_info()
+    return await load_exchange_info(db) or default_exchange_info()
 
 
 @router.put("/exchange-info", response_model=FriendExchangeInfo)

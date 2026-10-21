@@ -24,6 +24,8 @@ from app.api.v1.users import router as users_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.content_stats import router as content_stats_router
 from app.api.v1.r2_migration import router as r2_migration_router
+from app.api.v1.rss import router as rss_router
+from app.api.v1.storage import router as storage_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router)
@@ -46,3 +48,5 @@ router.include_router(users_router)
 router.include_router(analytics_router)
 router.include_router(content_stats_router)
 router.include_router(r2_migration_router)
+router.include_router(rss_router)
+router.include_router(storage_router)

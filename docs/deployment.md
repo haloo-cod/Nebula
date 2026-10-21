@@ -234,6 +234,14 @@ sudo certbot --nginx -d example.com -d www.example.com
 
 ### R2 媒体存储
 
+`R2_ENABLED=true` 仅启用存储能力，实际分发由各文件记录决定。本地迁移和浏览器直传均保留
+稳定的站内访问地址，但并非所有入口都重定向：通用文件 `/api/v1/files/{id}/download`
+和后台同源下载仍走后端；图书阅读依赖本地副本。完整分发规则见 [接口文档](./api-reference.md#静态文件访问)。
+
+后台 `/admin/files` 的“目录浏览”合并显示 `uploads`、`content` 的本地文件和已登记 R2 对象，
+可查看本地副本、相对路径与 R2 对象键；该视图只读，不需要新的数据库迁移或 R2 列桶权限。
+`GET /api/v1/storage/browse` 沿用现有 `/api/` 代理。上线时先更新并重启后端，再部署前端构建。
+
 媒体文件存储在 Cloudflare R2（自定义域，如 `r2.example.com`），后端 `/api/v1/files/{file_id}/media`
 以 **307 重定向**指向 R2 地址（重定向不缓存，同源入口保持可迁移性）。要点：
 
@@ -349,3 +357,17 @@ tar -czf backup-$(date +%Y%m%d).tar.gz \
 3. 重新运行初始化脚本
 
 代码层面无需修改（SQLAlchemy ORM 抽象了数据库差异）。
+
+## RSS 订阅更新
+
+RSS 接口为 `/api/v1/rss.xml`，沿用现有的 `/api/` 反向代理。上线时先拉取代码并重启后端，再执行前端 `pnpm install --frozen-lockfile` 和 `pnpm build`。不需要新增 Python／Node 依赖或数据库结构迁移。
+
+后端 `FRONTEND_URL` 应为正式博客的完整地址，用于订阅中的文章链接；同域生产构建保持 `VITE_API_BASE_URL` 为空，跨域部署使用现有 API 基址。通过以下命令检查 XML 和响应头：
+
+```bash
+curl --fail -i http://127.0.0.1:8000/api/v1/rss.xml
+```
+
+再检查正式域名的 `/api/v1/rss.xml`，确认返回 XML 而非 SPA HTML，以及构建后的 HTML 包含 RSS 自动发现标签。后台“友链管理 → 交换友链”可填写 RSS 地址；留空自动使用本站订阅源，填写后友链页和首页图标使用同一个自定义地址。RSS 响应可缓存 5 分钟，阅读器也有自身抓取周期。
+
+本地 RSS 浏览器检查使用生产构建和模拟 API，不读写站点数据库。在 `blog-frontend/` 依次运行 `pnpm build`、`pnpm exec playwright test --config playwright.rss.config.ts`，覆盖默认／自定义／清空地址、后台保存、主题及窄屏布局；测试截图与结果保存在忽略的 `.playwright-mcp/` 目录。

@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import { rssDiscovery } from './plugins/rss-discovery'
 
 // Vite 构建配置
 export default defineConfig({
@@ -20,6 +21,7 @@ export default defineConfig({
   //   },
   // },
   plugins: [
+    rssDiscovery(),
     vue(),
     tailwindcss(),
     // Element Plus 按需自动导入:组件 + API(ref/reactive 等不重复配置,只处理 ElMessage 等)

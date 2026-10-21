@@ -3,8 +3,9 @@
  * 对应后端 /api/v1/friends 路由
  */
 
-import { api } from './client'
+import { api, BASE_URL } from './client'
 import type { Friend } from '@/types'
+import { resolveRssUrl } from '@/utils/rss'
 
 /** 交换友链展示信息。 */
 export interface FriendExchangeInfo {
@@ -14,6 +15,12 @@ export interface FriendExchangeInfo {
   bio: string
   requirements: string[]
   contact: string
+  rss_url: string
+}
+
+/** 首页与友链页共享订阅地址，留空时生成可复制的完整本站地址。 */
+export function resolveFriendRssUrl(rssUrl = ''): string {
+  return resolveRssUrl(rssUrl, BASE_URL, window.location.origin)
 }
 
 /** 后端返回的友链条目 */

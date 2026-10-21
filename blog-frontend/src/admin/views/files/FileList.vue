@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 通用文件管理：上传、下载与删除后台资源。 */
 import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Download, Refresh, Upload } from '@element-plus/icons-vue'
 import { api, getToken, resolveUrl } from '@/api/client'
@@ -10,6 +11,7 @@ import { uploadDirectToR2 } from '@/api/r2Migration'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import { downloadWithProgress } from '@/utils/download'
+import StorageExplorer from '@/admin/components/StorageExplorer.vue'
 
 /** 图床图片记录。 */
 interface UploadedImage {
@@ -46,7 +48,11 @@ interface BookDownloadJob {
 const files = ref<UploadedFile[]>([])
 const images = ref<UploadedImage[]>([])
 const archives = ref<BookDownloadJob[]>([])
-const activeTab = ref('files')
+const route = useRoute()
+const activeTab = ref(
+  route.query.tab === 'images' || route.query.tab === 'archives' ? route.query.tab : 'files',
+)
+const viewMode = ref(route.query.view === 'library' ? 'library' : 'folders')
 const loading = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
@@ -216,9 +222,7 @@ async function uploadFilesDirect(selectedFiles: File[]) {
     uploadStatus.value = `正在直传 ${file.name}`
     try {
       const record = await uploadDirectToR2(file, 'files', (percent) => {
-        uploadProgress.value = Math.round(
-          ((index + percent / 100) / selectedFiles.length) * 100,
-        )
+        uploadProgress.value = Math.round(((index + percent / 100) / selectedFiles.length) * 100)
       })
       if (!record) throw new Error('直传不可用')
     } catch (err: unknown) {
@@ -360,46 +364,72 @@ function handleTabChange(tab: string | number) {
   if (tab === 'archives') handleArchiveTab()
 }
 
-onMounted(loadFiles)
+/** 从目录条目打开现有业务文件库。 */
+function openLibrary(tab: 'files' | 'images' | 'archives') {
+  activeTab.value = tab
+  viewMode.value = 'library'
+  void loadLibrary()
+}
+
+/** 打开文件库时刷新当前标签，保留原有上传、下载与删除交互。 */
+async function loadLibrary() {
+  if (viewMode.value !== 'library') return
+  if (activeTab.value === 'images') await loadImages()
+  else if (activeTab.value === 'archives') await loadArchives()
+  else await loadFiles()
+}
+
+onMounted(loadLibrary)
 </script>
 
 <template>
   <div class="file-list-page">
     <div class="page-header">
       <div>
-        <h2>文件与媒体</h2>
-        <p>统一管理普通文件和图床图片，数据库仍保持分表。</p>
+        <h2>文件管理</h2>
+        <p>按目录查看本地与 R2 文件，或进入文件库上传和管理资源。</p>
       </div>
-      <div class="upload-actions">
-        <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
-        <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="6" />
-        <span v-if="downloading" class="upload-status"
-          >{{ downloadStatus }} {{ downloadProgress }}%</span
-        >
-        <el-progress v-if="downloading" :percentage="downloadProgress" :stroke-width="6" />
-        <el-button
-          type="primary"
-          :icon="Upload"
-          :loading="uploading"
-          @click="openPicker"
-          :disabled="activeTab === 'archives'"
-        >
-          {{ activeTab === 'files' ? '上传文件' : '上传图片' }}
-        </el-button>
-        <StorageBackendSelect v-if="activeTab !== 'archives'" />
-        <el-switch
-          v-if="activeTab !== 'archives'"
-          v-model="showR2Url"
-          active-text="R2 直链"
-          inactive-text="站内路径"
-          size="small"
-          class="url-mode-switch"
-        />
-        <input ref="fileInput" type="file" class="file-input" multiple @change="handleUpload" />
-      </div>
+      <el-radio-group v-model="viewMode" aria-label="文件展示方式" @change="loadLibrary">
+        <el-radio-button value="folders">目录浏览</el-radio-button>
+        <el-radio-button value="library">文件库</el-radio-button>
+      </el-radio-group>
     </div>
 
-    <el-card shadow="never" class="table-card">
+    <StorageExplorer
+      v-show="viewMode === 'folders'"
+      :visible="viewMode === 'folders'"
+      @library="openLibrary"
+    />
+
+    <div v-show="viewMode === 'library'" class="upload-actions">
+      <span v-if="uploading" class="upload-status">{{ uploadStatus }}</span>
+      <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="6" />
+      <span v-if="downloading" class="upload-status"
+        >{{ downloadStatus }} {{ downloadProgress }}%</span
+      >
+      <el-progress v-if="downloading" :percentage="downloadProgress" :stroke-width="6" />
+      <el-button
+        type="primary"
+        :icon="Upload"
+        :loading="uploading"
+        @click="openPicker"
+        :disabled="activeTab === 'archives'"
+      >
+        {{ activeTab === 'files' ? '上传文件' : '上传图片' }}
+      </el-button>
+      <StorageBackendSelect v-if="activeTab !== 'archives'" />
+      <el-switch
+        v-if="activeTab !== 'archives'"
+        v-model="showR2Url"
+        active-text="R2 直链"
+        inactive-text="站内路径"
+        size="small"
+        class="url-mode-switch"
+      />
+      <input ref="fileInput" type="file" class="file-input" multiple @change="handleUpload" />
+    </div>
+
+    <el-card v-show="viewMode === 'library'" shadow="never" class="table-card">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="普通文件" name="files" />
         <el-tab-pane label="图片" name="images" />

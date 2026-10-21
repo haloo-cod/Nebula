@@ -3,11 +3,11 @@
  * 友链管理 — 列表页
  * 表格展示所有友链，支持新建、编辑、删除
  */
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api } from '@/api/client'
-import type { FriendExchangeInfo } from '@/api/friends'
+import { resolveFriendRssUrl, type FriendExchangeInfo } from '@/api/friends'
 
 /** 友链项（匹配后端 FriendResponse） */
 interface FriendItem {
@@ -34,7 +34,9 @@ const exchangeInfo = ref<FriendExchangeInfo>({
   bio: '',
   requirements: [],
   contact: '',
+  rss_url: '',
 })
+const effectiveRssUrl = computed(() => resolveFriendRssUrl(exchangeInfo.value.rss_url))
 const exchangeLoading = ref(false)
 const exchangeSaving = ref(false)
 const requirementsText = ref('')
@@ -204,6 +206,18 @@ onMounted(() => {
           <el-form-item label="联系方式">
             <el-input v-model="exchangeInfo.contact" placeholder="邮箱或其他联系方式" />
           </el-form-item>
+          <el-form-item label="RSS 订阅地址">
+            <el-input
+              v-model="exchangeInfo.rss_url"
+              placeholder="留空自动使用本站 RSS"
+              maxlength="2048"
+            />
+            <div class="rss-address-hint">
+              当前有效地址：<a :href="effectiveRssUrl" target="_blank" rel="noopener noreferrer">{{
+                effectiveRssUrl
+              }}</a>
+            </div>
+          </el-form-item>
         </div>
         <el-form-item label="站点简介">
           <el-input v-model="exchangeInfo.bio" type="textarea" :rows="2" />
@@ -254,6 +268,13 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.rss-address-hint {
+  margin-top: 6px;
+  color: var(--admin-text-secondary, #909399);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .friend-list-page {
   display: flex;
   flex-direction: column;

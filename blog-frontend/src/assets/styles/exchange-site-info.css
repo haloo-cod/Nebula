@@ -1,0 +1,102 @@
+.exchange-site-info {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.exchange-site-info .exchange-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.exchange-site-info .exchange-info-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.exchange-site-info .exchange-site-name {
+  margin-top: 0;
+  color: var(--text-primary);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.exchange-site-info .exchange-site-url {
+  color: rgba(140, 218, 214, 0.85);
+  font-size: 0.875rem;
+}
+
+[data-theme='light'] .exchange-site-info .exchange-site-url {
+  color: rgba(14, 116, 110, 0.85);
+}
+
+.exchange-site-info .exchange-site-bio {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.exchange-site-info .exchange-site-avatar-url,
+.exchange-site-info .exchange-site-rss {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.exchange-site-info .exchange-site-rss a {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.exchange-site-info .exchange-copy-button {
+  display: inline-flex;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: none;
+  transition: none;
+  animation: none;
+}
+
+.exchange-site-info .exchange-copy-button:hover,
+.exchange-site-info .exchange-copy-button:active {
+  transform: none;
+}
+
+.exchange-copy-button:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.exchange-copy-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.exchange-copy-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.exchange-copy-error {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}

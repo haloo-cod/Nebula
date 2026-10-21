@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, field_validator
 
 
 class FriendExchangeInfo(BaseModel):
@@ -15,6 +15,23 @@ class FriendExchangeInfo(BaseModel):
     bio: str = ""
     requirements: list[str] = []
     contact: str = ""
+    rss_url: str = Field(default="", max_length=2048)
+
+    @field_validator("rss_url", mode="before")
+    @classmethod
+    def trim_rss_url(cls, value):
+        """移除首尾空白，空字符串表示使用本站订阅源。"""
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("rss_url")
+    @classmethod
+    def validate_rss_url(cls, value: str) -> str:
+        """只接受完整 HTTP(S) 地址，并保留原始路径和查询参数。"""
+        if value:
+            if not value.lower().startswith(("http://", "https://")) or any(char.isspace() for char in value):
+                raise ValueError("RSS 链接必须是完整的 HTTP 或 HTTPS 地址")
+            TypeAdapter(HttpUrl).validate_python(value)
+        return value
 
 
 class FriendCreate(BaseModel):

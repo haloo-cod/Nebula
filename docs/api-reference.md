@@ -300,6 +300,34 @@ Authorization: Bearer eyJ...
 
 ---
 
+## 后台目录浏览 (`/api/v1/storage`)
+
+`GET /api/v1/storage/browse` 仅管理员可用。按目录合并本地文件与数据库中已登记的 R2 对象，
+保留只有 R2 对象或只有数据库记录的文件，并合并迁移后仍存在的本地副本；不读取文件正文、
+不列举整个 R2 存储桶，也不修改存储记录或磁盘文件。
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `root` | `uploads` | 只允许 `uploads`、`content`，对应后端配置的业务根目录 |
+| `path` | 空字符串 | 根目录内相对路径，例如 `images/2026/10`，最多 2048 字符 |
+| `page` | `1` | 文件页码，从 1 开始 |
+| `page_size` | `100` | 每页文件数，1–200；子目录始终完整返回 |
+
+响应包含 `root`、`path`、`directories`、`items`、`total`、`page`、`page_size`、`r2_enabled`。
+每个文件条目包含 `name`、`path`、`title`、`file_size`、`modified_at`、`local_exists`、
+`storage_backend`、`record_kind`、`record_id`、`r2_key`、`r2_url`、`url`、`manage_url`。
+未登记文件的关联字段为空；没有本地副本时，时间使用登记时间，大小可能未知。
+R2 标签表示数据库中的存储配置，不执行远程对象存在性检查。
+
+目录涵盖上传图片、普通文件、EPUB、背景自有视频、图书 / 文章 ZIP，以及 Markdown 原文件。
+背景引用的图片和文件库视频仍归其原目录，不重复生成文件。隐藏路径、绝对路径、`..`、
+符号链接和越出根目录的路径不允许浏览；未知目录返回 `404`。
+
+后台入口为 `/admin/files`，默认显示左侧目录树与右侧文件列表。文件行可展开查看对象键和地址；
+“管理”跳到现有业务页面，“文件库”保留原有上传、下载、删除及归档任务操作。
+
+---
+
 ## 背景图 (`/api/v1/backgrounds`)
 
 | 方法 | 路径 | 权限 | 说明 |
@@ -341,6 +369,8 @@ Authorization: Bearer eyJ...
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
 | GET | `/friends` | 公开 | 友链列表 |
+| GET | `/friends/exchange-info` | 公开 | 本站交换友链信息及 RSS 地址配置 |
+| PUT | `/friends/exchange-info` | 管理员 | 保存本站交换友链信息及 RSS 地址配置 |
 | POST | `/friends` | 管理员 | 添加友链 |
 | PUT | `/friends/{id}` | 管理员 | 更新友链 |
 | DELETE | `/friends/{id}` | 管理员 | 删除友链 |
@@ -356,6 +386,27 @@ Authorization: Bearer eyJ...
   "sort_order": 0
 }
 ```
+
+### 交换友链信息中的 RSS 配置
+
+GET／PUT `/api/v1/friends/exchange-info` 在原有 `name`、`url`、`avatar`、`bio`、`requirements`、`contact` 字段外增加 `rss_url: string`，默认 `""`。PUT 仍提交完整交换信息；地址会移除首尾空白，只允许空值或最长 2048 字符的完整 HTTP／HTTPS 地址。
+
+空值表示前台使用现有 API 基址下的 `/api/v1/rss.xml`，同域部署会补全当前站点来源。后台填写自定义地址后，友链页和首页图标共同使用该地址；清空恢复本站默认值。地址配置只控制两个可见入口，本站 RSS 接口和静态自动发现标签始终可用。
+
+配置仍存储在 `site_config` 的 `friends_exchange_info` JSON 中；旧 JSON 缺少 `rss_url` 时读取为空，无需数据库结构迁移。
+
+---
+
+## RSS 订阅 (`/api/v1/rss.xml`)
+
+`GET /api/v1/rss.xml` 无需认证，返回 UTF-8 RSS 2.0 XML，`Content-Type: application/rss+xml; charset=utf-8`，`Cache-Control: public, max-age=300`。
+
+- 返回最近 20 篇已发布博文；按实际发布日期、创建时间、ID 倒序，置顶不影响订阅顺序，草稿始终排除。
+- 兼容 `YYYY-M-D` 与 `YYYY-MM-DD`，发布日期按北京时间零点解释；为空或无效时使用创建时间，数据库无时区时间按 UTC 解释。
+- 每项包含标题、摘要、原文链接、发布日期、稳定 GUID，以及非空的分类。简介为空时，摘要从数据库中预渲染正文提取前 200 字纯文本，排除脚本和样式内容。
+- 原文地址使用后端 `FRONTEND_URL` 与编码后的文章 slug；GUID 由站点、文章 ID、创建时间组成，编辑标题、slug、正文时保持稳定。
+- 频道名称和简介使用交换友链配置，空值回退到博客默认名称及简介。XML 直接从数据库生成，文章发布后在阅读器下次抓取且缓存过期时体现。
+- 前端静态 HTML 中的 `link[rel="alternate"][type="application/rss+xml"]` 始终指向本站接口，构建时沿用 `VITE_API_BASE_URL`。
 
 ---
 
@@ -503,10 +554,24 @@ Authorization: Bearer eyJ...
 
 ## 静态文件访问
 
-媒体已迁移至 Cloudflare R2：上传后文件存入 R2 存储桶，`/uploads/*` 与
-`/api/v1/files/{file_id}/media` 等同源媒体入口均以 **307 重定向**指向 R2 自定义域地址
-（重定向不缓存）。浏览器会转发原始 `Origin` 到 R2，CORS 由 R2 桶策略放行；前端另以
-`_cors=2` 查询参数隔离浏览器缓存键（详见 [background-media.md](./background-media.md)）。
+是否访问 R2 取决于每条记录的 `storage_backend` 和 `r2_key`，启用 `R2_ENABLED` 不会自动迁移本地文件。
+
+| 访问入口 | R2 文件的实际分发方式 |
+|----------|----------------------|
+| `/uploads/...` 中登记的图片、通用文件和背景自有视频 | 配置公开域名时通常 `307`；带 `download=1` 或 Authorization 时由后端代理；无公开域名时也代理 |
+| `/api/v1/files/{id}/media`、`/api/v1/backgrounds/media/{name}` | 配置公开域名时 `307`，否则后端代理 |
+| `/api/v1/files/{id}/download` | 后端从 R2 取回并发送附件，仍占用服务器流量 |
+| 图书 `/read`、`/read-resource/...`、管理员 `/download` | 从本地 EPUB 提供；缺少副本时从 R2 回填，再由服务器响应 |
+| 已派生的 `r2_url` 直链 | 浏览器直接访问 R2，没有本站 `307` 这一步 |
+
+本地记录直接返回本地文件；`/uploads/books/...` 等未匹配上述存储记录的路径也使用本地兜底。
+跨域媒体的 CORS 由 R2 桶策略放行；前端另以 `_cors=2` 查询参数隔离浏览器缓存键
+（详见 [background-media.md](./background-media.md)）。
+
+上传也有不同入口：文件管理页选 R2 时，图片 / 普通文件使用预签名 PUT 直传，再登记数据库；
+其他仍调用 `/images/upload`、`/files/upload` 的入口先将内容交给后端，再按存储选项写入本地或 R2。
+EPUB 和背景自有视频经服务器处理并保留本地副本。已有本地文件迁移到 R2 后，当前实现保留本地文件，
+更新存储记录并维持原访问地址；上传不会为每个文件新增 FastAPI 路由。
 
 历史同源路径（用于后台管理与兼容）：
 

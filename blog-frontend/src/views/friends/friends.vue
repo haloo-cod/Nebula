@@ -112,12 +112,7 @@
               class="exchange-avatar"
               loading="lazy"
             />
-            <div class="exchange-site-info">
-              <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
-              <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
-              <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
-              <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
-            </div>
+            <ExchangeSiteInfo :info="exchangeInfo" :rss-url="rssUrl" />
           </div>
 
           <div class="exchange-block">
@@ -146,12 +141,7 @@
             class="exchange-avatar"
             loading="lazy"
           />
-          <div class="exchange-site-info">
-            <h3 class="exchange-site-name">{{ exchangeInfo.name }}</h3>
-            <p class="exchange-site-url">{{ exchangeInfo.url }}</p>
-            <p class="exchange-site-bio">{{ exchangeInfo.bio }}</p>
-            <p class="exchange-site-avatar-url">头像：{{ exchangeInfo.avatar }}</p>
-          </div>
+          <ExchangeSiteInfo :info="exchangeInfo" :rss-url="rssUrl" />
         </div>
 
         <div class="exchange-block">
@@ -177,8 +167,14 @@ import { onMounted, ref } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ExchangeSiteInfo from '@/components/ExchangeSiteInfo.vue'
 import { getFriends } from '@/data/friends'
-import { fetchFriends, fetchFriendExchangeInfo, type FriendExchangeInfo } from '@/api/friends'
+import {
+  fetchFriends,
+  fetchFriendExchangeInfo,
+  resolveFriendRssUrl,
+  type FriendExchangeInfo,
+} from '@/api/friends'
 import { siteText } from '@/data/site-text'
 import { useUIStore } from '@/stores/ui'
 import { useFloatingAvatars } from '@/composables/useFloatingAvatars'
@@ -186,6 +182,7 @@ import { useFloatingAvatars } from '@/composables/useFloatingAvatars'
 const ui = useUIStore()
 const friends = ref(getFriends())
 const aquariumRef = ref<HTMLElement | null>(null)
+const rssUrl = ref('')
 
 // 交换友链占位信息，后续替换为真实内容
 const exchangeInfo = ref<FriendExchangeInfo>({
@@ -195,6 +192,7 @@ const exchangeInfo = ref<FriendExchangeInfo>({
   bio: '这里填写你的站点简介。',
   requirements: ['原创内容优先', '站点稳定可访问', '无违法违规内容', '最好有定期更新'],
   contact: 'your-email@example.com',
+  rss_url: '',
 })
 
 const {
@@ -212,16 +210,20 @@ const {
 // 尝试从后端 API 加载友链列表
 onMounted(async () => {
   try {
-    const [apiFriends, apiExchangeInfo] = await Promise.all([
-      fetchFriends(),
-      fetchFriendExchangeInfo(),
-    ])
-    if (apiFriends.length > 0) {
-      friends.value = apiFriends
-    }
-    exchangeInfo.value = apiExchangeInfo
+    const apiFriends = await fetchFriends()
+    if (apiFriends.length > 0) friends.value = apiFriends
   } catch {
-    // API 失败，保留本地 fallback 数据
+    // 友链列表加载失败时保留静态列表，交换信息独立加载。
+  }
+})
+
+onMounted(async () => {
+  try {
+    const info = await fetchFriendExchangeInfo()
+    exchangeInfo.value = info
+    rssUrl.value = resolveFriendRssUrl(info.rss_url)
+  } catch {
+    // 配置不可用时隐藏订阅入口，其余内容独立保留现有数据。
   }
 })
 </script>
@@ -485,7 +487,7 @@ onMounted(async () => {
 
 .exchange-site {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1.25rem;
   padding-bottom: 1.25rem;
@@ -496,41 +498,11 @@ onMounted(async () => {
   width: 4rem;
   height: 4rem;
   flex-shrink: 0;
+  margin-top: 0.125rem;
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: var(--glass-bg-subtle);
   object-fit: cover;
-}
-
-.exchange-site-name {
-  color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.exchange-site-url {
-  margin-top: 0.2rem;
-  color: rgba(140, 218, 214, 0.85);
-  font-size: 0.8rem;
-}
-
-[data-theme='light'] .exchange-site-url {
-  color: rgba(14, 116, 110, 0.85);
-}
-
-.exchange-site-bio {
-  margin-top: 0.35rem;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-
-.exchange-site-avatar-url {
-  margin-top: 0.35rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  line-height: 1.45;
-  word-break: break-all;
 }
 
 .exchange-block {
@@ -542,22 +514,25 @@ onMounted(async () => {
 }
 
 .exchange-block-title {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-weight: 700;
+  line-height: 1.5;
 }
 
 .exchange-list {
   padding-left: 1.25rem;
   color: var(--text-secondary);
-  font-size: 0.82rem;
-  line-height: 1.7;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .exchange-contact {
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 767px) {

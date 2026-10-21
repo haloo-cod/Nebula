@@ -18,6 +18,7 @@
               :name="profileName"
               :bio="profileBio"
               :links="profileLinks"
+              :rss-url="profileRssUrl"
             />
           </LiquidGlass>
           <PanelFallbackGlass v-else static-blur>
@@ -26,6 +27,7 @@
               :name="profileName"
               :bio="profileBio"
               :links="profileLinks"
+              :rss-url="profileRssUrl"
             />
           </PanelFallbackGlass>
         </div>
@@ -50,7 +52,11 @@
 
     <!-- 玻璃横条（标题） -->
     <div class="title-container" :class="containerClass">
-      <div class="title-glass" data-background-credit-boundary :class="{ 'title-glass--visible': showUIElements }">
+      <div
+        class="title-glass"
+        data-background-credit-boundary
+        :class="{ 'title-glass--visible': showUIElements }"
+      >
         <h1 class="typewriter-title" translate="no">
           {{ typewriterDone ? fullTitle : displayed }}<span class="caret caret-blink">|</span>
         </h1>
@@ -168,6 +174,7 @@ import {
   socialLinks as fallbackLinks,
 } from '@/data/profile'
 import { fetchProfile } from '@/api/profile'
+import { fetchFriendExchangeInfo, resolveFriendRssUrl } from '@/api/friends'
 import type { SocialLink } from '@/types'
 
 const ui = useUIStore()
@@ -177,6 +184,7 @@ const profileAvatar = ref(fallbackAvatar)
 const profileName = ref(fallbackProfile.name)
 const profileBio = ref(fallbackProfile.bio)
 const profileLinks = ref<SocialLink[]>(fallbackLinks)
+const profileRssUrl = ref('')
 const fullTitle = "Starlitn'blog"
 const isMobile = ref(window.innerWidth < 768)
 const showContentDirectly = history.state?.showContent === true
@@ -223,6 +231,16 @@ onMounted(async () => {
 
 onUnmounted(() => {
   ui.showNavbar = true
+})
+
+onMounted(async () => {
+  // 与个人资料独立加载，避免其中一个接口失败遮蔽另一个接口的内容。
+  try {
+    const info = await fetchFriendExchangeInfo()
+    profileRssUrl.value = resolveFriendRssUrl(info.rss_url)
+  } catch {
+    // 未成功获取配置时不展示可能过期的 RSS 地址，个人资料保持正常。
+  }
 })
 
 const containerClass = computed(() => {

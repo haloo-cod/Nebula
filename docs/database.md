@@ -279,6 +279,8 @@
 
 当前由管理后台提供配置编辑入口，具体配置项以接口和实现为准。
 
+`friends_exchange_info` 使用 JSON 保存本站交换友链信息：`name`、`url`、`avatar`、`bio`、`requirements`、`contact` 和 `rss_url`。`rss_url` 默认空字符串，旧 JSON 缺少字段时由接口补默认值；空值让前台使用本站 `/api/v1/rss.xml`，自定义值须为不超过 2048 字符的完整 HTTP／HTTPS 地址。该字段复用现有 JSON，无需新增列或迁移正文文件。
+
 ---
 
 ## analytics_events — 访问统计事件

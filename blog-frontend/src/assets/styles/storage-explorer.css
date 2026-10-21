@@ -1,0 +1,152 @@
+.storage-explorer {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+  background: var(--admin-panel-bg);
+}
+
+.storage-directory-pane {
+  min-width: 0;
+  padding: 16px 10px;
+  border-right: 1px solid var(--el-border-color-light);
+}
+
+.storage-directory-pane h3 {
+  margin: 0 8px 14px;
+  font-size: 14px;
+  color: var(--admin-text-color);
+}
+
+.storage-directory-pane .el-tree {
+  overflow-x: auto;
+  background: transparent;
+}
+
+.storage-tree-label,
+.storage-file-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.storage-tree-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.storage-file-name > span {
+  overflow-wrap: anywhere;
+}
+
+.storage-file-pane {
+  min-width: 0;
+  padding: 18px;
+}
+
+.storage-directory-toolbar,
+.storage-directory-actions,
+.storage-directory-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.storage-directory-toolbar .el-breadcrumb {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.storage-directory-toolbar .el-breadcrumb button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--el-color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.storage-directory-note,
+.storage-directory-footer {
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+}
+
+.storage-directory-note {
+  margin: 12px 0;
+  line-height: 1.7;
+}
+
+.storage-directory-content {
+  min-height: 260px;
+}
+
+.storage-subdirectories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.storage-subdirectories .el-button + .el-button,
+.storage-directory-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.storage-file-title {
+  display: block;
+  margin-top: 4px;
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.storage-file-details {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px 14px;
+  margin: 12px 24px;
+  font-size: 13px;
+}
+
+.storage-file-details dt {
+  color: var(--admin-text-secondary);
+}
+
+.storage-file-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.storage-directory-footer {
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .storage-explorer {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .storage-explorer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .storage-directory-pane {
+    max-height: 210px;
+    overflow: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--el-border-color-light);
+  }
+
+  .storage-file-pane {
+    padding: 14px;
+  }
+}

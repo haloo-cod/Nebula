@@ -31,6 +31,17 @@
       </div>
       <div class="hp-social" translate="no">
         <a
+          v-if="rssUrl"
+          :href="rssUrl"
+          title="RSS 订阅"
+          aria-label="RSS 订阅"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hp-social-icon hp-rss-link"
+        >
+          <SvgIcon name="rss" class="hp-social-svg" />
+        </a>
+        <a
           v-for="link in links"
           :key="link.label"
           :href="link.url"
@@ -75,11 +86,13 @@ withDefaults(
     name?: string
     bio?: string
     links?: SocialLink[]
+    rssUrl?: string
   }>(),
   {
     name: 'Starlit',
     bio: '分享技术、生活和思考的个人博客',
     links: () => [],
+    rssUrl: '',
   },
 )
 </script>
