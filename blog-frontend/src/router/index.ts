@@ -127,6 +127,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/auth/AuthCallback.vue'),
   },
   {
+    path: '/auth/link-github',
+    name: 'auth-link-github',
+    meta: { hideChrome: true },
+    component: () => import('../views/auth/GithubLinkConfirm.vue'),
+  },
+  {
     path: '/verify-email',
     name: 'verify-email',
     meta: { hideChrome: true },
@@ -305,7 +311,7 @@ router.afterEach((to) => {
 
   if (
     to.path.startsWith('/admin') ||
-    ['/login', '/register', '/auth/callback', '/verify-email'].includes(to.path)
+    ['/login', '/register', '/auth/callback', '/auth/link-github', '/verify-email'].includes(to.path)
   ) {
     return
   }

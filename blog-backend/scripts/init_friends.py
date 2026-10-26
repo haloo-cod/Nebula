@@ -14,6 +14,8 @@ from sqlalchemy import select
 from app.database import engine, AsyncSessionLocal
 from app.models import Base
 from app.models.friend import Friend
+from app.services.friend import create_friend, update_friend, commit_friend_changes
+from app.services.schema_migration import migrate_existing_schema
 
 
 # 前端 friends.ts 中的静态数据
@@ -64,6 +66,7 @@ async def main():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await migrate_existing_schema(engine)
 
     async with AsyncSessionLocal() as session:
         created = 0
@@ -82,24 +85,18 @@ async def main():
                 continue
 
             if existing_friend and force:
-                existing_friend.bio = data["bio"]
-                existing_friend.avatar = data["avatar"]
-                existing_friend.url = data["url"]
-                existing_friend.sort_order = order
+                await update_friend(
+                    session, existing_friend.id, bio=data["bio"], avatar=data["avatar"],
+                    url=data["url"], sort_order=order, rss_url=data.get("rss_url", ""),
+                )
                 print(f"  更新: {data['name']}")
             else:
-                friend = Friend(
-                    name=data["name"],
-                    bio=data["bio"],
-                    avatar=data["avatar"],
-                    url=data["url"],
-                    sort_order=order,
-                )
-                session.add(friend)
+                await create_friend(session, sort_order=order, rss_url=data.get("rss_url", ""),
+                                    **{key: data[key] for key in ("name", "bio", "avatar", "url")})
                 created += 1
                 print(f"  新增: {data['name']}")
 
-        await session.commit()
+        await commit_friend_changes(session)
 
     print(f"\n完成! 新增 {created} 条，跳过 {skipped} 条")
 

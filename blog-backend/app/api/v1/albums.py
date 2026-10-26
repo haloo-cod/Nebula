@@ -94,6 +94,7 @@ async def update(
             description=data.description,
             orientation=data.orientation,
             cover_image_id=data.cover_image_id,
+            update_cover="cover_image_id" in data.model_fields_set,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

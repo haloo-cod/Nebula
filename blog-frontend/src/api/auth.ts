@@ -3,7 +3,7 @@
  * 对接后端 /api/v1/auth 模块（登录、获取当前用户信息）
  */
 
-import { api } from './client'
+import { api, refreshAccessToken } from './client'
 
 /** 登录请求参数 */
 export interface LoginRequest {
@@ -15,6 +15,12 @@ export interface LoginRequest {
 export interface RegisterRequest {
   username: string
   email: string
+  password: string
+}
+
+/** 使用现有账户密码确认 GitHub 绑定。 */
+export interface GithubLinkConfirmRequest {
+  link_token: string
   password: string
 }
 
@@ -53,9 +59,14 @@ export function register(data: RegisterRequest): Promise<RegisterResponse> {
   return api.post<RegisterResponse>('/api/v1/auth/register', data)
 }
 
+/** 确认 GitHub 绑定并建立登录会话。 */
+export function confirmGithubLink(data: GithubLinkConfirmRequest): Promise<TokenResponse> {
+  return api.post<TokenResponse>('/api/v1/auth/github/confirm-link', data)
+}
+
 /** 使用 Refresh Cookie 恢复访问令牌 */
 export function refreshSession(): Promise<TokenResponse> {
-  return api.post<TokenResponse>('/api/v1/auth/refresh')
+  return refreshAccessToken()
 }
 
 /** 撤销当前登录会话 */

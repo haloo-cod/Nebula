@@ -330,7 +330,7 @@ blog-backend/
 ├── blog.db              # SQLite 数据库（核心！）
 ├── data/
 │   ├── moments.json     # 说说数据
-│   └── comments.json    # 评论数据
+│   └── friends.json     # 数据库生成的正式友链副本，可在启动或后台重新同步
 ├── uploads/             # 所有上传文件
 └── content/             # Markdown 原文
 ```

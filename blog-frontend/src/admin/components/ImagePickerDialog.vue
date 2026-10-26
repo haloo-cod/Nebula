@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 后台媒体库图片选择器：复用已有图床图片，也支持上传新图片。 */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
@@ -38,16 +38,33 @@ const uploading = ref(false)
 const { storageBackend } = useStorageBackend()
 const uploadInput = ref<HTMLInputElement | null>(null)
 const keyword = ref('')
-const selectedId = ref<number | null>(null)
-const selectedIds = ref<number[]>([])
+const page = ref(1)
+const pageSize = ref(24)
+const total = ref(0)
+const error = ref('')
+const selectedImage = ref<PickerImage | null>(null)
+const selectedImages = ref(new Map<number, PickerImage>())
+const selectedId = computed(() => selectedImage.value?.id ?? null)
+const selectedIds = computed(() => [...selectedImages.value.keys()])
+let requestVersion = 0
+let dialogVersion = 0
 
-const filteredImages = computed(() => {
-  const query = keyword.value.trim().toLowerCase()
-  if (!query) return images.value
-  return images.value.filter((image) => image.original_name.toLowerCase().includes(query))
-})
+/** 每次打开、关闭都开始独立的选择会话，并作废未完成的列表请求。 */
+function resetPicker() {
+  requestVersion++
+  dialogVersion++
+  images.value = []
+  loading.value = false
+  error.value = ''
+  keyword.value = ''
+  page.value = 1
+  total.value = 0
+  selectedImage.value = null
+  selectedImages.value.clear()
+}
 
 function close() {
+  resetPicker()
   emit('update:modelValue', false)
 }
 
@@ -57,34 +74,62 @@ function formatSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+/** 只接收当前对话框最后一次列表请求的结果。 */
 async function loadImages() {
+  const version = ++requestVersion
   loading.value = true
+  error.value = ''
+  images.value = []
+  const params = new URLSearchParams({
+    page: String(page.value),
+    page_size: String(pageSize.value),
+  })
+  const query = keyword.value.trim()
+  if (query) params.set('keyword', query)
   try {
     const response = await api.get<{ items: PickerImage[]; total: number }>(
-      '/api/v1/images?page=1&page_size=100',
+      `/api/v1/images?${params}`,
       true,
     )
+    if (version !== requestVersion || !props.modelValue) return
     images.value = response.items
+    total.value = response.total
   } catch (err: unknown) {
-    ElMessage.error(err instanceof Error ? err.message : '加载图片库失败')
+    if (version !== requestVersion || !props.modelValue) return
+    error.value = err instanceof Error ? err.message : '加载图片库失败'
+    ElMessage.error(error.value)
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
+}
+
+function searchImages() {
+  page.value = 1
+  void loadImages()
+}
+
+function changePage(value: number) {
+  page.value = value
+  void loadImages()
+}
+
+function changePageSize(value: number) {
+  pageSize.value = value
+  searchImages()
 }
 
 function choose(image: PickerImage) {
   if (props.multiple) {
-    selectedIds.value = selectedIds.value.includes(image.id)
-      ? selectedIds.value.filter((id) => id !== image.id)
-      : [...selectedIds.value, image.id]
+    if (selectedImages.value.has(image.id)) selectedImages.value.delete(image.id)
+    else selectedImages.value.set(image.id, image)
     return
   }
-  selectedId.value = image.id
+  selectedImage.value = image
 }
 
 function confirm() {
   if (props.multiple) {
-    const selected = images.value.filter((item) => selectedIds.value.includes(item.id))
+    const selected = [...selectedImages.value.values()]
     if (!selected.length) {
       ElMessage.warning('请至少选择一张图片')
       return
@@ -93,7 +138,7 @@ function confirm() {
     close()
     return
   }
-  const image = images.value.find((item) => item.id === selectedId.value)
+  const image = selectedImage.value
   if (!image) {
     ElMessage.warning('请选择一张图片')
     return
@@ -110,14 +155,21 @@ async function handleUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const session = dialogVersion
   uploading.value = true
   try {
     const image = await uploadImage(file, storageBackend.value)
+    if (session !== dialogVersion || !props.modelValue) return
+    if (props.multiple) selectedImages.value.set(image.id, image)
+    else selectedImage.value = image
+    keyword.value = ''
+    page.value = 1
     await loadImages()
-    selectedId.value = image.id
-    ElMessage.success('图片上传成功，已选中')
+    if (session === dialogVersion) ElMessage.success('图片上传成功，已选中')
   } catch (err: unknown) {
-    ElMessage.error(err instanceof Error ? err.message : '图片上传失败')
+    if (session === dialogVersion) {
+      ElMessage.error(err instanceof Error ? err.message : '图片上传失败')
+    }
   } finally {
     uploading.value = false
     input.value = ''
@@ -127,14 +179,16 @@ async function handleUpload(event: Event) {
 watch(
   () => props.modelValue,
   (visible) => {
-    if (visible) {
-      selectedId.value = null
-      selectedIds.value = []
-      keyword.value = ''
-      void loadImages()
-    }
+    resetPicker()
+    if (visible) void loadImages()
   },
+  { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  requestVersion++
+  dialogVersion++
+})
 </script>
 
 <template>
@@ -146,7 +200,14 @@ watch(
     @close="close"
   >
     <div class="picker-toolbar">
-      <el-input v-model="keyword" clearable placeholder="搜索文件名" />
+      <el-input
+        v-model="keyword"
+        clearable
+        placeholder="搜索全部图片文件名"
+        @keyup.enter="searchImages"
+        @clear="searchImages"
+      />
+      <el-button :disabled="uploading" @click="searchImages">搜索</el-button>
       <el-button type="primary" plain :icon="Upload" :loading="uploading" @click="openUpload">
         上传新图片
       </el-button>
@@ -160,13 +221,17 @@ watch(
       />
     </div>
 
-    <div v-loading="loading" class="image-grid">
+    <el-result v-if="error" icon="error" :title="error">
+      <template #extra><el-button @click="loadImages">重新加载</el-button></template>
+    </el-result>
+    <div v-else v-loading="loading" class="image-grid">
       <button
-        v-for="image in filteredImages"
+        v-for="image in images"
         :key="image.id"
         type="button"
         class="image-option"
         :class="{ selected: multiple ? selectedIds.includes(image.id) : selectedId === image.id }"
+        :disabled="loading || uploading"
         @click="choose(image)"
       >
         <img :src="resolveUrl(image.url)" :alt="image.original_name" />
@@ -175,12 +240,22 @@ watch(
           {{ image.width }} × {{ image.height }} · {{ formatSize(image.file_size) }}
         </span>
       </button>
-      <el-empty v-if="!loading && filteredImages.length === 0" description="暂无可选图片" />
+      <el-empty v-if="!loading && images.length === 0" description="暂无可选图片" />
     </div>
+    <el-pagination
+      :current-page="page"
+      :page-size="pageSize"
+      :page-sizes="[24, 48, 100]"
+      :total="total"
+      :disabled="uploading"
+      layout="total, sizes, prev, pager, next"
+      @current-change="changePage"
+      @size-change="changePageSize"
+    />
 
     <template #footer>
       <el-button @click="close">取消</el-button>
-      <el-button type="primary" @click="confirm"
+      <el-button type="primary" :disabled="loading || uploading" @click="confirm"
         >确认选择{{ multiple ? `（${selectedIds.length}）` : '' }}</el-button
       >
     </template>

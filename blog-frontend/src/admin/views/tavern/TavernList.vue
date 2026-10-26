@@ -84,8 +84,9 @@ async function handleDelete(post: TavernPost) {
     await api.delete(`/api/v1/tavern/${post.id}`)
     ElMessage.success('删除成功')
     loadPosts()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除帖子失败')
   }
 }
 

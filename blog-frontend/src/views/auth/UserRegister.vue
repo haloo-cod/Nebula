@@ -4,6 +4,7 @@ import { reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { BASE_URL } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { getPasswordError } from '@/utils/password'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -31,6 +32,11 @@ async function submit() {
   }
   if (form.password !== form.confirmPassword) {
     error.value = '两次输入的密码不一致'
+    return
+  }
+  const passwordError = getPasswordError(form.password)
+  if (passwordError) {
+    error.value = passwordError
     return
   }
   loading.value = true
@@ -155,9 +161,9 @@ async function submit() {
                   v-model="form.password"
                   :type="passwordVisible ? 'text' : 'password'"
                   minlength="8"
-                  maxlength="128"
+                  maxlength="72"
                   autocomplete="new-password"
-                  placeholder="至少 8 个字符"
+                  placeholder="至少 8 个字符，最多 72 字节"
                   required
                 />
                 <button

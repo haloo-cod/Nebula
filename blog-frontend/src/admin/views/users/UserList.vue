@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshRight } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import { getPasswordError } from '@/utils/password'
 
 /** 用户列表项。 */
 interface UserItem {
@@ -98,11 +99,13 @@ function openPassword(user: UserItem) {
 /** 重置密码并撤销用户旧会话。 */
 async function resetPassword() {
   if (!editingUser.value) return
-  if (
-    passwordForm.value.password.length < 8 ||
-    passwordForm.value.password !== passwordForm.value.confirm
-  ) {
-    ElMessage.warning('请输入至少 8 位且两次一致的新密码')
+  const passwordError = getPasswordError(passwordForm.value.password)
+  if (passwordError) {
+    ElMessage.warning(passwordError)
+    return
+  }
+  if (passwordForm.value.password !== passwordForm.value.confirm) {
+    ElMessage.warning('两次输入的密码不一致')
     return
   }
   resetting.value = true
@@ -129,8 +132,9 @@ async function revokeSessions(user: UserItem) {
     })
     await api.post(`/api/v1/users/${user.id}/revoke-sessions`, undefined, true)
     ElMessage.success('登录会话已撤销')
-  } catch {
-    // 取消操作不提示
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '撤销登录会话失败')
   }
 }
 
@@ -145,8 +149,9 @@ async function deleteUser(user: UserItem) {
     await api.delete(`/api/v1/users/${user.id}`, true)
     ElMessage.success('用户已删除')
     await loadData()
-  } catch {
-    // 取消操作不提示
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除用户失败')
   }
 }
 
@@ -270,7 +275,7 @@ onMounted(() => loadData())
 
     <el-dialog v-model="showPasswordDialog" title="重置密码" width="420px">
       <el-form label-position="top"
-        ><el-form-item label="新密码"
+        ><el-form-item label="新密码（至少 8 个字符，最多 72 个 UTF-8 字节）"
           ><el-input v-model="passwordForm.password" type="password" show-password /></el-form-item
         ><el-form-item label="确认密码"
           ><el-input v-model="passwordForm.confirm" type="password" show-password /></el-form-item

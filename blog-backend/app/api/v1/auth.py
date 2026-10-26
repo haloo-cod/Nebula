@@ -2,24 +2,27 @@
 
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
+import secrets
 
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models.user import AuthSession, User
-from app.schemas.auth import LoginRequest, RegisterRequest, RegisterResponse, TokenResponse, UserResponse
+from app.schemas.auth import GithubLinkConfirmRequest, LoginRequest, RegisterRequest, RegisterResponse, TokenResponse, UserResponse
 from app.services.email import send_verification_email
 from app.utils.security import (
     create_access_token,
     create_email_verification_token,
     create_refresh_token,
     decode_access_token,
+    decode_user_token,
     hash_password,
     hash_token,
     verify_password,
@@ -66,21 +69,40 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
     )
 
 
-async def _create_session(user: User, db: AsyncSession, response: Response) -> TokenResponse:
-    """创建刷新会话并返回短期访问令牌。"""
-
+async def _create_session(
+    user: User, db: AsyncSession, response: Response, *, previous_session: AuthSession | None = None,
+) -> TokenResponse:
+    """锁定账户身份，原子轮换刷新会话并签发 UUID 访问令牌。"""
+    now = datetime.now(timezone.utc)
+    active = await db.scalar(
+        update(User).where(User.id == user.id, User.auth_id == user.auth_id)
+        .values(last_login_at=now).returning(User.is_active)
+        .execution_options(synchronize_session=False)
+    )
+    if not active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账户不可用")
+    if previous_session is not None:
+        claimed = await db.execute(
+            update(AuthSession).where(
+                AuthSession.id == previous_session.id,
+                AuthSession.user_id == user.id, AuthSession.auth_id == user.auth_id,
+                AuthSession.revoked_at.is_(None), AuthSession.expires_at > now,
+            ).values(revoked_at=now).execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录会话已失效")
     refresh_token = create_refresh_token()
     db.add(
         AuthSession(
             user_id=user.id,
+            auth_id=user.auth_id,
             token_hash=hash_token(refresh_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         )
     )
-    user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     _set_refresh_cookie(response, refresh_token)
-    return TokenResponse(access_token=create_access_token({"sub": str(user.id)}))
+    return TokenResponse(access_token=create_access_token({"sub": user.auth_id}))
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -110,7 +132,7 @@ async def register(
     db.add(user)
     await db.flush()
     if settings.REQUIRE_EMAIL_VERIFICATION:
-        verification_token = create_email_verification_token(user.id, body.email)
+        verification_token = create_email_verification_token(user.auth_id, body.email)
         verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
         await send_verification_email(body.email, verification_url)
         await db.commit()
@@ -130,7 +152,7 @@ async def resend_email_verification(
 
     if user.email_verified or not user.email:
         return
-    token = create_email_verification_token(user.id, user.email)
+    token = create_email_verification_token(user.auth_id, user.email)
     await send_verification_email(user.email, f"{settings.FRONTEND_URL}/verify-email?token={token}")
 
 
@@ -138,13 +160,15 @@ async def resend_email_verification(
 async def confirm_email_verification(token: str, db: AsyncSession = Depends(get_db)):
     """校验验证令牌并激活当前邮箱。"""
 
-    payload = decode_access_token(token)
-    if not payload or payload.get("type") != "email-verification":
+    payload = decode_user_token(token, "email-verification")
+    if not payload:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="邮箱验证链接无效或已过期")
-    user = await db.get(User, int(payload["sub"]))
-    if not user or user.email != payload.get("email"):
+    updated = await db.execute(
+        update(User).where(User.auth_id == payload["sub"], User.email == payload.get("email"))
+        .values(email_verified=True).execution_options(synchronize_session=False)
+    )
+    if updated.rowcount != 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="邮箱验证链接已失效")
-    user.email_verified = True
     await db.commit()
     return {"verified": True}
 
@@ -191,12 +215,11 @@ async def refresh_session(
     if not session or session.revoked_at or session.expires_at.replace(tzinfo=timezone.utc) <= now:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录会话已失效")
     user = await db.get(User, session.user_id)
-    if not user or not user.is_active:
+    if not user or session.auth_id != user.auth_id or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账户不可用")
     if settings.REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="请先完成邮箱验证")
-    session.revoked_at = now
-    return await _create_session(user, db, response)
+    return await _create_session(user, db, response, previous_session=session)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -229,6 +252,7 @@ async def github_login(redirect: str | None = Query(None, max_length=500)):
             "sub": "github-oauth",
             "type": "oauth-state",
             "redirect": _safe_redirect(redirect),
+            "nonce": secrets.token_urlsafe(16),
         },
         expires_delta=timedelta(minutes=10),
     )
@@ -328,6 +352,25 @@ async def github_callback(
     user = result.scalar_one_or_none()
     if not user and email:
         user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if user and user.password_hash:
+            link_token = create_access_token(
+                {
+                    "sub": user.auth_id,
+                    "type": "github-link",
+                    "github_id": github_id,
+                    "github_email": email or "",
+                    "github_avatar": profile.get("avatar_url") or "",
+                    "nonce": state_payload.get("nonce", ""),
+                },
+                expires_delta=timedelta(minutes=10),
+            )
+            query = urlencode({"token": link_token, "redirect": _safe_redirect(state_payload.get("redirect"))})
+            redirect = RedirectResponse(
+                f"{settings.FRONTEND_URL}/auth/link-github?{query}",
+                status_code=status.HTTP_302_FOUND,
+            )
+            redirect.delete_cookie(OAUTH_STATE_COOKIE, path="/api/v1/auth/github/callback")
+            return redirect
     if not user:
         base = "".join(char for char in str(profile.get("login", "github-user")) if char.isalnum() or char in "_-")[:24] or "github-user"
         username = base
@@ -350,6 +393,45 @@ async def github_callback(
     redirect.delete_cookie(OAUTH_STATE_COOKIE, path="/api/v1/auth/github/callback")
     await _create_session(user, db, redirect)
     return redirect
+
+
+@router.post("/github/confirm-link", response_model=TokenResponse)
+async def confirm_github_link(
+    body: GithubLinkConfirmRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """验证现有账户密码后原子绑定 GitHub，拒绝过期、重放和并发绑定。"""
+    payload = decode_user_token(body.link_token, "github-link")
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="绑定链接无效或已过期，请重新使用 GitHub 登录")
+    user = (await db.execute(select(User).where(User.auth_id == payload["sub"]))).scalar_one_or_none()
+    if not user or not user.is_active or not user.password_hash or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="密码错误")
+    github_id = payload.get("github_id")
+    if not isinstance(github_id, str) or not github_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="绑定链接无效或已过期，请重新使用 GitHub 登录")
+    if user.github_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该账户已绑定 GitHub")
+    try:
+        claimed = await db.execute(
+            update(User).where(
+                User.auth_id == user.auth_id,
+                User.is_active.is_(True),
+                or_(User.github_id.is_(None), User.github_id == ""),
+            ).values(
+                github_id=github_id,
+                avatar_url=user.avatar_url or payload.get("github_avatar") or "",
+                email_verified=user.email_verified or bool(user.email and payload.get("github_email") == user.email),
+            ).execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该账户已绑定 GitHub")
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该 GitHub 账户已被绑定") from exc
+    return await _create_session(user, db, response)
 
 
 @router.get("/me", response_model=UserResponse)

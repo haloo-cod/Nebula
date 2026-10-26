@@ -110,3 +110,70 @@ async def test_background_source_migration_serializes_workers(tmp_path):
     finally:
         for engine in engines:
             await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_friend_rss_migration_preserves_existing_friends(tmp_path):
+    """旧表连续升级两次，只补齐 RSS，不更改既有 ID 和站点字段。"""
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'friend-migration.db'}")
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+            await connection.execute(text("ALTER TABLE friends DROP COLUMN rss_url"))
+            await connection.execute(text(
+                "INSERT INTO friends (id,name,bio,avatar,url,sort_order) "
+                "VALUES (17,'原有站点','介绍','/avatar.png','legacy-address',9)"
+            ))
+            before = (await connection.execute(text("SELECT * FROM friends"))).mappings().one()
+        await migrate_existing_schema(engine)
+        await migrate_existing_schema(engine)
+        async with engine.connect() as connection:
+            after = (await connection.execute(text("SELECT * FROM friends"))).mappings().one()
+            assert {key: after[key] for key in before} == dict(before)
+            assert after["rss_url"] == ""
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_application_id_migration_preserves_history_and_never_reuses_ids(tmp_path):
+    """申请表升级两次保留审核数据，删除最高 ID 后新申请也使用新的讨论地址。"""
+    from app.models.friend import Friend
+    from app.models.friend_application import FriendApplication
+    from app.models.user import User
+
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'application-ids.db'}")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as session:
+            session.add_all([User(id=1, username="original-owner"), Friend(id=7, name="旧站", url="https://old.example.com/")])
+            await session.flush()
+            session.add(FriendApplication(
+                id=12, user_id=1, name="旧申请", url="https://old.example.com/", avatar="https://old.example.com/a.png",
+                email="private@example.com", rss_url="https://old.example.com/rss.xml", status="approved", friend_id=7,
+                active_site_key="https://old.example.com/", reviewed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            ))
+            await session.commit()
+        async with engine.begin() as connection:
+            before = (await connection.execute(text("SELECT * FROM friend_applications"))).mappings().all()
+            ddl = await connection.scalar(text("SELECT sql FROM sqlite_master WHERE name = 'friend_applications'"))
+            await connection.execute(text("DROP TABLE friend_applications"))
+            await connection.execute(text(ddl.replace("AUTOINCREMENT", "")))
+            columns = ", ".join(before[0])
+            parameters = ", ".join(f":{column}" for column in before[0])
+            await connection.execute(text(f"INSERT INTO friend_applications ({columns}) VALUES ({parameters})"), [dict(row) for row in before])
+        await migrate_existing_schema(engine)
+        await migrate_existing_schema(engine)
+        async with engine.begin() as connection:
+            after = (await connection.execute(text("SELECT * FROM friend_applications"))).mappings().all()
+            assert [dict(row) for row in after] == [dict(row) for row in before]
+            await connection.execute(text("DELETE FROM friend_applications WHERE id = 12"))
+        async with sessions() as session:
+            replacement = FriendApplication(user_id=1, name="新申请", url="https://new.example.com/", avatar="https://new.example.com/a.png", email="new@example.com")
+            session.add(replacement)
+            await session.commit()
+            assert replacement.id > 12
+    finally:
+        await engine.dispose()

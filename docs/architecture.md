@@ -40,10 +40,12 @@ Starlit Blog 是一个基于 **Vue 3 + FastAPI** 的全栈个人博客系统，�
 
 | 存储方式 | 内容 |
 |----------|------|
-| SQLite (`blog.db`) | 结构化数据（博文/图书/相册/友链/藏宝阁/背景图/轮播/个人资料/酒馆留言等） |
-| JSON 文件 (`data/`) | 说说（moments）、评论（comments） — filelock 并发保护 |
+| SQLite (`blog.db`) | 结构化数据（博文/评论/图书/相册/正式友链/友链申请/藏宝阁/背景图/轮播/个人资料/酒馆留言等） |
+| JSON 文件 (`data/`) | 说说（`moments.json`）与生成的 `friends.json` 公开副本 — filelock 并发保护；评论不在 JSON 中 |
 | 文件系统 (`uploads/`) | 图片/EPUB/静态资源 |
 | 文件系统 (`content/`) | Markdown 原文（博文/展览/关于页） |
+
+评论保存于 `comments` 表，按 `page_key` 关联页面；`friend-application:{id}` 的讨论只对已通过且仍关联正式友链的申请开放。友链申请保存在 `friend_applications` 表，邮箱等联络字段不进入公开接口。正式友链和申请均以数据库为准，`friends.json` 只是在数据库提交后由 `DATA_DIR` 生成的只读副本，后端不做反向导入；`DATA_DIR` 可配置，默认 `blog-backend/data`，该目录没有静态挂载。
 
 ## 前端特色实现
 
@@ -103,7 +105,7 @@ My_blog/
 │   │   │       ├── images.py      # 图床
 │   │   │       ├── backgrounds.py # 背景图
 │   │   │       ├── carousel.py    # 首页轮播
-│   │   │       ├── friends.py     # 友链
+│   │   │       ├── friends.py     # 友链、申请审核与 JSON 副本
 │   │   │       ├── treasures.py   # 藏宝阁
 │   │   │       ├── profile.py     # 个人资料
 │   │   │       ├── tavern.py      # 深夜酒馆
@@ -121,7 +123,7 @@ My_blog/
 │   │   └── main.py                # FastAPI 入口
 │   ├── scripts/                   # 初始化/迁移脚本
 │   ├── content/                   # Markdown 内容
-│   ├── data/                      # JSON 数据（说说/评论/友链）
+│   ├── data/                      # 说说 JSON 与生成的 friends.json（评论在数据库）
 │   ├── uploads/                   # 上传文件
 │   └── requirements.txt
 │
@@ -133,17 +135,19 @@ My_blog/
 
 ### 1. 渐进式 API 迁移
 
-前端所有页面都采用 **API + Fallback** 双层数据策略：
+多数内容页面采用 **API + Fallback** 双层数据策略：
 
 ```
-onMounted → 调用后端 API → 成功则使用 API 数据
+onMounted → 调用后端 API → 成功则使用 API 数据（是否接受空列表由页面决定）
                           → 失败则保留本地静态数据（import.meta.glob / 硬编码）
 ```
 
 这意味着：
-- **前端可以独立运行**（不启动后端也能展示内容）
-- **后端挂了不影响用户体验**（静默降级到静态数据）
+- **多数展示页可以独立运行**（不启动后端也能展示静态内容）
+- **后端异常时降级到静态数据**（大多数页面静默降级）
 - 通过 `VITE_USE_API=false` 环境变量可彻底禁用 API 调用
+
+评论、友链申请和后台管理不伪造 fallback：评论加载失败显示错误与重试，不展示预置评论；友链页和申请区在窗口重新获得焦点时刷新真实数据。详见 [`frontend-data-flow.md`](frontend-data-flow.md)。
 
 ### 2. 页面文案集中管理
 
@@ -179,7 +183,7 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 | `/images` | 图片/相册 | 相册网格 → 瀑布流 → 灯箱 |
 | `/gallery` | 展览 | 项目卡片 |
 | `/gallery/project/:slug` | 项目详情 | Markdown 文档 |
-| `/friends` | 友链 | 鱼缸动画 + 链接卡片 |
+| `/friends` | 友链 | 鱼缸动画 + 链接卡片 + 申请审核进度与公开讨论 |
 | `/treasure` | 藏宝阁 | 分类筛选 + 分页 |
 | `/about` | 关于 | 个人介绍 + 活动热力图 + 时间线 |
 | `/midnight-tavern` | 深夜酒馆 | 登录后留言页（隐藏导航栏） |
@@ -205,7 +209,7 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 | `/admin/comments` | 评论管理 |
 | `/admin/gallery` | 展览管理 |
 | `/admin/albums` | 相册管理 |
-| `/admin/friends` | 友链管理 |
+| `/admin/friends` | 友链管理与申请审核（含同步失败重试） |
 | `/admin/treasures` | 藏宝阁管理 |
 | `/admin/tavern` | 深夜酒馆管理 |
 | `/admin/carousel` | 首页轮播管理 |
@@ -226,6 +230,7 @@ onMounted → 调用后端 API → 成功则使用 API 数据
 | 展览 | ✅ | ✅ | ✅ |
 | 相册 | ✅ | ✅ | ✅ |
 | 友链 | ✅ | ✅ | ✅ |
+| 友链申请 | ✅（提交/审核/公开/讨论） | ✅ | ✅ |
 | 藏宝阁 | ✅ | ✅ | ✅ |
 | 背景图 | ✅ | ✅ | ✅ |
 | 轮播图 | ✅ | ✅ | ✅ |

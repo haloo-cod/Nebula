@@ -24,6 +24,16 @@ def generate_upload_path(original_name: str) -> tuple[str, str]:
     return relative_path, f"/uploads/{relative_path}"
 
 
+def resolve_upload_path(relative_path: str) -> Path:
+    """解析上传目录内的相对路径，拒绝绝对路径、空段和越界符号链接。"""
+    if Path(relative_path).is_absolute() or any(not part for part in relative_path.replace("\\", "/").split("/")):
+        raise ValueError("上传文件路径越界")
+    result = (settings.UPLOAD_DIR / relative_path).resolve()
+    if not result.is_relative_to(settings.UPLOAD_DIR.resolve()):
+        raise ValueError("上传文件路径越界")
+    return result
+
+
 async def save_upload_file(
     file: UploadFile,
     relative_path: str,
@@ -39,7 +49,7 @@ async def save_upload_file(
         return await r2.upload_file(relative_path, file, content_type=file.content_type)
     else:
         # 本地存储
-        full_path = settings.UPLOAD_DIR / relative_path
+        full_path = resolve_upload_path(relative_path)
         full_path.parent.mkdir(parents=True, exist_ok=True)
         content = await file.read()
         full_path.write_bytes(content)
@@ -53,6 +63,4 @@ def delete_file(relative_path: str, storage_backend: str = "local") -> None:
         r2 = get_r2_client()
         r2.delete_file(relative_path)
     else:
-        full_path = settings.UPLOAD_DIR / relative_path
-        if full_path.exists():
-            full_path.unlink()
+        resolve_upload_path(relative_path).unlink(missing_ok=True)

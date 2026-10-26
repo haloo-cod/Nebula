@@ -126,8 +126,9 @@ async function deleteLink(link: SocialLink) {
     await api.delete(`/api/v1/profile/social-links/${link.id}`)
     ElMessage.success('删除成功')
     loadProfile()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除社交链接失败')
   }
 }
 

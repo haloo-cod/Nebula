@@ -133,8 +133,9 @@ async function deleteAlbum(album: AlbumItem) {
     await api.delete(`/api/v1/albums/${album.id}`)
     ElMessage.success('删除成功')
     loadAlbums()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除相册失败')
   }
 }
 
@@ -248,8 +249,9 @@ async function deletePhoto(photo: PhotoItem) {
     // 刷新
     const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
     currentAlbum.value = detail
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除照片失败')
   }
 }
 

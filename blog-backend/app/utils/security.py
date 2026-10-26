@@ -6,6 +6,7 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
+from uuid import UUID
 
 import bcrypt
 from jose import JWTError, jwt
@@ -15,13 +16,31 @@ from app.config import settings
 ALGORITHM = "HS256"
 
 
+def validate_password_length(password: str) -> str:
+    """新密码至少八个字符，且不超过 bcrypt 的七十二字节边界。"""
+    if len(password) < 8:
+        raise ValueError("密码至少需要 8 个字符")
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("密码最多为 72 个 UTF-8 字节")
+    return password
+
+
 def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+    encoded = password.encode("utf-8")
+    if len(encoded) > 72:
+        raise ValueError("密码最多为 72 个 UTF-8 字节")
+    return bcrypt.hashpw(encoded, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    """超长输入或无效历史哈希按凭据不匹配处理，不截断密码。"""
+    encoded = plain.encode("utf-8")
+    if len(encoded) > 72:
+        return False
+    try:
+        return bcrypt.checkpw(encoded, hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
@@ -55,10 +74,26 @@ def decode_access_token(token: str) -> dict | None:
         return None
 
 
-def create_email_verification_token(user_id: int, email: str) -> str:
+def decode_user_token(token: str, token_type: str = "access") -> dict | None:
+    """用户令牌只接受不可复用的 UUID 主体；OAuth state 仍单独解码。"""
+    payload = decode_access_token(token)
+    if not payload or payload.get("type") != token_type:
+        return None
+    subject = payload.get("sub")
+    if not isinstance(subject, str):
+        return None
+    try:
+        if str(UUID(subject)) != subject:
+            return None
+    except ValueError:
+        return None
+    return payload
+
+
+def create_email_verification_token(auth_id: str, email: str) -> str:
     """创建单次用途由当前邮箱绑定校验的验证令牌。"""
 
     return create_access_token(
-        {"sub": str(user_id), "email": email, "type": "email-verification"},
+        {"sub": auth_id, "email": email, "type": "email-verification"},
         expires_delta=timedelta(hours=24),
     )

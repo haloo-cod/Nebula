@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { fetchCarouselSlides } from '@/api/carousel'
 
 const fallbackImages = import.meta.glob<string>(
@@ -53,6 +53,7 @@ const INTERVAL = 4000
 const TRANSITION_DURATION = 500
 const TRANSITION_FALLBACK_DELAY = TRANSITION_DURATION + 100
 let transitionFallbackTimer: number | null = null
+let disposed = false
 
 // 真实图片从 index=1 开始（前面有一个尾部克隆）
 const OFFSET = 1
@@ -63,7 +64,7 @@ const trackStyle = computed(() => ({
 }))
 
 function goTo(index: number) {
-  if (transitioning.value) return
+  if (disposed || transitioning.value) return
   transitioning.value = true
   currentIndex.value = index
   scheduleTransitionFallback()
@@ -71,7 +72,7 @@ function goTo(index: number) {
 }
 
 function next() {
-  if (transitioning.value) return
+  if (disposed || transitioning.value || images.value.length < 2) return
   transitioning.value = true
   currentIndex.value += 1
   scheduleTransitionFallback()
@@ -87,12 +88,14 @@ function clearTransitionFallback() {
 
 function scheduleTransitionFallback() {
   clearTransitionFallback()
+  if (disposed) return
   transitionFallbackTimer = window.setTimeout(finishTransition, TRANSITION_FALLBACK_DELAY)
 }
 
 // transitionend 可能因页面重排或组件不可见而丢失，超时回调负责兜底解锁。
 function finishTransition() {
   clearTransitionFallback()
+  if (disposed) return
   if (currentIndex.value === images.value.length) {
     transitioning.value = false
     currentIndex.value = 0
@@ -111,18 +114,30 @@ function onTransitionCancel(event: TransitionEvent) {
 }
 
 function resetAutoPlay() {
-  if (autoPlayTimer.value) clearInterval(autoPlayTimer.value)
+  if (autoPlayTimer.value !== null) clearInterval(autoPlayTimer.value)
+  autoPlayTimer.value = null
+  if (disposed || images.value.length < 2) return
   autoPlayTimer.value = window.setInterval(next, INTERVAL)
 }
 
+// 轨道随异步图片出现时绑定事件，替换或卸载轨道时移除旧监听。
+watch(trackRef, (track, _previous, onCleanup) => {
+  if (!track) return
+  track.addEventListener('transitionend', onTransitionEnd)
+  track.addEventListener('transitioncancel', onTransitionCancel)
+  onCleanup(() => {
+    track.removeEventListener('transitionend', onTransitionEnd)
+    track.removeEventListener('transitioncancel', onTransitionCancel)
+  })
+})
+
 onMounted(async () => {
-  trackRef.value?.addEventListener('transitionend', onTransitionEnd)
-  trackRef.value?.addEventListener('transitioncancel', onTransitionCancel)
   // 即使 API 不可用，也应让本地 fallback 图片自动播放。
   resetAutoPlay()
   // 尝试从后端 API 加载轮播图列表
   try {
     const slides = await fetchCarouselSlides()
+    if (disposed) return
     if (slides.length > 0) {
       clearTransitionFallback()
       transitioning.value = false
@@ -137,9 +152,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  trackRef.value?.removeEventListener('transitionend', onTransitionEnd)
-  trackRef.value?.removeEventListener('transitioncancel', onTransitionCancel)
-  if (autoPlayTimer.value) clearInterval(autoPlayTimer.value)
+  disposed = true
+  if (autoPlayTimer.value !== null) clearInterval(autoPlayTimer.value)
+  autoPlayTimer.value = null
   clearTransitionFallback()
 })
 </script>

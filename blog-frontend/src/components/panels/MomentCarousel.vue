@@ -43,12 +43,14 @@ const slides = ref<Moment[]>([])
 const current = ref(0)
 const paused = ref(false)
 let timer: number | null = null
+let disposed = false
 const INTERVAL = 6000
 
 // 启动时尝试从 API 获取
 onMounted(async () => {
   try {
     const res = await fetchMoments(1, 5)
+    if (disposed) return
     if (res.items.length > 0) {
       slides.value = res.items
     }
@@ -86,7 +88,7 @@ function slideClass(i: number): string {
 }
 
 function next() {
-  if (slides.value.length === 0) return
+  if (disposed || slides.value.length === 0) return
   current.value = (current.value + 1) % slides.value.length
 }
 
@@ -96,7 +98,9 @@ function goTo(i: number) {
 }
 
 function resetTimer() {
-  if (timer) clearInterval(timer)
+  if (timer !== null) clearInterval(timer)
+  timer = null
+  if (disposed || slides.value.length < 2) return
   timer = window.setInterval(() => {
     if (!paused.value) next()
   }, INTERVAL)
@@ -119,7 +123,9 @@ function handleClick() {
 }
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  disposed = true
+  if (timer !== null) clearInterval(timer)
+  timer = null
 })
 </script>
 

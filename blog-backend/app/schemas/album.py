@@ -41,6 +41,7 @@ class AlbumUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     orientation: str | None = None
+    # 省略时保留原封面；显式 null 清空指定封面并使用首张照片作为回退。
     cover_image_id: int | None = None
 
 

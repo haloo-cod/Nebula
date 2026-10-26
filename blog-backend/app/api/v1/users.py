@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
 from app.database import get_db
 from app.models.user import AuthSession, User
+from app.models.friend_application import FriendApplication
 from app.schemas.user import (
     UserAdminItem,
     UserAdminListResponse,
@@ -140,5 +141,15 @@ async def delete_user(
     if current.id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除自己的账户")
     await _ensure_admin_survives(db, current, user, False)
+    # 与申请提交保持相同锁顺序：账户 → 申请，避免删除后插入遗留所有权。
+    await db.execute(
+        update(User).where(User.id == user_id).values(id=User.id, updated_at=User.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    await db.execute(
+        update(FriendApplication).where(FriendApplication.user_id == user_id).values(
+            user_id=None, updated_at=FriendApplication.updated_at,
+        )
+    )
     await db.delete(user)
     await db.commit()

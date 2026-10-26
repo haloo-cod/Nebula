@@ -103,21 +103,11 @@ async function handleImport(event: Event) {
   try {
     const previewForm = new FormData()
     files.forEach((file) => previewForm.append('files', file))
-    const previewResponse = await fetch(`${BASE_URL}/api/v1/posts/import-preview`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      body: previewForm,
-      credentials: 'include',
-    })
-    if (!previewResponse.ok) {
-      const body = await previewResponse.json().catch(() => ({ detail: '预览失败' }))
-      throw new Error(body.detail || '预览失败')
-    }
-    const previews = (await previewResponse.json()) as Array<{
+    const previews = await api.post<Array<{
       filename: string
       title: string
       slug: string
-    }>
+    }>>('/api/v1/posts/import-preview', previewForm, true)
     await ElMessageBox.confirm(
       previews.map((item) => `${item.filename} -> ${item.title} (${item.slug})`).join('\n'),
       `确认导入 ${previews.length} 篇 Markdown？`,
@@ -137,16 +127,7 @@ async function handleImport(event: Event) {
     const formData = new FormData()
     files.forEach((file) => formData.append('files', file))
     formData.append('conflict', conflict.value)
-    const response = await fetch(`${BASE_URL}/api/v1/posts/import-batch`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      body: formData,
-      credentials: 'include',
-    })
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ detail: '导入失败' }))
-      throw new Error(body.detail || '导入失败')
-    }
+    await api.post('/api/v1/posts/import-batch', formData, true)
     ElMessage.success('Markdown 导入完成，文章已保存为草稿')
     await loadData()
   } catch (err: unknown) {
@@ -163,33 +144,22 @@ async function downloadSelectedZip() {
   if (selectedPosts.value.length === 0 || downloading.value) return
   downloading.value = true
   try {
-    const response = await fetch(`${BASE_URL}/api/v1/posts/download-jobs`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${getToken() ?? ''}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
+    const created = await api.post<{ id: number }>(
+      '/api/v1/posts/download-jobs',
+      {
         slugs: selectedPosts.value.map((post) => post.slug),
         archive_name: 'starlit-posts',
         include_images: true,
-      }),
-    })
-    if (!response.ok) throw new Error('创建文章 ZIP 任务失败')
-    const created = (await response.json()) as { id: number }
+      },
+      true,
+    )
     for (let attempt = 0; attempt < 300; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 700))
-      const statusResponse = await fetch(`${BASE_URL}/api/v1/posts/download-jobs/${created.id}`, {
-        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-        credentials: 'include',
-      })
-      if (!statusResponse.ok) throw new Error('读取文章 ZIP 任务失败')
-      const job = (await statusResponse.json()) as {
+      const job = await api.get<{
         status: string
         download_url: string | null
         error_message: string
-      }
+      }>(`/api/v1/posts/download-jobs/${created.id}`, true)
       if (job.status === 'failed') throw new Error(job.error_message || '文章 ZIP 打包失败')
       if (job.status === 'completed' && job.download_url) {
         await downloadWithProgress(`${BASE_URL}${job.download_url}`, 'starlit-posts.zip', {

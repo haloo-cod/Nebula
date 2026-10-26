@@ -10,6 +10,8 @@ class CommentItem(BaseModel):
 
     id: int
     user_id: int | None = None
+    parent_id: int | None = None
+    reply_to_author: str = ""
     author: str
     date: str
     content: str

@@ -4,9 +4,18 @@
 
 from pydantic import BaseModel, field_validator
 
+from app.utils.security import validate_password_length
+
 
 class LoginRequest(BaseModel):
     username: str
+    password: str
+
+
+class GithubLinkConfirmRequest(BaseModel):
+    """使用现有账户密码确认 GitHub 绑定。"""
+
+    link_token: str
     password: str
 
 
@@ -36,9 +45,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
-        if not 8 <= len(value) <= 128:
-            raise ValueError("密码长度需为 8-128 位")
-        return value
+        return validate_password_length(value)
 
 
 class TokenResponse(BaseModel):

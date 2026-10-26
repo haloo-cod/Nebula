@@ -16,4 +16,5 @@ class Friend(Base, TimestampMixin):
     bio: Mapped[str] = mapped_column(Text, default="")  # 简介
     avatar: Mapped[str] = mapped_column(String(500), default="")  # 头像 URL
     url: Mapped[str] = mapped_column(String(500))  # 站点地址
+    rss_url: Mapped[str] = mapped_column(String(2048), default="", server_default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

@@ -101,6 +101,7 @@ import SchedulePanel from '@/components/study/SchedulePanel.vue'
 import HistorySummary from '@/components/study/HistorySummary.vue'
 import StudyRoomContent from './StudyRoomContent.vue'
 import { useUIStore } from '@/stores/ui'
+import { getLogicalDate } from '@/utils/studyDate'
 import type { StudyTodo, ScheduleItem, StudyHistoryRecord } from '@/types'
 
 const ui = useUIStore()
@@ -123,6 +124,9 @@ const rightOpen = ref(false)
 const mode = ref<'focus' | 'break'>('focus')
 const isFlashing = ref(false)
 let timerInterval: ReturnType<typeof setInterval> | null = null
+let breakStartTimeout: number | null = null
+let flashTimeout: number | null = null
+let disposed = false
 
 // Active todo
 const activeTodo = computed(() => todos.value.find((t) => t.id === activeTodoId.value))
@@ -151,17 +155,6 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-/**
- * 获取"逻辑日期"：凌晨 4:00 前算前一天
- * 这样深夜学习不会被意外重置日程和计数
- */
-function getLogicalDate(): string {
-  const now = new Date()
-  if (now.getHours() < 4) {
-    now.setDate(now.getDate() - 1)
-  }
-  return now.toISOString().slice(0, 10)
-}
 
 // Load from localStorage
 function loadFromStorage() {
@@ -231,12 +224,15 @@ watch([todos, schedule, history], saveToStorage, { deep: true })
 
 // Timer logic
 function startTimer() {
-  if (!activeTodo.value) return
+  if (disposed || !activeTodo.value) return
   stopTimer()
   activeTodo.value.isRunning = true
   timerInterval = setInterval(() => {
     const todo = activeTodo.value
-    if (!todo || !todo.isRunning) return
+    if (disposed || !todo || !todo.isRunning) {
+      stopTimer()
+      return
+    }
 
     if (todo.remainingSeconds > 0) {
       todo.remainingSeconds -= 1
@@ -248,6 +244,15 @@ function startTimer() {
 }
 
 function stopTimer() {
+  if (breakStartTimeout !== null) {
+    window.clearTimeout(breakStartTimeout)
+    breakStartTimeout = null
+  }
+  if (flashTimeout !== null) {
+    window.clearTimeout(flashTimeout)
+    flashTimeout = null
+  }
+  isFlashing.value = false
   if (activeTodo.value) activeTodo.value.isRunning = false
   if (timerInterval) {
     clearInterval(timerInterval)
@@ -273,9 +278,9 @@ function resetTimer() {
 
 function handleTimerEnd() {
   stopTimer()
-  isFlashing.value = true
   const todo = activeTodo.value
-  if (!todo) return
+  if (disposed || !todo) return
+  isFlashing.value = true
 
   if (mode.value === 'focus') {
     // Update todo stats
@@ -290,7 +295,9 @@ function handleTimerEnd() {
     todo.remainingSeconds = todo.breakMinutes * 60
 
     // Start break after a short delay
-    window.setTimeout(() => {
+    breakStartTimeout = window.setTimeout(() => {
+      breakStartTimeout = null
+      if (disposed || activeTodo.value !== todo) return
       isFlashing.value = false
       startTimer()
     }, 1500)
@@ -299,13 +306,16 @@ function handleTimerEnd() {
     mode.value = 'focus'
     todo.remainingSeconds = todo.durationMinutes * 60
 
-    window.setTimeout(() => {
+    flashTimeout = window.setTimeout(() => {
+      flashTimeout = null
+      if (disposed || activeTodo.value !== todo) return
       isFlashing.value = false
     }, 1500)
   }
 }
 
 function recordFocus(minutes: number) {
+  if (disposed) return
   const today = getLogicalDate()
   const record = history.value.find((h) => h.date === today)
   if (record) {
@@ -351,9 +361,11 @@ function selectTodo(id: string) {
 }
 
 function deleteTodo(id: string) {
+  if (activeTodoId.value === id) stopTimer()
   todos.value = todos.value.filter((t) => t.id !== id)
   if (activeTodoId.value === id) {
     activeTodoId.value = todos.value[0]?.id ?? null
+    mode.value = 'focus'
   }
 }
 
@@ -361,7 +373,7 @@ function toggleTodo(id: string) {
   const todo = todos.value.find((t) => t.id === id)
   if (!todo) return
   todo.isCompleted = !todo.isCompleted
-  if (todo.isCompleted && activeTodoId.value === id && isRunning.value) {
+  if (todo.isCompleted && activeTodoId.value === id) {
     stopTimer()
   }
 }
@@ -395,6 +407,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  disposed = true
   stopTimer()
 })
 </script>

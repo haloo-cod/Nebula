@@ -19,6 +19,7 @@ from app.models.background import Background
 from app.models.book import Book
 from app.models.user import User
 from app.config import settings
+from app.services.file import resolve_upload_path
 
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
     from app.services.r2_storage import R2Storage
 
 router = APIRouter(prefix="/r2-migration", tags=["R2 迁移"])
+
+_IMAGE_KEY_RE = re.compile(r"^images/\d{4}/\d{2}/[0-9a-f]{12}_[A-Za-z0-9._-]{1,200}\.[a-z0-9]{1,10}$")
+_FILE_KEY_RE = re.compile(r"^files/[0-9a-f]{32}\.[a-z0-9]{1,10}$")
 
 
 class MigrateRequest(BaseModel):
@@ -82,7 +86,7 @@ async def migrate_images_to_r2(
             continue
 
         # 本地文件路径
-        local_path = settings.UPLOAD_DIR / image.filename
+        local_path = resolve_upload_path(image.filename)
         if not local_path.is_file():
             failed_ids.append(image_id)
             failed_count += 1
@@ -140,7 +144,7 @@ async def migrate_files_to_r2(
             success_count += 1
             continue
 
-        local_path = settings.UPLOAD_DIR / file.filename
+        local_path = resolve_upload_path(file.filename)
         if not local_path.is_file():
             failed_ids.append(file_id)
             failed_count += 1
@@ -228,7 +232,7 @@ async def migrate_backgrounds_to_r2(
             errors.append(f"背景 {bg_id} 引用的是外部/文件管理视频，请通过对应来源迁移")
             continue
 
-        local_path = settings.UPLOAD_DIR / relative
+        local_path = resolve_upload_path(relative)
         if not local_path.is_file():
             failed_ids.append(bg_id)
             failed_count += 1
@@ -286,7 +290,7 @@ async def migrate_books_to_r2(
             success_count += 1
             continue
 
-        local_path = settings.UPLOAD_DIR / "books" / f"{book.slug}.epub"
+        local_path = resolve_upload_path(f"books/{book.slug}.epub")
         if not local_path.is_file():
             failed_ids.append(book_id)
             failed_count += 1
@@ -472,7 +476,8 @@ def _generate_image_key(original_name: str) -> str:
     """按图床规则生成 images/{year}/{month}/{uuid}_{name} 键名。"""
     now = datetime.now()
     suffix = Path(original_name).suffix.lower()
-    unique_name = f"{uuid4().hex[:12]}_{Path(original_name).stem}{suffix}"
+    stem = re.sub(r"[^A-Za-z0-9._-]", "_", Path(original_name).stem)[:200] or "image"
+    unique_name = f"{uuid4().hex[:12]}_{stem}{suffix}"
     return f"images/{now.year}/{now.month:02d}/{unique_name}"
 
 
@@ -497,8 +502,9 @@ async def register_upload(
     """预签名直传完成后登记记录，并校验对象确实已在 R2 上。"""
     if req.directory not in ("images", "files"):
         raise HTTPException(status_code=400, detail="directory 必须是 images 或 files")
-    if req.r2_key.split("/", 1)[0] != req.directory:
-        raise HTTPException(status_code=400, detail="r2_key 目录与 directory 不匹配")
+    pattern = _IMAGE_KEY_RE if req.directory == "images" else _FILE_KEY_RE
+    if not pattern.fullmatch(req.r2_key):
+        raise HTTPException(status_code=400, detail="r2_key 格式不合法，仅接受 presign-upload 生成的对象键")
 
     r2 = _require_r2()
     if not r2.file_exists(req.r2_key):

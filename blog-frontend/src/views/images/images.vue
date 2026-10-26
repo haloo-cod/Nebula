@@ -10,6 +10,9 @@
         <p>{{ siteText.images.subtitle }}</p>
       </section>
 
+      <p v-if="albumsLoading" role="status">相册加载中...</p>
+      <p v-else-if="albumsError" role="alert">{{ albumsError }}</p>
+      <p v-else-if="albums.length === 0">暂无相册</p>
       <div class="album-grid">
         <AlbumCard v-for="album in albums" :key="album.id" :album="album" @open="openAlbum" />
       </div>
@@ -42,6 +45,9 @@
             共 <strong>{{ currentAlbum.photos.length }}</strong> 瞬间
           </div>
         </div>
+        <p v-if="albumLoading" role="status">照片加载中...</p>
+        <p v-else-if="albumError" role="alert">{{ albumError }}</p>
+        <p v-else-if="currentAlbum.photos.length === 0">暂无照片</p>
 
         <div class="photo-masonry">
           <figure
@@ -128,28 +134,42 @@ import { siteText } from '@/data/site-text'
 import type { Album } from '@/types'
 
 const albums = ref<Album[]>([])
+const albumsLoading = ref(true)
+const albumsError = ref('')
+let disposed = false
+let albumRequest = 0
 
 // ============ 相册详情状态(页内切换,不进路由) ============
 
 const currentAlbum = ref<Album | null>(null)
+const albumLoading = ref(false)
+const albumError = ref('')
 
 async function openAlbum(album: Album) {
+  const request = ++albumRequest
+  const isCurrent = () => !disposed && request === albumRequest
   currentAlbum.value = album
+  albumLoading.value = true
+  albumError.value = ''
+  closeLightbox()
   window.scrollTo({ top: 0 })
 
   // 尝试从 API 获取完整照片列表（列表接口 photos 为空）
   try {
     const detail = await fetchAlbumDetail(Number(album.id))
-    if (detail.photos.length > 0) {
-      currentAlbum.value = detail
-    }
+    if (isCurrent()) currentAlbum.value = detail
   } catch {
-    // API 失败时保持当前数据
+    if (isCurrent()) albumError.value = '相册加载失败，请稍后重试'
+  } finally {
+    if (isCurrent()) albumLoading.value = false
   }
 }
 
 function closeAlbum() {
+  albumRequest += 1
   currentAlbum.value = null
+  albumLoading.value = false
+  albumError.value = ''
   closeLightbox()
   window.scrollTo({ top: 0 })
 }
@@ -198,13 +218,17 @@ onMounted(async () => {
   // 尝试从后端 API 获取相册列表
   try {
     const apiAlbums = await fetchAlbums()
-    albums.value = apiAlbums
+    if (!disposed) albums.value = apiAlbums
   } catch {
-    // API 失败时保持空状态
+    if (!disposed) albumsError.value = '相册加载失败，请稍后重试'
+  } finally {
+    if (!disposed) albumsLoading.value = false
   }
 })
 
 onUnmounted(() => {
+  disposed = true
+  albumRequest += 1
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>

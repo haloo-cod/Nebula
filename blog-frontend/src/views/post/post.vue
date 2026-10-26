@@ -11,6 +11,8 @@
 
         <div v-if="loading" class="post-state">加载中...</div>
 
+        <div v-else-if="loadError" class="post-state" role="alert">{{ loadError }}</div>
+
         <div v-else-if="currentPost">
           <div v-if="currentPost.cover" class="post-cover">
             <img :src="currentPost.cover" :alt="currentPost.title" />
@@ -44,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GlassPanel from '@/components/panels/GlassPanel.vue'
 import { getPost, renderPost, renderMarkdown } from '@/data/posts'
@@ -58,6 +60,9 @@ const router = useRouter()
 const currentPost = ref<Post | null>(null)
 const html = ref('')
 const loading = ref(true)
+const loadError = ref('')
+let loadRequest = 0
+let disposed = false
 
 const categoryColors: Record<string, string> = {
   技术: 'cyan',
@@ -79,10 +84,19 @@ function catColorKey(cat: string): string {
 }
 
 async function load(slug: string) {
+  const request = ++loadRequest
+  const isCurrent = () => !disposed && request === loadRequest
   loading.value = true
+  loadError.value = ''
+  currentPost.value = null
+  html.value = ''
   try {
     // 优先从后端 API 获取
     const detail = await fetchPost(slug)
+    if (!isCurrent()) return
+    // 用前端 marked + highlight.js 渲染 Markdown，完成后一起提交文章和正文。
+    const rendered = detail.content_md ? await renderMarkdown(detail.content_md) : ''
+    if (!isCurrent()) return
     currentPost.value = {
       slug: detail.slug,
       title: detail.title,
@@ -95,30 +109,37 @@ async function load(slug: string) {
       pinned: detail.is_pinned,
       content: detail.content_md,
     }
-    // 用前端 marked + highlight.js 渲染 Markdown
-    html.value = detail.content_md ? await renderMarkdown(detail.content_md) : ''
+    html.value = rendered
   } catch {
+    if (!isCurrent()) return
     // 后端不可用时 fallback 到本地 glob 数据
-    const post = getPost(slug)
-    if (!post) {
-      currentPost.value = null
-      html.value = ''
-      loading.value = false
-      return
+    try {
+      const post = getPost(slug)
+      if (!post) return
+      const rendered = (await renderPost(slug)) || ''
+      if (!isCurrent()) return
+      currentPost.value = post
+      html.value = rendered
+    } catch {
+      if (isCurrent()) loadError.value = '文章加载失败，请稍后重试'
     }
-    currentPost.value = post
-    html.value = (await renderPost(slug)) || ''
+  } finally {
+    if (isCurrent()) loading.value = false
   }
-  loading.value = false
 }
 
-load(String(route.params.slug))
+void load(String(route.params.slug))
 watch(
   () => route.params.slug,
   (slug) => {
-    if (slug) load(String(slug))
+    if (slug) void load(String(slug))
   },
 )
+
+onUnmounted(() => {
+  disposed = true
+  loadRequest += 1
+})
 
 function goBack() {
   // 从归档页进入时路径以 /archive/ 开头,应返回归档页

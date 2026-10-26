@@ -10,6 +10,9 @@
           v-model="inputText"
           class="comments-input"
           type="text"
+          maxlength="2000"
+          :disabled="interactionDisabled"
+          aria-label="评论内容"
           :placeholder="replyTo ? `回复 @${replyTo.author}...` : '写下你的想法...'"
           @keydown.enter="submitComment"
         />
@@ -17,6 +20,7 @@
           v-if="replyTo"
           class="comments-cancel-reply"
           type="button"
+          :disabled="interactionDisabled"
           @click="cancelReply"
           title="取消回复"
         >
@@ -25,10 +29,10 @@
         <button
           class="comments-submit"
           type="button"
-          :disabled="!inputText.trim()"
+          :disabled="interactionDisabled || !inputText.trim()"
           @click="submitComment"
         >
-          发送
+          {{ submitting ? '发送中…' : '发送' }}
         </button>
       </div>
       <div v-if="replyTo" class="comments-replying-to">
@@ -42,7 +46,16 @@
     </div>
 
     <!-- 评论列表 -->
-    <div v-if="comments.length === 0" class="comments-empty">暂无评论，来抢沙发吧~</div>
+    <div v-if="loading && comments.length === 0" class="comments-empty" role="status">
+      正在加载评论…
+    </div>
+    <div v-else-if="error" class="comments-empty comments-error" role="alert">
+      <span>{{ error }}</span>
+      <button class="comments-submit comments-retry" type="button" @click="loadComments">
+        重试
+      </button>
+    </div>
+    <div v-else-if="comments.length === 0" class="comments-empty">暂无评论，来抢沙发吧~</div>
     <div v-else class="comments-list">
       <template v-for="comment in comments" :key="comment.id">
         <!-- 父评论 -->
@@ -67,23 +80,33 @@
               <span class="comment-date">{{ comment.date }}</span>
             </div>
             <p class="comment-content">{{ comment.content }}</p>
-            <button v-if="auth.isLoggedIn" class="comment-reply-btn" @click="startReply(comment)">
+            <button
+              v-if="auth.isLoggedIn"
+              class="comment-reply-btn"
+              :disabled="interactionDisabled"
+              @click="startReply(comment)"
+            >
               回复
             </button>
             <button
               v-if="comment.canDelete"
               class="comment-delete-btn"
+              :disabled="interactionDisabled"
               @click="removeComment(comment)"
             >
-              删除
+              {{ deletingId === comment.id ? '删除中…' : '删除' }}
             </button>
           </div>
         </div>
 
         <!-- 子回复 -->
-        <div v-if="comment.children && comment.children.length > 0" class="comment-replies">
+        <div
+          v-if="comment.children.length > 0"
+          :id="replyListId(comment.id)"
+          class="comment-replies"
+        >
           <div
-            v-for="reply in comment.children"
+            v-for="reply in visibleReplies(comment)"
             :key="reply.id"
             class="comment-item comment-item--child"
           >
@@ -104,21 +127,45 @@
               <div class="comment-head">
                 <span class="comment-author">{{ reply.author }}</span>
                 <span v-if="reply.author === 'Starlit'" class="comment-owner-tag">作者</span>
+                <span v-if="reply.replyToAuthor" class="comment-date">
+                  回复 @{{ reply.replyToAuthor }}
+                </span>
                 <span class="comment-date">{{ reply.date }}</span>
               </div>
               <p class="comment-content">{{ reply.content }}</p>
-              <button v-if="auth.isLoggedIn" class="comment-reply-btn" @click="startReply(comment)">
+              <button
+                v-if="auth.isLoggedIn"
+                class="comment-reply-btn"
+                :disabled="interactionDisabled"
+                @click="startReply(reply, comment.id)"
+              >
                 回复
               </button>
               <button
                 v-if="reply.canDelete"
                 class="comment-delete-btn"
+                :disabled="interactionDisabled"
                 @click="removeComment(reply)"
               >
-                删除
+                {{ deletingId === reply.id ? '删除中…' : '删除' }}
               </button>
             </div>
           </div>
+          <button
+            v-if="comment.children.length > COLLAPSED_REPLY_LIMIT"
+            class="comment-reply-btn comment-thread-toggle"
+            type="button"
+            :aria-expanded="expandedThreads.has(comment.id)"
+            :aria-controls="replyListId(comment.id)"
+            :disabled="interactionDisabled"
+            @click="toggleThread(comment.id)"
+          >
+            {{
+              expandedThreads.has(comment.id)
+                ? '收起回复'
+                : `展开剩余 ${comment.children.length - COLLAPSED_REPLY_LIMIT} 条回复`
+            }}
+          </button>
         </div>
       </template>
     </div>
@@ -126,7 +173,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, nextTick, watch, onBeforeUnmount, useId } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -147,7 +194,9 @@ interface CommentItem {
   avatarColor: string
   avatarUrl?: string
   canDelete?: boolean
-  children?: CommentItem[]
+  parentId: number | null
+  replyToAuthor: string
+  children: CommentItem[]
 }
 
 // 接收页面标识 prop，默认为 about 页
@@ -155,52 +204,24 @@ const props = withDefaults(defineProps<{ pageKey?: string }>(), {
   pageKey: 'about',
 })
 const auth = useAuthStore()
-
-const seedComments: CommentItem[] = [
-  {
-    id: 1,
-    author: '访客A',
-    date: '2026-07-15 14:22',
-    content: '博客很漂亮，液态玻璃效果惊艳！一直在找这种风格的博客参考，学到很多。',
-    avatarColor: '#6366f1',
-  },
-  {
-    id: 2,
-    author: 'Starlit',
-    date: '2026-07-15 16:05',
-    content: '谢谢喜欢！还在不断完善中，后续会加入更多有趣的功能~',
-    avatarColor: '#ec4899',
-  },
-  {
-    id: 3,
-    author: '访客B',
-    date: '2026-07-17 09:30',
-    content: '请问自习室的番茄钟数据是存在本地的吗？还是会在后端上线后同步？',
-    avatarColor: '#14b8a6',
-    children: [
-      {
-        id: 5,
-        author: 'Starlit',
-        date: '2026-07-17 10:15',
-        content: '目前是 localStorage 本地存储，后续后端上线后会支持云端同步，数据不会丢的。',
-        avatarColor: '#ec4899',
-      },
-    ],
-  },
-  {
-    id: 4,
-    author: 'Starlit',
-    date: '2026-07-17 22:08',
-    content: '等后端上线后评论也会接入数据库，到时候就不怕刷新丢失啦~',
-    avatarColor: '#ec4899',
-  },
-]
+/** 每个讨论串初始展示三条回复，其余由读者展开。 */
+const COLLAPSED_REPLY_LIMIT = 3
+const componentId = useId()
+const expandedThreads = ref(new Set<number>())
 
 const comments = ref<CommentItem[]>([])
 const inputText = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
-const replyTo = ref<{ id: number; author: string } | null>(null)
+const replyTo = ref<{ id: number; author: string; rootId: number } | null>(null)
 const loading = ref(false)
+const error = ref('')
+const submitting = ref(false)
+const deletingId = ref<number | null>(null)
+let loadSeq = 0
+let contextVersion = 0
+const interactionDisabled = computed(
+  () => loading.value || Boolean(error.value) || submitting.value || deletingId.value !== null,
+)
 
 /** 将 API 返回的 snake_case 字段映射为前端 camelCase */
 function mapApiComment(item: ApiCommentItem): CommentItem {
@@ -212,7 +233,9 @@ function mapApiComment(item: ApiCommentItem): CommentItem {
     avatarColor: item.avatar_color || '#6366f1',
     avatarUrl: item.avatar_url,
     canDelete: item.can_delete,
-    children: item.children?.map(mapApiComment) || [],
+    parentId: item.parent_id ?? null,
+    replyToAuthor: item.reply_to_author ?? '',
+    children: [],
   }
 }
 
@@ -224,22 +247,30 @@ const totalCount = computed(() => {
   return count
 })
 
-/** 从后端加载评论，失败时 fallback 到种子数据 */
+/** 只展示真实评论；失败时保留明确错误态，不回退演示数据。 */
 async function loadComments() {
+  const seq = ++loadSeq
   loading.value = true
+  error.value = ''
   try {
     const items = await fetchComments(props.pageKey)
-    comments.value = items.map(mapApiComment)
-  } catch {
-    // 后端不可用时使用种子数据
-    comments.value = JSON.parse(JSON.stringify(seedComments))
+    if (seq !== loadSeq) return
+    comments.value = items.map((item) => ({
+      ...mapApiComment(item),
+      children: (item.children ?? []).map(mapApiComment),
+    }))
+  } catch (err: unknown) {
+    if (seq !== loadSeq) return
+    comments.value = []
+    error.value = err instanceof Error ? err.message : '评论加载失败，请稍后重试'
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
-function startReply(comment: CommentItem) {
-  replyTo.value = { id: comment.id, author: comment.author }
+function startReply(comment: CommentItem, rootId = comment.id) {
+  if (interactionDisabled.value) return
+  replyTo.value = { id: comment.id, author: comment.author, rootId }
   nextTick(() => {
     inputRef.value?.focus()
   })
@@ -250,30 +281,41 @@ function cancelReply() {
 }
 
 async function submitComment() {
-  if (!auth.isLoggedIn) return
+  if (!auth.isLoggedIn || interactionDisabled.value) return
   const text = inputText.value.trim()
   if (!text) return
+  if (text.length > 2000) return
+  const version = contextVersion
+  const pageKey = props.pageKey
 
   const parentId = replyTo.value?.id || null
+  const rootId = replyTo.value?.rootId
+  submitting.value = true
   try {
     // 调用后端 API 发表评论
-    const newItem = await postComment(props.pageKey, text, parentId)
+    const newItem = await postComment(pageKey, text, parentId)
+    if (version !== contextVersion) return
     const mapped = mapApiComment(newItem)
 
-    if (parentId) {
-      const parent = findCommentById(comments.value, parentId)
-      if (parent) {
-        if (!parent.children) parent.children = []
-        parent.children.push(mapped)
+    if (parentId !== null) {
+      if (rootId !== undefined) expandedThreads.value.add(rootId)
+      const root = comments.value.find((item) => item.id === rootId)
+      if (root) {
+        root.children.push(mapped)
       } else {
-        comments.value.push(mapped)
+        await loadComments()
+        if (version !== contextVersion) return
       }
     } else {
       comments.value.push(mapped)
     }
   } catch (err: unknown) {
+    if (version !== contextVersion) return
+    // 失败时保留输入与回复对象，方便用户重试。
     ElMessage.error(err instanceof Error ? err.message : '评论发送失败')
     return
+  } finally {
+    if (version === contextVersion) submitting.value = false
   }
 
   inputText.value = ''
@@ -285,28 +327,56 @@ async function submitComment() {
 
 /** 删除本人评论并重新加载评论树。 */
 async function removeComment(comment: CommentItem) {
+  if (interactionDisabled.value) return
+  deletingId.value = comment.id
+  const version = contextVersion
   try {
     await deleteComment(comment.id)
+    if (version !== contextVersion) return
     await loadComments()
     ElMessage.success('评论已删除')
   } catch (err: unknown) {
+    if (version !== contextVersion) return
     ElMessage.error(err instanceof Error ? err.message : '删除失败')
+  } finally {
+    if (version === contextVersion) deletingId.value = null
   }
 }
 
-function findCommentById(list: CommentItem[], id: number): CommentItem | null {
-  for (const item of list) {
-    if (item.id === id) return item
-    if (item.children) {
-      const found = findCommentById(item.children, id)
-      if (found) return found
-    }
-  }
-  return null
+function replyListId(rootId: number): string {
+  return `${componentId}-replies-${rootId}`
 }
 
-onMounted(() => {
-  loadComments()
+function visibleReplies(comment: CommentItem): CommentItem[] {
+  return expandedThreads.value.has(comment.id)
+    ? comment.children
+    : comment.children.slice(0, COLLAPSED_REPLY_LIMIT)
+}
+
+function toggleThread(rootId: number) {
+  if (expandedThreads.value.has(rootId)) expandedThreads.value.delete(rootId)
+  else expandedThreads.value.add(rootId)
+}
+
+// 页面标识或登录状态变化后重新加载，并清理上一页面的草稿与回复对象。
+watch(
+  () => [props.pageKey, auth.isLoggedIn, auth.user?.id] as const,
+  () => {
+    ++contextVersion
+    comments.value = []
+    submitting.value = false
+    deletingId.value = null
+    inputText.value = ''
+    replyTo.value = null
+    expandedThreads.value.clear()
+    void loadComments()
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  ++contextVersion
+  ++loadSeq
 })
 </script>
 
@@ -430,6 +500,14 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
+.comments-error {
+  overflow-wrap: anywhere;
+}
+
+.comments-error .comments-submit {
+  margin-left: 0.75rem;
+}
+
 /* ===== 评论列表 ===== */
 .comments-list {
   display: flex;
@@ -535,6 +613,11 @@ onMounted(() => {
   font-size: 0.72rem;
   cursor: pointer;
   transition: color 0.2s ease;
+}
+
+.comment-thread-toggle {
+  align-self: flex-start;
+  margin-top: 0.2rem;
 }
 
 .comment-delete-btn {

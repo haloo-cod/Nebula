@@ -43,6 +43,11 @@
 
     <!-- 下方友链列表 -->
     <section class="friends-list-section" aria-label="友链列表">
+      <p v-if="friendsLoading && !friends.length" role="status">正在加载友链…</p>
+      <p v-if="friendsError" role="alert">
+        {{ friendsError }} <button type="button" @click="loadFriends">重试</button>
+      </p>
+      <p v-else-if="!friendsLoading && !friends.length">暂无友链</p>
       <div class="friends-grid">
         <a
           v-for="friend in friends"
@@ -159,15 +164,17 @@
         </div>
       </PanelFallbackGlass>
     </section>
+    <FriendApplications />
   </main>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import ExchangeSiteInfo from '@/components/ExchangeSiteInfo.vue'
+import FriendApplications from './FriendApplications.vue'
 import { getFriends } from '@/data/friends'
 import {
   fetchFriends,
@@ -183,6 +190,9 @@ const ui = useUIStore()
 const friends = ref(getFriends())
 const aquariumRef = ref<HTMLElement | null>(null)
 const rssUrl = ref('')
+const friendsLoading = ref(false)
+const friendsError = ref('')
+let friendsRequest = 0
 
 // 交换友链占位信息，后续替换为真实内容
 const exchangeInfo = ref<FriendExchangeInfo>({
@@ -207,14 +217,31 @@ const {
   speed: 0.8,
 })
 
-// 尝试从后端 API 加载友链列表
-onMounted(async () => {
+/** 重新读取数据库列表，空数组同样覆盖旧卡片。 */
+async function loadFriends(): Promise<void> {
+  const request = ++friendsRequest
+  friendsLoading.value = true
+  friendsError.value = ''
   try {
-    const apiFriends = await fetchFriends()
-    if (apiFriends.length > 0) friends.value = apiFriends
-  } catch {
-    // 友链列表加载失败时保留静态列表，交换信息独立加载。
+    const items = await fetchFriends()
+    if (request === friendsRequest) friends.value = items
+  } catch (error: unknown) {
+    if (request === friendsRequest) {
+      friendsError.value = error instanceof Error ? error.message : '加载友链失败'
+    }
+  } finally {
+    if (request === friendsRequest) friendsLoading.value = false
   }
+}
+
+onMounted(() => {
+  void loadFriends()
+  window.addEventListener('focus', loadFriends)
+})
+
+onUnmounted(() => {
+  ++friendsRequest
+  window.removeEventListener('focus', loadFriends)
 })
 
 onMounted(async () => {

@@ -16,6 +16,8 @@
 
 前台账户支持用户名/邮箱密码注册、登录、刷新和退出。刷新令牌不返回到 JavaScript，而是由后端写入限定在 `/api/v1/auth` 路径下的 HttpOnly Cookie。
 
+用户访问 JWT 的 `sub` 和用户邮箱验证令牌的主体均为服务端生成、不可变的规范 UUID `users.auth_id`；签名、令牌类型和 UUID 格式都必须有效，整数 ID／用户名主体不再作为用户身份接受，也不做兼容查询。登录仍使用用户名或邮箱；`/auth/me` 等用户资料响应与管理接口继续使用整数 `id`，不新增 `auth_id` 字段。OAuth state 使用原有的非用户主体及独立令牌类型。
+
 #### 注册
 
 ```
@@ -30,6 +32,8 @@ Content-Type: application/json
 
 → 201 { "access_token": "eyJ...", "token_type": "bearer" }
 ```
+
+注册及管理员重置的新密码至少为 8 个 Unicode 字符，UTF-8 编码后最多 72 字节；超过边界返回 `422`。登录输入超过 72 字节按凭据错误返回 `401`，不会截断密码或返回服务器异常。
 
 #### 登录获取 Token
 
@@ -52,7 +56,9 @@ POST /api/v1/auth/refresh
 POST /api/v1/auth/logout
 ```
 
-浏览器请求需要携带 Cookie。刷新接口会轮换旧会话，退出接口会撤销当前刷新会话并清除 Cookie。
+浏览器请求需要携带 Cookie。刷新接口会轮换旧会话，退出接口会撤销当前刷新会话并清除 Cookie。刷新时会检查过期、撤销状态和账户启用状态，并要求会话中冻结的 `auth_id` 为有效 UUID、与当前账户一致；整数 `user_id` 相同不能恢复其他身份的会话。
+
+部署 UUID 认证切换时，迁移会一次性撤销旧刷新会话，所有用户（包括管理员）需要重新登录一次。旧整数／用户名主体访问令牌在需要登录的接口返回 `401`；旧邮箱验证链接失效，应重新发送验证邮件。用户资料、邮箱验证状态、业务整数 ID 和关联保留。重复运行迁移不会更换 UUID 或再次撤销新会话；`schema_migrations` 中的 `20261023_auth_identity_uuid` 是内部版本记录，不属于 API 响应字段。操作步骤见[生产更新流程](production-update.md)。
 
 #### 当前用户与邮箱验证
 
@@ -71,7 +77,16 @@ GET /api/v1/auth/github?redirect=/target
 GET /api/v1/auth/github/callback
 ```
 
-GitHub 回调成功后，后端创建或恢复账户并写入 Refresh Cookie，再跳转到前端 `/auth/callback` 页面。
+GitHub 已绑定的账户和新建 OAuth 账户仍写入 Refresh Cookie，并跳转到前端 `/auth/callback`。GitHub 的已验证主邮箱命中已有密码账户时，不自动合并身份、不建立会话；回调跳转到 `/auth/link-github?token=...&redirect=...`，要求输入现有账户密码。已有无密码 OAuth 账户保留按邮箱绑定行为。OAuth state 包含随机 nonce，绑定令牌有效期为 10 分钟，不能作为 Bearer 登录令牌使用。
+
+```http
+POST /api/v1/auth/github/confirm-link
+Content-Type: application/json
+
+{"link_token": "<callback token>", "password": "<existing account password>"}
+```
+
+确认成功返回与密码登录相同的 `TokenResponse` 并设置 Refresh Cookie。密码错误、无效或过期令牌返回 `401`；账户已绑定、重复/并发确认或 GitHub 身份已被其他账户绑定返回 `409`。只有当前邮箱仍匹配 GitHub 的已验证邮箱时才补充邮箱验证状态；绑定页不记录访问统计，避免令牌写入统计 URL。过期后需重新使用 GitHub 登录。
 
 ### 使用 Token
 
@@ -136,12 +151,17 @@ Authorization: Bearer eyJ...
 
 ## 评论 (`/api/v1/comments`)
 
+评论保存在 SQLite 的 `comments` 表，不再读写 `data/comments.json`；读取匿名可用，发表和删除需要登录。
+
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
-| GET | `/comments?page_key=xxx` | 公开 | 获取指定页面的评论列表 |
-| POST | `/comments` | 公开 | 发表评论 |
+| GET | `/comments?page_key=xxx` | 公开 | 获取主评论及扁平回复（按创建时间、ID 升序） |
+| GET | `/comments/count?page_key=xxx` | 公开 | 获取单页评论数 |
 | POST | `/comments/batch-count` | 公开 | 批量获取多个页面的评论数 |
-| DELETE | `/comments/{id}` | 管理员 | 删除评论 |
+| POST | `/comments` | 已登录用户 | 发表评论或回复 |
+| DELETE | `/comments/{id}` | 评论本人或管理员 | 删除评论及其全部回复 |
+
+评论响应固定为“主评论 → 回复列表”两层：所有后代均归入对应主评论的 `children`，回复本身的 `children` 为空。每条回复包含原始 `parent_id` 和 `reply_to_author`，用于表示真正回复的对象；不修改数据库中的父子关系。历史孤立评论作为主评论展示，异常循环也不会阻断读取。前台评论区与后台友链讨论默认显示每个主评论的前三条回复，更多回复支持展开、收起；发布回复后自动展开所在讨论串。
 
 ### page_key 约定
 
@@ -149,18 +169,26 @@ Authorization: Bearer eyJ...
 |------|--------------|
 | 博文评论 | `post:hello-world` |
 | 关于页评论 | `about` |
-| 其他页面 | 自定义字符串 |
+| 已通过友链申请的讨论 | `friend-application:{申请ID}` |
+| 其他页面 | 自定义字符串，去除首尾空白后 1–300 字符 |
+
+`friend-application:{id}` 只对 `approved` 且仍关联正式友链的申请开放：列表、计数和发表接口在申请不存在、未通过或正式友链已删除时返回 `404`；批量计数把这类键记作 `0`，不抛错。删除申请或正式友链会永久删除对应讨论。历史匿名评论以 `legacy_author` 保留只读展示，作者显示为“已注销用户”时不可再登录编辑。
 
 ### POST /comments 请求体
 
 ```json
 {
   "page_key": "post:hello-world",
-  "author": "访客",
   "content": "写得好！",
   "parent_id": null
 }
 ```
+
+- `content` 去除首尾空白后必须为 1–2000 字符，`page_key` 不能为空。
+- `parent_id` 必须是同一 `page_key` 下已存在的评论，否则返回 `400`。
+- 同一 IP 每小时最多创建 20 条评论，超限返回 `429`；启用邮箱验证且账户邮箱未验证时返回 `403`。
+- 友链申请讨论先写入并提交限频记录，再锁定对应申请行并复查公开状态；申请删除也锁定同一行，因此评论写入与申请删除串行，避免评论落到刚刚删除的申请上。
+- 删除评论会一并删除其全部后代回复，遍历具有循环保护；删除申请或正式友链会删除该申请的整段讨论。响应分别为 `201`（新评论）和 `204`（删除）。
 
 ---
 
@@ -269,8 +297,12 @@ Authorization: Bearer eyJ...
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
 | POST | `/images/upload` | 管理员 | 上传图片 |
-| GET | `/images` | 管理员 | 图片列表（分页） |
+| GET | `/images` | 管理员 | 图片列表（分页、全库文件名搜索、存储后端筛选） |
 | DELETE | `/images/{id}` | 管理员 | 删除图片 |
+
+`GET /images` 接收 `page`、`page_size`（1–100）、可选 `storage_backend` 以及 `keyword`（最多 300 字符）。关键词按原文件名或内部文件名进行不区分大小写的字面子串匹配，分页列表与 `total` 使用相同过滤条件，按创建时间及 ID 降序返回。
+
+删除正在被轮播、相册、图书封面、文章封面、背景或视频封面引用的图片返回 `409`，响应包含引用原因，文件和记录保留。
 
 ### POST /images/upload（multipart/form-data）
 
@@ -368,12 +400,19 @@ R2 标签表示数据库中的存储配置，不执行远程对象存在性检�
 
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
-| GET | `/friends` | 公开 | 友链列表 |
+| GET | `/friends` | 公开 | 正式友链列表（按 `sort_order`、`id` 升序） |
 | GET | `/friends/exchange-info` | 公开 | 本站交换友链信息及 RSS 地址配置 |
 | PUT | `/friends/exchange-info` | 管理员 | 保存本站交换友链信息及 RSS 地址配置 |
-| POST | `/friends` | 管理员 | 添加友链 |
-| PUT | `/friends/{id}` | 管理员 | 更新友链 |
-| DELETE | `/friends/{id}` | 管理员 | 删除友链 |
+| POST | `/friends` | 管理员 | 添加正式友链 |
+| PUT | `/friends/{id}` | 管理员 | 更新正式友链 |
+| DELETE | `/friends/{id}` | 管理员 | 删除正式友链，并清理关联申请与讨论 |
+| POST | `/friends/applications` | 已登录用户 | 提交友链申请（待审核，不直接公开） |
+| GET | `/friends/applications` | 公开 | 已通过且仍关联正式友链的申请 |
+| GET | `/friends/applications/mine` | 已登录用户 | 当前账户的申请历史（含私有字段） |
+| GET | `/friends/applications/admin` | 管理员 | 全部申请，可按状态筛选 |
+| PATCH | `/friends/applications/{id}/review` | 管理员 | 通过或拒绝申请 |
+| DELETE | `/friends/applications/{id}` | 管理员 | 删除申请；已通过时同时删除正式友链与讨论 |
+| POST | `/friends/sync-json` | 管理员 | 仅重建 `friends.json` 副本，不写数据库 |
 
 ### POST /friends 请求体
 
@@ -383,9 +422,83 @@ R2 标签表示数据库中的存储配置，不执行远程对象存在性检�
   "bio": "一个有趣的博客",
   "avatar": "https://example.com/avatar.png",
   "url": "https://example.com",
+  "rss_url": "https://example.com/rss.xml",
   "sort_order": 0
 }
 ```
+
+`name`、`url` 必填；`rss_url` 可为空或最长 2048 字符的完整 HTTP／HTTPS 地址。列表和写入响应都包含 `rss_url` 与 `created_at`。编辑友链时可只提交要修改的字段；`rss_url: ""` 会清空订阅地址。
+
+### 友链申请
+
+提交体只包含站点与联络字段，未知字段返回 `422`：
+
+```json
+{
+  "name": "星尘小站",
+  "url": "https://example.com",
+  "avatar": "https://example.com/avatar.png",
+  "email": "owner@example.com",
+  "rss_url": ""
+}
+```
+
+- `name` 1–100 字符；`url`、`avatar` 为 1–500 字符的完整 HTTP／HTTPS 地址；`email` 最长 320 字符；`rss_url` 为空或最长 2048 字符的完整 HTTP／HTTPS 地址；字段首尾空白会去除。
+- 上述地址不能包含空白或 URL 凭据（用户名／密码）。
+- 提交成功返回 `201` 的私有申请。`email` 只在本人和管理员接口出现，公开接口不返回。
+- 提交时站点不得与正式友链重复，也不得有同站点待审核／已通过申请：前者返回 `409`，后者由唯一约束返回 `409`。被拒绝后站点键释放，可重新申请。
+- 同一站点由 `active_site_key` 唯一约束保证在待审核／已通过阶段不可重复。
+
+公开分页 `GET /friends/applications`：`page` 默认 1，`page_size` 默认 10（1–50），按 `reviewed_at`、`id` 倒序；响应为 `{ "items": [...], "total": n }`。每项仅含 `id`、`name`、`url`、`avatar`、`rss_url`、`created_at`、`reviewed_at`、`friend_id`，不包含 `email`、`user_id`、`status`、`review_note`。
+
+`GET /friends/applications/mine` 同样分页，只返回当前账户的申请，按 `created_at`、`id` 倒序；`GET /friends/applications/admin` 默认 `page_size=20`（1–100），可用 `status=pending|approved|rejected` 筛选，列表同样按 `created_at`、`id` 倒序。私有项包含：
+
+```json
+{
+  "id": 12,
+  "name": "星尘小站",
+  "url": "https://example.com",
+  "avatar": "https://example.com/avatar.png",
+  "rss_url": "",
+  "created_at": "2026-10-20T08:00:00Z",
+  "reviewed_at": null,
+  "friend_id": null,
+  "email": "owner@example.com",
+  "user_id": 3,
+  "status": "pending",
+  "review_note": ""
+}
+```
+
+`user_id` 在账户删除后为 `null`，申请和审核记录保留；显示为“已注销用户”。公开列表只包含 `approved` 且 `friend_id` 仍指向存在友链的记录，友链删除后该申请不再公开。
+
+### 审核、幂等与冲突
+
+`PATCH /friends/applications/{id}/review` 请求体：
+
+```json
+{ "decision": "approved", "reason": "" }
+```
+
+- 仅 `pending` 可转换。通过时在同一事务内用申请的 `name`、`url`、`avatar`、`rss_url` 创建正式友链（`bio` 为空、`sort_order` 取当前最大值 + 1），并写入 `status=approved`、`friend_id`、`reviewed_at`；正式友链与公开申请同时生效。
+- 拒绝时 `reason` 去除首尾空白后必须为 1–500 字符，写入 `review_note`，状态变为 `rejected` 并释放站点键；通过时忽略并清空 `reason`。
+- 已 `approved` 的申请再次提交 `approved` 是幂等的：不重复创建友链，返回现有记录和 `200`。
+- 已拒绝的申请再次审核、已通过申请改为拒绝、或并发审核已被处理时返回 `409`（“申请已处理，请刷新列表”）。
+- 申请不存在返回 `404`；通过时站点已在正式友链中也返回 `409`。
+- 删除申请返回 `204`。`approved` 申请会同时删除关联正式友链、公开申请及 `friend-application:{id}` 全部讨论；`pending`／`rejected` 只删除申请与其讨论。操作先锁定申请行，避免与评论写入交错。
+- 申请 ID 删除后不会复用；旧审核操作与旧讨论地址继续返回 `404`，不会指向后续申请。
+- 通过 `PUT /friends/{id}` 编辑由申请生成的友链时，`name`、`url`、`avatar`、`rss_url` 会同步回关联申请并重新校验站点唯一性，重复站点返回 `409`、字段校验失败返回 `422`；`DELETE /friends/{id}` 会删除关联申请和讨论。
+
+### friends.json 公开副本
+
+数据库是唯一权威数据源；`friends.json` 只是正式友链的生成副本，后端从不读取或反向导入它。每次新增、修改、删除正式友链、通过申请或删除已通过申请，都在数据库提交后重建副本；提交申请、拒绝申请和删除未通过申请不触发同步。
+
+- 路径为 `DATA_DIR/friends.json`。`DATA_DIR` 可由环境变量覆盖，默认 `blog-backend/data`。
+- 同步使用 `friends.json.lock` 串行化，在新数据库会话中读取已提交列表，写入同目录临时文件后用原子替换覆盖目标，失败时保留旧文件。
+- 副本字段与公开友链响应一致，不包含申请邮箱或其他私有联络信息。
+- 数据库提交成功但文件同步失败时，接口返回 `503`，`detail` 为 `FRIEND_JSON_SYNC_FAILED`；数据库结果已保留，不可回滚。客户端应保留成功状态并调用 `POST /friends/sync-json` 仅重试文件同步；后续正式友链写操作也会再次重建副本，但不应通过重复业务写操作来修复。
+- `POST /friends/sync-json` 成功返回 `204`，失败同样返回 `503` 和 `FRIEND_JSON_SYNC_FAILED`。
+- `data/` 未挂载为静态目录，`friends.json` 不通过 HTTP 对外提供。
 
 ### 交换友链信息中的 RSS 配置
 
@@ -393,7 +506,7 @@ GET／PUT `/api/v1/friends/exchange-info` 在原有 `name`、`url`、`avatar`、
 
 空值表示前台使用现有 API 基址下的 `/api/v1/rss.xml`，同域部署会补全当前站点来源。后台填写自定义地址后，友链页和首页图标共同使用该地址；清空恢复本站默认值。地址配置只控制两个可见入口，本站 RSS 接口和静态自动发现标签始终可用。
 
-配置仍存储在 `site_config` 的 `friends_exchange_info` JSON 中；旧 JSON 缺少 `rss_url` 时读取为空，无需数据库结构迁移。
+配置仍存储在 `site_config` 的 `friends_exchange_info` JSON 中；旧 JSON 缺少 `rss_url` 时读取为空，该配置本身无需数据库结构迁移（正式友链的 `friends.rss_url` 列迁移见数据库文档）。
 
 ---
 
@@ -549,6 +662,7 @@ GET／PUT `/api/v1/friends/exchange-info` 在原有 `name`、`url`、`avatar`、
 | 409 | 冲突（如 slug 已存在） |
 | 422 | 请求体验证失败 |
 | 429 | 请求频率超限 |
+| 503 | 公开 JSON 副本同步失败（`FRIEND_JSON_SYNC_FAILED`；写操作通常已先提交数据库） |
 
 ---
 
@@ -564,7 +678,7 @@ GET／PUT `/api/v1/friends/exchange-info` 在原有 `name`、`url`、`avatar`、
 | 图书 `/read`、`/read-resource/...`、管理员 `/download` | 从本地 EPUB 提供；缺少副本时从 R2 回填，再由服务器响应 |
 | 已派生的 `r2_url` 直链 | 浏览器直接访问 R2，没有本站 `307` 这一步 |
 
-本地记录直接返回本地文件；`/uploads/books/...` 等未匹配上述存储记录的路径也使用本地兜底。
+本地记录直接返回本地文件；`/uploads/books/...` 等未匹配上述存储记录的路径也使用本地兜底。由相对路径派生的文件访问先解析真实路径并检查其仍位于 `UPLOAD_DIR` 内，绝对路径、空路径段和解析后越界的路径会被拒绝（包括指向目录外的符号链接）。公开下载、媒体和 `/uploads/` 访问返回 `404`；删除服务抛出异常并保留目录外文件，不自动修复损坏记录。
 跨域媒体的 CORS 由 R2 桶策略放行；前端另以 `_cors=2` 查询参数隔离浏览器缓存键
 （详见 [background-media.md](./background-media.md)）。
 
@@ -572,6 +686,8 @@ GET／PUT `/api/v1/friends/exchange-info` 在原有 `name`、`url`、`avatar`、
 其他仍调用 `/images/upload`、`/files/upload` 的入口先将内容交给后端，再按存储选项写入本地或 R2。
 EPUB 和背景自有视频经服务器处理并保留本地副本。已有本地文件迁移到 R2 后，当前实现保留本地文件，
 更新存储记录并维持原访问地址；上传不会为每个文件新增 FastAPI 路由。
+
+`POST /api/v1/r2-migration/register-upload` 仅接受预签名上传使用的键结构：`files/<32位小写十六进制UUID>.<1–10位小写字母数字扩展名>`，或 `images/YYYY/MM/<12位小写十六进制UUID>_<1–200位安全文件名>.<扩展名>`。图片键中的文件名仅保留 `A–Z a–z 0–9 . _ -`，其他字符替换为下划线，最长 200 字符；原始文件名独立保存在记录中。格式不合法返回 `400`，校验通过后仍须确认对象已上传。检查只约束新登记，不重写历史记录或 R2 对象键。
 
 历史同源路径（用于后台管理与兼容）：
 

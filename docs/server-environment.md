@@ -63,8 +63,10 @@ git clone --branch dev --single-branch https://github.com/haloo-cod/Nebula.git /
 
 恢复到 `repo/blog-backend/`：
 
-- 真实生产 `.env`、`blog.db` 及停止旧服务后仍存在的数据库事务文件。
+- 真实生产 `.env` 和 SQLite 一致性备份（默认恢复为 `blog.db`）。使用 SQLite `.backup`，或停掉全部数据库进程并确认 checkpoint 完成后备份；不能使用在线仅复制 `blog.db` 的文件，也不能混用不同备份的 WAL/SHM。
 - `uploads/`、`content/`、`data/` 整个目录。
+
+源站备份时先停止写入，完整步骤见[生产更新流程](production-update.md)。恢复时沿用原用户 ID、媒体路径和 `.env` 中的实际数据库／存储目录，不运行初始化脚本重建账户或覆盖内容。
 
 前端实际使用的 `.env.production` 等环境配置恢复到 `repo/blog-frontend/`。同域部署的 `VITE_API_BASE_URL` 留空。
 R2 继续使用原桶及媒体域名时，保留原 `.env` 中的凭据和配置。
@@ -78,6 +80,15 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
+核对 systemd 的服务用户和 Python 路径。以下以 `www` 为例，必须使用服务实际运行的 `.venv/bin/python` 确认其 SQLite **至少为 3.35**，不能仅检查系统 `sqlite3` 命令的版本：
+
+```bash
+sudo -u www .venv/bin/python -c "import sqlite3; print(sqlite3.sqlite_version); assert sqlite3.sqlite_version_info >= (3, 35, 0), 'SQLite >= 3.35 required'"
+sudo -u www .venv/bin/python -c "import tempfile; from app.config import settings; settings.DATA_DIR.mkdir(parents=True, exist_ok=True); tempfile.TemporaryFile(dir=settings.DATA_DIR).close(); print('DATA_DIR writable')"
+```
+
+`DATA_DIR`（默认 `data/`）须允许服务用户创建锁和临时文件、原子替换 `friends.json`。数据库及其所在目录也必须可写；不要通过 root 运行应用来绕过权限问题。
+
 前端在服务器安装依赖并构建：
 
 ```bash
@@ -86,15 +97,24 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
-首次上线使用的生产数据来自备份；不要运行 `scripts.init_* --force` 覆盖已有内容。
+首次上线使用的生产数据来自备份；不要运行 `scripts.init_* --force` 覆盖已有内容。启动任何 worker 前，在后端工作目录以服务用户执行：
+
+```bash
+cd /www/wwwroot/starlitn.top/repo/blog-backend
+sudo -u www .venv/bin/python -m scripts.migrate
+```
+
+命令使用当前 `.env`、数据库引擎和生产配置校验，只迁移结构；不会导入 `app.main`、运行启动流程、创建管理员、清理资源或修改 JSON。成功后再启动服务，配置或迁移失败时保持停止。建表与升级通过文件锁和 SQLite `BEGIN IMMEDIATE` 串行处理，支持多 worker 首次启动；仍应先运行 CLI，重复运行安全。
+
+认证迁移会生成内部 `users.auth_id`，新刷新会话保存签发时的 `auth_id`，并一次性记录 `20261023_auth_identity_uuid`、撤销旧刷新会话。旧会话新增的 `auth_id` 保持空值，不用当前整数 ID 对应的用户回填历史身份，已有非空值保留。所有用户需重新登录一次；旧整数／用户名主体 JWT 和旧邮箱验证链接不再接受，需要时重新发送验证邮件。整数用户 ID、资料、关联和媒体路径保留，UUID 与迁移标记不新增到用户资料 API。正常启动仍会从数据库重建正式友链 JSON 副本。
 
 恢复 Nginx 和 `blog-backend.service` 后，核对站点目录、`WorkingDirectory`、虚拟环境路径、服务用户和文件权限。
 旧宝塔的 `www` 用户及其 Nginx `include` 路径在纯 Ubuntu 上可能不存在，需要调整；SQLite 所在目录也要允许后端服务用户写入。
-小服务器先使用一个 Uvicorn worker（`--workers 1`）。确认 `nginx -t` 通过，再启动服务和验证图片、视频、图书及后台读写。
+小服务器先使用一个 Uvicorn worker（`--workers 1`）。迁移成功并确认 `nginx -t` 通过后再启动服务；保持维护状态验证健康检查、管理员和普通账户登录／刷新、图片、视频、图书及后台读写，并确认匿名和其他账户不能看到申请邮箱等私有数据，完成后才恢复写流量。
 
 ## 4. 后续更新
 
-每次更新前备份运行数据并确认 `git status` 没有需要保留的代码改动。下面各步成功后再继续下一步；更新失败时查看报错后处理，避免反复重启。
+每次更新先进入维护期、暂停写流量，停止全部后端 worker 和其他写库进程。确认 `git status` 没有需要保留的代码改动，记录当前提交和前端构建，再按[生产更新流程](production-update.md)使用 `.backup` 备份数据库，并保存 `.env`、`data/`、`content/`、`uploads/` 及前端部署配置。下面各步成功后再继续下一步；更新失败保持服务停止，避免反复重启。
 
 停止后端后拉取同一分支：
 
@@ -122,7 +142,14 @@ pnpm build
 如果 Nginx 直接指向 `blog-frontend/dist`，新构建即为发布内容；若网站根目录是其他目录，将构建结果同步到该目录。
 运行依赖安装和构建的用户需要有对应目录写权限；服务仍使用配置中的非 root 用户运行。
 
-启动并等待数据库就绪：
+先确认上述 SQLite 版本与目录权限检查仍通过，再从后端工作目录以服务用户迁移；不要在拉起多个 worker 的同时手工改库：
+
+```bash
+cd /www/wwwroot/starlitn.top/repo/blog-backend
+sudo -u www .venv/bin/python -m scripts.migrate
+```
+
+退出码为零后启动并等待数据库就绪：
 
 ```bash
 systemctl start blog-backend.service
@@ -132,11 +159,13 @@ systemctl start blog-backend.service
 curl --fail --retry 15 --retry-connrefused --retry-delay 2 --max-time 5 --retry-max-time 90 http://127.0.0.1:8000/health
 ```
 
-正常返回 `{"status":"ok","database":"ok"}` 后，再验证页面及媒体。启动失败时查看：
+正常返回 `{"status":"ok","database":"ok"}` 后，按上述登录、刷新、媒体和私有申请检查验收，再恢复写流量。本次 UUID 迁移仅使用户首次重新登录，重跑迁移不会更换 UUID 或撤销新会话。启动失败时查看：
 
 ```bash
 journalctl -u blog-backend.service -n 100 --no-pager
 ```
+
+失败时的回滚只在写流量恢复前进行：停掉全部数据库进程，将代码、前端构建和匹配的数据库／`.env`／数据目录一并恢复，隔离失败版本的 WAL/SHM，保留原 ID 和路径。恢复写入后不要直接覆盖旧备份，应先停写并保存当前完整数据，再处理新增数据的保留和恢复。
 
 ## 脚本验证
 

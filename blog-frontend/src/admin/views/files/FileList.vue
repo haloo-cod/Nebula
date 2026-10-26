@@ -269,8 +269,9 @@ async function removeFile(file: UploadedFile) {
     await api.delete(`/api/v1/files/${file.id}`, true)
     ElMessage.success('文件已删除')
     await loadFiles()
-  } catch {
-    // 用户取消删除或请求失败。
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除文件失败')
   }
 }
 
@@ -287,8 +288,11 @@ async function removeImage(image: UploadedImage) {
     ElMessage.success('图片已删除')
     await loadImages()
   } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
     if (err instanceof Error && 'status' in err && (err as { status?: number }).status === 409) {
       ElMessage.warning(err.message)
+    } else {
+      ElMessage.error(err instanceof Error ? err.message : '删除图片失败')
     }
   }
 }
@@ -314,8 +318,9 @@ async function removeArchive(job: BookDownloadJob) {
     await api.delete(`/api/v1/books/download-jobs/${job.id}`, true)
     ElMessage.success('归档已删除')
     await loadArchives()
-  } catch {
-    // 用户取消删除或请求失败。
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除归档失败')
   }
 }
 

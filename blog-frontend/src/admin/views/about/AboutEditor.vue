@@ -8,7 +8,8 @@ import { ElMessage } from 'element-plus'
 import { RefreshRight } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
-import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import { uploadEditorImages } from '@/utils/editorUpload'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
@@ -89,26 +90,16 @@ function initVditor(content: string) {
     cache: { enable: false },
     value: content,
     upload: {
-      // 存储后端跟随全局选择器，通过 URL 查询参数传给后端
-      url: `${BASE_URL}/api/v1/images/upload?storage_backend=${storageBackend.value}`,
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      fieldName: 'file',
       max: 10 * 1024 * 1024,
       accept: 'image/*',
-      format(_files: File[], responseText: string): string {
-        try {
-          const response = JSON.parse(responseText) as { original_name: string; url: string }
-          return JSON.stringify({
-            msg: '',
-            code: 0,
-            data: {
-              errFiles: [],
-              succMap: { [response.original_name]: resolveUrl(response.url) },
-            },
-          })
-        } catch {
-          return JSON.stringify({ msg: '上传失败', code: 1, data: { errFiles: [], succMap: {} } })
-        }
+      handler(files) {
+        const editor = vditor
+        return uploadEditorImages(files, storageBackend.value, (markdown) => {
+          if (vditor === editor) editor?.insertMD(markdown)
+        }).catch((error: unknown) => {
+          if (vditor === editor) editor?.tip(error instanceof Error ? error.message : '图片上传失败')
+          return null
+        })
       },
     },
     preview: {

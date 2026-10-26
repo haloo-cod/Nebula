@@ -3,6 +3,7 @@ User 模型 — 管理员认证
 """
 
 from datetime import datetime
+from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,6 +15,8 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # 认证主体不可复用，业务关联继续使用整数 ID。
+    auth_id: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid4()))
     username: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(200), default="")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -35,6 +38,8 @@ class AuthSession(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # 冻结签发时的主体，阻止残留会话随整数 ID 复用转移到账户。
+    auth_id: Mapped[str] = mapped_column(String(36))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

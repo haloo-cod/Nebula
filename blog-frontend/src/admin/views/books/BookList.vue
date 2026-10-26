@@ -14,7 +14,7 @@ import {
   RefreshRight,
   Upload,
 } from '@element-plus/icons-vue'
-import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { api, apiXhr, BASE_URL, getToken, resolveUrl } from '@/api/client'
 import { uploadImage } from '@/api/images'
 import type { BookSort } from '@/api/books'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
@@ -186,37 +186,17 @@ function formatFileSize(size: number): string {
 }
 
 /** 上传单本 EPUB，并报告浏览器侧进度 */
-function uploadBook(task: BookUploadTask): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    const formData = new FormData()
-    formData.append('file', task.file)
-    formData.append('title', isSingleUpload.value ? uploadForm.value.title : '')
-    formData.append('author', isSingleUpload.value ? uploadForm.value.author : '')
-    formData.append('description', isSingleUpload.value ? uploadForm.value.description : '')
-
-    xhr.open('POST', `${BASE_URL}/api/v1/books?storage_backend=${storageBackend.value}`)
-    const token = getToken()
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) task.progress = Math.round((event.loaded / event.total) * 100)
-    })
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve()
-        return
-      }
-      try {
-        const body = JSON.parse(xhr.responseText) as { detail?: string }
-        const error = new Error(body.detail || `上传失败 (${xhr.status})`)
-        Object.assign(error, { status: xhr.status })
-        reject(error)
-      } catch {
-        reject(new Error(`上传失败 (${xhr.status})`))
-      }
-    })
-    xhr.addEventListener('error', () => reject(new Error('网络错误，上传失败')))
-    xhr.send(formData)
+async function uploadBook(task: BookUploadTask): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', task.file)
+  formData.append('title', isSingleUpload.value ? uploadForm.value.title : '')
+  formData.append('author', isSingleUpload.value ? uploadForm.value.author : '')
+  formData.append('description', isSingleUpload.value ? uploadForm.value.description : '')
+  await apiXhr(`${BASE_URL}/api/v1/books?storage_backend=${storageBackend.value}`, {
+    method: 'POST',
+    body: formData,
+    auth: true,
+    onUploadProgress: (percent) => (task.progress = percent),
   })
 }
 
@@ -328,21 +308,15 @@ async function downloadSelectedZip() {
   downloadProgress.value = 0
   downloadStatus.value = '正在创建打包任务'
   try {
-    const response = await fetch(`${BASE_URL}/api/v1/books/download-jobs`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${getToken() ?? ''}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
+    const created = await api.post<{ id: number }>(
+      '/api/v1/books/download-jobs',
+      {
         slugs: selectedBooks.value.map((book) => book.slug),
         archive_name: archiveName.value,
         expire_days: archiveExpireDays.value,
-      }),
-    })
-    if (!response.ok) throw new Error('创建 ZIP 打包任务失败')
-    const created = (await response.json()) as { id: number }
+      },
+      true,
+    )
     const job = await waitForDownloadJob(created.id)
     if (!archiveOnly.value) {
       await downloadWithProgress(`${BASE_URL}${job.download_url}`, `${archiveName.value}.zip`, {
@@ -364,22 +338,14 @@ async function downloadSelectedZip() {
 async function waitForDownloadJob(jobId: number): Promise<{ download_url: string }> {
   for (let attempt = 0; attempt < 300; attempt += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, 1000))
-    const response = await fetch(`${BASE_URL}/api/v1/books/download-jobs/${jobId}`, {
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      credentials: 'include',
-    })
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ detail: '读取 ZIP 任务状态失败' }))
-      throw new Error(body.detail || '读取 ZIP 任务状态失败')
-    }
-    const job = (await response.json()) as {
+    const job = await api.get<{
       status: string
       progress: number
       completed_books: number
       total_books: number
       error_message: string
       download_url: string | null
-    }
+    }>(`/api/v1/books/download-jobs/${jobId}`, true)
     downloadProgress.value = job.progress
     downloadStatus.value = `${job.completed_books}/${job.total_books} 本已打包`
     if (job.status === 'completed' && job.download_url) return { download_url: job.download_url }

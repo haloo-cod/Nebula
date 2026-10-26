@@ -217,8 +217,9 @@ async function removeUploadedFile(file: UploadedFile) {
     uploadedFiles.value = uploadedFiles.value.filter((item) => item.id !== file.id)
     if (form.value.download_file === file.url) form.value.download_file = ''
     ElMessage.success('文件已删除')
-  } catch {
-    // 用户取消
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除文件失败')
   }
 }
 
@@ -307,8 +308,9 @@ async function handleDelete(item: TreasureItem) {
     await api.delete(`/api/v1/treasures/${item.id}`)
     ElMessage.success('删除成功')
     loadData()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除资源失败')
   }
 }
 

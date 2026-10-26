@@ -3,20 +3,28 @@
 """
 
 import json
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_admin
+from app.api.deps import get_current_user, require_admin
 from app.database import get_db
 from app.models.user import User
+from app.models.friend_application import FriendApplication
 from app.schemas.friend import (
     FriendCreate,
     FriendListResponse,
     FriendResponse,
     FriendUpdate,
     FriendExchangeInfo,
+    FriendApplicationCreate,
+    FriendApplicationReview,
+    FriendApplicationPublic,
+    FriendApplicationPrivate,
+    FriendApplicationListResponse,
+    FriendApplicationPrivateListResponse,
 )
 from app.models.site_config import SiteConfig
 from app.services.friend_exchange import EXCHANGE_CONFIG_KEY, load_exchange_info
@@ -25,6 +33,12 @@ from app.services.friend import (
     delete_friend,
     list_friends,
     update_friend,
+    commit_friend_changes,
+    sync_friends_json,
+    lock_application,
+)
+from app.services.friend_application import (
+    create_application, list_applications, review_application, delete_application,
 )
 
 router = APIRouter(prefix="/friends", tags=["友链"])
@@ -65,6 +79,17 @@ async def update_exchange_info(
     return data
 
 
+@router.post("/sync-json", status_code=status.HTTP_204_NO_CONTENT)
+async def rebuild_friends_json(
+    db: AsyncSession = Depends(get_db), _: User = Depends(require_admin),
+):
+    """仅重建公开副本，不重复数据库写操作。"""
+    try:
+        await sync_friends_json(db)
+    except Exception as exc:
+        raise HTTPException(503, "FRIEND_JSON_SYNC_FAILED") from exc
+
+
 @router.get("", response_model=FriendListResponse)
 async def get_friends(db: AsyncSession = Depends(get_db)):
     """获取友链列表（公开接口）"""
@@ -80,9 +105,84 @@ async def add_friend(
 ):
     """添加友链（管理员）"""
     friend = await create_friend(
-        db, name=data.name, bio=data.bio, avatar=data.avatar, url=data.url, sort_order=data.sort_order
+        db, name=data.name, bio=data.bio, avatar=data.avatar, url=data.url, sort_order=data.sort_order,
+        rss_url=data.rss_url,
     )
+    await commit_friend_changes(db)
     return friend
+
+
+@router.post("/applications", response_model=FriendApplicationPrivate, status_code=201)
+async def submit_application(
+    data: FriendApplicationCreate, user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """唯一的申请提交入口，仅接收站点与联络字段。"""
+    application = await create_application(db, user, data)
+    await db.commit()
+    return application
+
+
+@router.get("/applications", response_model=FriendApplicationListResponse)
+async def public_applications(
+    page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """匿名可读，响应模型明确排除所有私有字段。"""
+    items, total = await list_applications(db, scope="public", user_id=None, status=None, page=page, page_size=page_size)
+    return FriendApplicationListResponse(items=[FriendApplicationPublic.model_validate(item) for item in items], total=total)
+
+
+@router.get("/applications/mine", response_model=FriendApplicationPrivateListResponse)
+async def my_applications(
+    page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=50),
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    """只读取当前账户的申请历史。"""
+    items, total = await list_applications(db, scope="mine", user_id=user.id, status=None, page=page, page_size=page_size)
+    return FriendApplicationPrivateListResponse(items=[FriendApplicationPrivate.model_validate(item) for item in items], total=total)
+
+
+@router.get("/applications/admin", response_model=FriendApplicationPrivateListResponse)
+async def admin_applications(
+    status: Literal["pending", "approved", "rejected"] | None = None,
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+    _: User = Depends(require_admin), db: AsyncSession = Depends(get_db),
+):
+    """管理员按状态审核完整申请。"""
+    items, total = await list_applications(db, scope="admin", user_id=None, status=status, page=page, page_size=page_size)
+    return FriendApplicationPrivateListResponse(items=[FriendApplicationPrivate.model_validate(item) for item in items], total=total)
+
+
+@router.patch("/applications/{application_id}/review", response_model=FriendApplicationPrivate)
+async def review_friend_application(
+    application_id: int, data: FriendApplicationReview,
+    _: User = Depends(require_admin), db: AsyncSession = Depends(get_db),
+):
+    """审核与生成正式友链在同一事务提交。"""
+    application = await review_application(db, application_id, data.decision, data.reason)
+    if application.status == "approved":
+        await commit_friend_changes(db)
+    else:
+        await db.commit()
+    return application
+
+
+@router.delete("/applications/{application_id}", status_code=204)
+async def remove_friend_application(
+    application_id: int, _: User = Depends(require_admin), db: AsyncSession = Depends(get_db),
+):
+    """删除申请及其讨论，已通过记录同时移除正式友链。"""
+    if not await lock_application(db, application_id):
+        raise HTTPException(404, "申请不存在")
+    application = await db.get(FriendApplication, application_id, populate_existing=True)
+    approved = application.status == "approved"
+    if not await delete_application(db, application_id):
+        raise HTTPException(404, "申请不存在")
+    if approved:
+        await commit_friend_changes(db)
+    else:
+        await db.commit()
 
 
 @router.put("/{friend_id}", response_model=FriendResponse)
@@ -94,10 +194,12 @@ async def edit_friend(
 ):
     """更新友链（管理员）"""
     friend = await update_friend(
-        db, friend_id, name=data.name, bio=data.bio, avatar=data.avatar, url=data.url, sort_order=data.sort_order
+        db, friend_id, name=data.name, bio=data.bio, avatar=data.avatar, url=data.url, sort_order=data.sort_order,
+        rss_url=data.rss_url,
     )
     if not friend:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="友链不存在")
+    await commit_friend_changes(db)
     return friend
 
 
@@ -111,3 +213,4 @@ async def remove_friend(
     success = await delete_friend(db, friend_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="友链不存在")
+    await commit_friend_changes(db)

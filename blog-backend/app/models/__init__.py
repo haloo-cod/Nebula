@@ -12,6 +12,7 @@ from app.models.background import Background
 from app.models.carousel import CarouselSlide
 from app.models.album import Album, AlbumPhoto
 from app.models.friend import Friend
+from app.models.friend_application import FriendApplication
 from app.models.treasure import Treasure
 from app.models.tavern import TavernPost
 from app.models.profile import Profile, SocialLink
@@ -19,6 +20,7 @@ from app.models.study import StudyTodo, ScheduleItem, StudyHistory
 from app.models.site_config import SiteConfig
 from app.models.analytics import AnalyticsEvent
 from app.models.rate_limit import RateLimitHit
+from app.models.schema_migration import SchemaMigration
 
 __all__ = [
     "Base",
@@ -37,6 +39,7 @@ __all__ = [
     "Album",
     "AlbumPhoto",
     "Friend",
+    "FriendApplication",
     "Treasure",
     "TavernPost",
     "Profile",
@@ -47,4 +50,5 @@ __all__ = [
     "SiteConfig",
     "AnalyticsEvent",
     "RateLimitHit",
+    "SchemaMigration",
 ]

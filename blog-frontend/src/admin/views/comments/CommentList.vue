@@ -121,8 +121,9 @@ async function deleteComment(comment: CommentItem) {
     await api.delete(`/api/v1/comments/${comment.id}`)
     ElMessage.success('删除成功')
     loadComments()
-  } catch {
-    // 用户取消
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除评论失败')
   }
 }
 

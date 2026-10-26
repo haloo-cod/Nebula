@@ -96,8 +96,9 @@ export function useAdminTable<T>(options: AdminTableOptions<T>) {
         pagination.page--
       }
       await loadData()
-    } catch {
-      // 用户取消或删除失败,不处理
+    } catch (err: unknown) {
+      if (err === 'cancel' || err === 'close') return
+      ElMessage.error(err instanceof Error ? err.message : '删除失败')
     }
   }
 

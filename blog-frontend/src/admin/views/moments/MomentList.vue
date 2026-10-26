@@ -111,8 +111,9 @@ async function removeComment(comment: MomentComment) {
     await api.delete(`/api/v1/moments/${selectedMoment.value.id}/comments/${comment.id}`, true)
     comments.value = comments.value.filter((item) => item.id !== comment.id)
     ElMessage.success('评论已删除')
-  } catch {
-    // 用户取消或删除失败
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除评论失败')
   }
 }
 

@@ -97,14 +97,20 @@ async function handleBatchDelete() {
     const results = await Promise.allSettled(
       selectedIds.value.map((id) => api.delete(`/api/v1/carousel/${id}`)),
     )
-    const failed = results.filter((result) => result.status === 'rejected').length
-    ElMessage[failed ? 'warning' : 'success'](
-      failed ? `删除完成，${failed} 张失败` : '批量删除成功',
-    )
+    const failed = results.filter((result) => result.status === 'rejected')
+    if (failed.length) {
+      const details = failed.map((result) =>
+        result.reason instanceof Error ? result.reason.message : '删除失败',
+      )
+      ElMessage.error(`${failed.length} 张轮播图删除失败：${[...new Set(details)].join('；')}`)
+    } else {
+      ElMessage.success('批量删除成功')
+    }
     selectedIds.value = []
     await loadSlides()
-  } catch {
-    // 用户取消删除
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '批量删除失败')
   } finally {
     deleting.value = false
   }
@@ -117,8 +123,9 @@ async function handleDelete(slide: CarouselSlide) {
     await api.delete(`/api/v1/carousel/${slide.id}`)
     ElMessage.success('删除成功')
     loadSlides()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除轮播图失败')
   }
 }
 
