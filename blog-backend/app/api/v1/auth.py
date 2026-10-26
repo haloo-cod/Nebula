@@ -1,7 +1,7 @@
 """统一账户认证：密码注册登录、刷新会话与 GitHub OAuth。"""
 
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 import secrets
 
 import httpx
@@ -242,11 +242,34 @@ async def logout(
 
 
 @router.get("/github")
-async def github_login(redirect: str | None = Query(None, max_length=500)):
+async def github_login(request: Request, redirect: str | None = Query(None, max_length=500)):
     """跳转至 GitHub OAuth 授权页面。"""
 
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="GitHub 登录未配置")
+    try:
+        callback = urlsplit(settings.GITHUB_CALLBACK_URL)
+        callback_host = callback.hostname
+        if (
+            callback.scheme not in {"http", "https"}
+            or not callback_host
+            or callback.username
+            or callback.password
+            or any(char.isspace() for char in settings.GITHUB_CALLBACK_URL)
+        ):
+            raise ValueError("invalid callback URL")
+        # 同时验证端口是否合法；回跳目标只从服务端配置读取。
+        callback.port
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="GitHub 回调地址配置无效") from None
+    if request.url.hostname != callback_host:
+        # host-only Cookie 无法从别名带到回调域名，必须先跳转、再创建 state。
+        # Cookie 不按端口隔离；不比较请求协议，兼容 Cloudflare Flexible 的源站 HTTP。
+        login_url = urlunsplit((
+            callback.scheme, callback.netloc, "/api/v1/auth/github",
+            urlencode({"redirect": _safe_redirect(redirect)}), "",
+        ))
+        return RedirectResponse(login_url, headers={"Cache-Control": "no-store"})
     state_token = create_access_token(
         {
             "sub": "github-oauth",
@@ -262,7 +285,9 @@ async def github_login(redirect: str | None = Query(None, max_length=500)):
         "scope": "read:user user:email",
         "state": state_token,
     })
-    response = RedirectResponse(f"https://github.com/login/oauth/authorize?{query}")
+    response = RedirectResponse(
+        f"https://github.com/login/oauth/authorize?{query}", headers={"Cache-Control": "no-store"},
+    )
     response.set_cookie(
         OAUTH_STATE_COOKIE,
         hash_token(state_token),

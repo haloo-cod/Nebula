@@ -167,6 +167,30 @@ journalctl -u blog-backend.service -n 100 --no-pager
 
 失败时的回滚只在写流量恢复前进行：停掉全部数据库进程，将代码、前端构建和匹配的数据库／`.env`／数据目录一并恢复，隔离失败版本的 WAL/SHM，保留原 ID 和路径。恢复写入后不要直接覆盖旧备份，应先停写并保存当前完整数据，再处理新增数据的保留和恢复。
 
+## 双域名的 GitHub 登录
+
+同一个博客的 `starlitn.top`、`blog.starlitn.top` 可共用同一 GitHub OAuth App。保留一个固定回调域名，并确保 GitHub 应用中登记的回调 URL 与后端配置一致：
+
+```dotenv
+GITHUB_CALLBACK_URL=https://starlitn.top/api/v1/auth/github/callback
+FRONTEND_URL=https://starlitn.top
+COOKIE_SECURE=true
+```
+
+从别名访问 `/api/v1/auth/github` 时，后端先跳转到配置的回调主机，再创建 state 并跳转 GitHub。授权回调在同一主机校验 host-only、HttpOnly Cookie，完成后回到 `FRONTEND_URL`。因此两个域名都能作为登录入口，GitHub 登录流程最终统一在主域完成；不会让两个浏览器源的 localStorage 自动共用。
+
+Nginx 的 `/api/` 代理保留实际 Host，现有示例已包含 `proxy_set_header Host $host;`。主机匹配不依赖源站收到的 HTTP/HTTPS 协议，因此兼容 Cloudflare Flexible 外部 HTTPS、源站 HTTP 的部署，避免协议判断造成跳转循环。登录发起响应禁止缓存。
+
+以前从 `blog` 发起、回到主域的流程会丢失 state Cookie，并返回 `OAuth state 无效`。不要仅将固定回调改为另一个入口域名；应更新包含上述修复的后端代码、重启服务，再从登录按钮重新发起流程。本次修复无需新增数据库迁移或修改现有账户。
+
+GitHub 应用的授权用户数与本地 `users.github_id` 已绑定账号数量不是同一统计。用户可在 GitHub 完成授权，但在本站的 state 校验、资料请求或同邮箱密码账号绑定确认阶段失败/中断；此时不会新增成功绑定的本地 GitHub 账号。授权阶段与本站回调步骤见 [GitHub 官方流程](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)。仅凭人数差异不能判断具体哪个账号失败，需要结合对应回调结果核对。
+
+本地认证回归使用独立测试数据库和模拟 GitHub 响应：
+
+```bash
+python -B -m pytest -q tests/test_github_oauth_domains.py tests/test_auth_identity.py
+```
+
 ## 脚本验证
 
 安装脚本的隔离测试使用 Bash 与 Python 标准库，模拟网络和软件包命令，不安装系统软件：
