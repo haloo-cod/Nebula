@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "node",
+      "args": [".codegraph/gitnexus/run.cjs", "mcp"]
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": ["serve", "--mcp"]
+    }
+  }
+}

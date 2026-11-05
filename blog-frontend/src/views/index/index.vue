@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="home-root" :class="{ 'home-locked': !showUIElements }">
-    <!-- 面板区域（简介 + 占位） -->
+    <!-- 上方面板：个人简介 + 访客统计 -->
     <div v-if="showUIElements" class="home-panels" data-background-credit-boundary>
       <div class="home-panels-inner">
         <div class="left-panel-glass">
@@ -258,10 +258,12 @@ const containerClass = computed(() => {
   position: relative;
   width: 100%;
   min-height: 100vh;
+  padding: 90px 0 16px;
 }
 
 .home-locked {
   height: 100vh;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -269,28 +271,32 @@ const containerClass = computed(() => {
    标题容器 — 阶段 1: 偏上静止 → 阶段 2: 下滑定住
    ============================================ */
 .title-container {
-  position: absolute;
-  top: 50vh;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   z-index: 20;
   width: 100%;
   display: flex;
   justify-content: center;
 }
 
-.title-container--initial {
+/* 入场阶段居中；面板出现后按内容布局，仅让横条材质淡入。 */
+.home-locked .title-container {
+  position: absolute;
+  top: 50vh;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.home-locked .title-container--initial {
   transform: translate(-50%, calc(-50% - 50px));
 }
 
-.title-container--sliding {
-  transform: translate(-50%, -50%);
+.home-locked .title-container--sliding {
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
 }
 
 .title-container--centered {
-  transform: translate(-50%, -50%);
+  transform: none;
 }
 
 /* ============================================
@@ -375,7 +381,7 @@ const containerClass = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-container--sliding {
+  .home-locked .title-container--sliding {
     transition: none;
   }
   .title-glass {
@@ -384,18 +390,14 @@ const containerClass = computed(() => {
 }
 
 /* ============================================
-   双面板 — 阶段 3: 横条下方,简介 + 日历
+   上方面板 — 个人简介 + 访客统计
    ============================================ */
 .home-panels {
-  position: absolute;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  top: 90px;
+  position: relative;
+  margin: 0 auto 10px;
   z-index: 15;
   width: 85%;
   max-width: 1100px;
-  max-height: calc(50vh - 130px);
   display: flex;
   flex-direction: column;
 }
@@ -440,13 +442,12 @@ const containerClass = computed(() => {
 }
 
 @media (max-width: 768px) {
+  .home-root {
+    padding: 0;
+  }
+
   .home-panels {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
     width: 92%;
-    max-height: none;
     margin: 70px auto 0;
     display: block;
   }
@@ -474,11 +475,8 @@ const containerClass = computed(() => {
    下方面板区域
    ============================================ */
 .home-bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  top: calc(50vh + 40px);
+  position: relative;
+  margin: 10px auto 0;
   z-index: 15;
   width: 85%;
   max-width: 1100px;
@@ -535,10 +533,6 @@ const containerClass = computed(() => {
 
 @media (max-width: 768px) {
   .home-bottom {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
     width: 92%;
     margin: 16px auto 2rem;
   }
