@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="home-root" :class="{ 'home-locked': !showUIElements }">
     <!-- 上方面板：个人简介 + 访客统计 -->
-    <div v-if="showUIElements" class="home-panels" data-background-credit-boundary>
+    <div ref="homePanelsRef" class="home-panels" data-background-credit-boundary>
       <div class="home-panels-inner">
         <div class="left-panel-glass">
           <LiquidGlass
@@ -51,7 +51,12 @@
     </div>
 
     <!-- 玻璃横条（标题） -->
-    <div class="title-container" :class="containerClass">
+    <div
+      ref="titleContainerRef"
+      class="title-container"
+      :class="containerClass"
+      :style="{ '--home-title-top': `${titleFlowTop}px` }"
+    >
       <div
         class="title-glass"
         data-background-credit-boundary
@@ -199,6 +204,12 @@ const { displayed, done: typewriterDone } = useTypewriter(fullTitle, {
 })
 
 const showUIElements = ref(instant)
+// 上方面板提前占位，入场和展示阶段始终使用同一套标题布局坐标。
+const homePanelsRef = ref<HTMLElement | null>(null)
+const titleContainerRef = ref<HTMLElement | null>(null)
+const titleFlowTop = ref(0)
+let titleLayoutObserver: ResizeObserver | null = null
+let revealTimer: ReturnType<typeof setTimeout> | null = null
 
 if (!instant) {
   ui.showNavbar = false
@@ -209,11 +220,26 @@ watch(typewriterDone, (val) => {
   if (instant) {
     showUIElements.value = true
   } else {
-    setTimeout(() => {
+    revealTimer = setTimeout(() => {
+      titleLayoutObserver?.disconnect()
+      titleLayoutObserver = null
+      revealTimer = null
       showUIElements.value = true
       ui.showNavbar = true
     }, 850)
   }
+})
+
+onMounted(() => {
+  if (instant || !homePanelsRef.value) return
+
+  // offsetTop 不包含 transform，避免把当前动画位移当作布局位置反复叠加。
+  const updateTitleFlowTop = () => {
+    titleFlowTop.value = titleContainerRef.value?.offsetTop ?? 0
+  }
+  updateTitleFlowTop()
+  titleLayoutObserver = new ResizeObserver(updateTitleFlowTop)
+  titleLayoutObserver.observe(homePanelsRef.value)
 })
 
 onMounted(async () => {
@@ -230,6 +256,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (revealTimer !== null) clearTimeout(revealTimer)
+  titleLayoutObserver?.disconnect()
   ui.showNavbar = true
 })
 
@@ -263,12 +291,11 @@ const containerClass = computed(() => {
 
 .home-locked {
   height: 100vh;
-  padding: 0;
   overflow: hidden;
 }
 
 /* ============================================
-   标题容器 — 阶段 1: 偏上静止 → 阶段 2: 下滑定住
+   标题容器 — 阶段 1: 居中打字 → 阶段 2: 纵向归位
    ============================================ */
 .title-container {
   position: relative;
@@ -278,19 +305,17 @@ const containerClass = computed(() => {
   justify-content: center;
 }
 
-/* 入场阶段居中；面板出现后按内容布局，仅让横条材质淡入。 */
-.home-locked .title-container {
-  position: absolute;
-  top: 50vh;
-  left: 50%;
-  transform: translate(-50%, -50%);
+/* 提前保留面板空间；标题只改变纵向位移，材质淡入时不再切换定位方式。 */
+.home-locked .home-panels {
+  visibility: hidden;
 }
 
-.home-locked .title-container--initial {
-  transform: translate(-50%, calc(-50% - 50px));
+.title-container--initial {
+  transform: translateY(calc(50vh - var(--home-title-top, 0px) - 50% - 50px));
 }
 
-.home-locked .title-container--sliding {
+.title-container--sliding {
+  transform: translateY(0);
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
 }
@@ -381,7 +406,7 @@ const containerClass = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-locked .title-container--sliding {
+  .title-container--sliding {
     transition: none;
   }
   .title-glass {
