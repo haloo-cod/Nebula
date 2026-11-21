@@ -99,6 +99,7 @@ import { fetchPosts, toFrontendPost } from '@/api/posts'
 import { fetchMoments } from '@/api/moments'
 import { fetchAlbums } from '@/api/albums'
 import type { ActivityRecord } from '@/types'
+import { formatMomentDate } from '@/utils/momentDate'
 
 const activeAvatar = ref('')
 const activeName = ref('Starlit')
@@ -200,7 +201,7 @@ onMounted(async () => {
       }
     }
 
-    // 说说活动
+    // 说说活动统一使用固定北京时间，避免 UTC 午夜边界偏移到错误日期。
     if (momentsResp && momentsResp.items) {
       for (const m of momentsResp.items) {
         const title = m.content.length > 20 ? m.content.slice(0, 20) + '...' : m.content
@@ -208,7 +209,7 @@ onMounted(async () => {
           id: `moment-${m.id}`,
           type: '说说',
           title,
-          date: m.date,
+          date: formatMomentDate(m.date),
           url: `/moments#moment-${m.id}`,
         })
       }

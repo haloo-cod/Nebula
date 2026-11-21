@@ -34,6 +34,7 @@
 import { ref, computed, onMounted } from 'vue'
 import type { Moment } from '@/types'
 import { likeMoment } from '@/api/moments'
+import { formatMomentRelativeTime } from '@/utils/momentDate'
 
 const props = defineProps<{
   moment: Moment
@@ -105,21 +106,7 @@ const commentCount = computed(() => props.moment.commentCount || 0)
 
 /** 相对时间显示 */
 function relativeTime(dateStr: string): string {
-  const now = Date.now()
-  const d = new Date(dateStr).getTime()
-  const diff = now - d
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 3) return `${days}天前`
-
-  const date = new Date(dateStr)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return formatMomentRelativeTime(dateStr)
 }
 
 </script>

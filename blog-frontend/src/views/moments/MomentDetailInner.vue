@@ -44,7 +44,7 @@
       <div v-else class="detail-inner__comments-list">
         <div v-for="c in comments" :key="c.id" class="detail-inner__comment-item">
           <span class="detail-inner__comment-nick">{{ c.nickname }}</span>
-          <span class="detail-inner__comment-date">{{ c.date }}</span>
+          <span class="detail-inner__comment-date">{{ formatMomentDate(c.date).slice(0, 16) }}</span>
           <p class="detail-inner__comment-text">{{ c.content }}</p>
         </div>
       </div>
@@ -86,6 +86,7 @@ import type { Moment, MomentComment } from '@/types'
 import ImageGrid from './ImageGrid.vue'
 import { likeMoment, fetchMomentComments, postMomentComment } from '@/api/moments'
 import { useAuthStore } from '@/stores/auth'
+import { formatMomentDate } from '@/utils/momentDate'
 
 const props = defineProps<{
   moment: Moment
@@ -184,9 +185,7 @@ async function submitComment() {
 
 /** 完整日期格式(详情面板用) */
 function fullDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatMomentDate(dateStr).slice(0, 16)
 }
 
 </script>

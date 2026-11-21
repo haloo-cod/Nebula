@@ -38,12 +38,12 @@ let refreshFlight: { version: number; promise: Promise<RefreshResponse> } | null
  */
 export const USE_API = import.meta.env.VITE_USE_API !== 'false'
 
-/** 将后端相对路径补全为完整 URL（图片/文件等静态资源） */
+/** 将后端相对路径补全为完整 URL，保留已有转义并编码原始空格。 */
 export function resolveUrl(url: string): string {
   if (!url) return ''
   if (url.startsWith('http')) return url
   const path = url.startsWith('/') ? url : `/${url}`
-  return encodeURI(`${BASE_URL}${path}`)
+  return encodeURI(`${BASE_URL}${path}`).replace(/%25([\da-f]{2})/gi, '%$1')
 }
 
 /** 从 localStorage 获取 JWT */

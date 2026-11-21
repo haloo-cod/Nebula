@@ -34,6 +34,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchMoments } from '@/api/moments'
 import type { Moment } from '@/types'
+import { formatMomentRelativeTime } from '@/utils/momentDate'
 
 const router = useRouter()
 
@@ -62,21 +63,7 @@ onMounted(async () => {
 
 /** 相对时间 */
 function relativeTime(dateStr: string): string {
-  const now = Date.now()
-  const d = new Date(dateStr).getTime()
-  const diff = now - d
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 30) return `${days}天前`
-
-  const date = new Date(dateStr)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return formatMomentRelativeTime(dateStr)
 }
 
 /** 根据索引计算 slide 的 CSS class */

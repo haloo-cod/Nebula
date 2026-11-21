@@ -10,6 +10,7 @@ import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import EmojiPicker from '@/admin/components/EmojiPicker.vue'
+import { formatMomentDate } from '@/utils/momentDate'
 
 /** 说说项（匹配后端 MomentResponse） */
 interface MomentItem {
@@ -203,7 +204,7 @@ onMounted(() => loadData())
             </span>
             <span>{{ row.images.length }} 张图</span>
             <span>{{ row.likes }} 赞</span>
-            <span>{{ row.date.replace('T', ' ').slice(0, 16) }}</span>
+            <span>{{ formatMomentDate(row.date).slice(0, 16) }}</span>
           </div>
           <div class="moment-mobile-actions">
             <el-button type="primary" link size="small" @click="openComments(row)">评论</el-button>
@@ -244,7 +245,7 @@ onMounted(() => loadData())
         <el-table-column prop="likes" label="点赞" width="70" />
         <el-table-column prop="date" label="日期" width="170">
           <template #default="{ row }">
-            {{ row.date.replace('T', ' ').slice(0, 16) }}
+            {{ formatMomentDate(row.date).slice(0, 16) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
@@ -342,7 +343,7 @@ onMounted(() => loadData())
           <template #default="{ row }">{{ row.content }}</template>
         </el-table-column>
         <el-table-column label="时间" width="165">
-          <template #default="{ row }">{{ row.date.replace('T', ' ').slice(0, 16) }}</template>
+          <template #default="{ row }">{{ formatMomentDate(row.date).slice(0, 16) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="70" fixed="right">
           <template #default="{ row }">

@@ -37,6 +37,27 @@ sudo -u www pnpm build
 
 将 `dist/` 同步到实际 Nginx 网站根目录；若 Nginx 直接指向该目录，无需另行复制。保留服务器已有的环境配置、数据库、`data/`、`content/` 和 `uploads/`，媒体目录和 URL 路径保持原样。
 
+### 修正说说/评论历史时间
+
+说说数据保存在 `DATA_DIR/moments.json`，不是 SQLite。发布时间记录混有 UTC 与北京时间且没有时区标记；脚本以现有毫秒 `id` 为权威，将说说和评论的 `date` 改为对应的 UTC ISO 时间，不改 ID、正文、图片、点赞、评论关系或顺序。前台与后台再固定显示为北京时间。不要直接对全部记录统一加减 8 小时。
+
+进入维护期并停止全部后端 worker；使用前文创建的受限备份目录（此处以 `$backup_dir` 表示），按实际 `DATA_DIR` 备份 JSON。更新代码后在 `blog-backend/` 使用服务用户和服务实际 Python 预览：
+
+```bash
+sudo systemctl stop blog-backend.service
+cd /www/wwwroot/<domain>/blog-backend
+sudo -u www cp -a data/moments.json "$backup_dir/moments.json.before-timezone-fix"
+sudo -u www .venv/bin/python -m scripts.migrate_moment_timestamps
+```
+
+预览会报告待改日期数及无效 ID 数，不写文件。确认记录数与备份一致、无效 ID 为 0 后再执行：
+
+```bash
+sudo -u www .venv/bin/python -m scripts.migrate_moment_timestamps --apply
+```
+
+脚本会在同目录生成带 UTC 时间后缀的 `.bak-...` 原始备份，再以临时文件 + 原子替换写入，并对并发迁移使用 `moments.json.lock`。核对输出备份路径和 API 前三条时间，再按本节“启动和验收”恢复服务。若预览计数不符合预期，或看到无效 ID，先不要 `--apply`；保留原文件并查明记录来源。
+
 ## 先迁移，再启动 worker
 
 使用服务实际运行的 Python 检查 SQLite **至少为 3.35**，并以服务用户确认 `DATA_DIR` 可创建临时文件。该目录还必须允许写入锁文件和原子替换 `friends.json`，否则启动或后续友链同步会失败。

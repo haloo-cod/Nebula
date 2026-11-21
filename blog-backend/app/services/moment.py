@@ -22,7 +22,7 @@ JSON 结构（数组）:
 import json
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from filelock import FileLock
 
@@ -52,35 +52,66 @@ def _generate_id() -> int:
     return int(time.time() * 1000) + random.randint(0, 999)
 
 
+def _utc_timestamp(record_id: int) -> str:
+    """按毫秒 ID 中的 Unix 时间生成 UTC ISO 时间字符串。"""
+    return datetime.fromtimestamp(record_id / 1000, timezone.utc).isoformat(timespec="seconds")
+
+
+def _normalize_record_dates(record: dict) -> dict:
+    """兼容旧 JSON：说说和评论的毫秒 ID 是创建时间权威来源。"""
+    normalized = dict(record)
+    if isinstance(normalized.get("id"), int):
+        normalized["date"] = _utc_timestamp(normalized["id"])
+    comments = normalized.get("comments")
+    if isinstance(comments, list):
+        normalized["comments"] = [
+            {**comment, "date": _utc_timestamp(comment["id"])}
+            if isinstance(comment, dict) and isinstance(comment.get("id"), int)
+            else comment
+            for comment in comments
+        ]
+    return normalized
+
+
+def _write_datetime_utc() -> str:
+    """创建带显式 UTC 时区的当前时间。"""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
 def get_moments(page: int = 1, page_size: int = 10) -> tuple[list[dict], int]:
-    """分页获取说说（按时间倒序）"""
-    all_moments = _read_all()
-    # 倒序排列
+    """分页获取说说，统一将历史时间按记录 ID 规范为 UTC。"""
+    all_moments = [_normalize_record_dates(moment) for moment in _read_all()]
     all_moments.sort(key=lambda m: m.get("date", ""), reverse=True)
     total = len(all_moments)
     offset = (page - 1) * page_size
     items = all_moments[offset:offset + page_size]
-    # 不返回 liked_ips
     for item in items:
         item.pop("liked_ips", None)
     return items, total
 
 
 def get_moment_activity_dates() -> tuple[set[str], int]:
-    """获取说说总数和用于主页活跃天数统计的日期。"""
-    moments = _read_all()
-    dates = {str(item.get("date", ""))[:10] for item in moments if item.get("date")}
+    """获取按北京时间规范后的说说创建日期，供主页活跃天数统计。"""
+    moments = [_normalize_record_dates(moment) for moment in _read_all()]
+    dates = {
+        datetime.fromtimestamp(moment["id"] / 1000, timezone.utc)
+        .astimezone(timezone(timedelta(hours=8)))
+        .date()
+        .isoformat()
+        for moment in moments
+        if isinstance(moment.get("id"), int)
+    }
     return dates, len(moments)
 
 
 def get_moment_by_id(moment_id: int) -> dict | None:
-    """获取单条说说"""
-    for m in _read_all():
-        if m.get("id") == moment_id:
-            m.pop("liked_ips", None)
-            return m
+    """获取按 UTC 规范时间返回的单条说说。"""
+    for moment in _read_all():
+        if moment.get("id") == moment_id:
+            moment = _normalize_record_dates(moment)
+            moment.pop("liked_ips", None)
+            return moment
     return None
-
 
 def create_moment(
     content: str,
@@ -95,8 +126,7 @@ def create_moment(
         data = _read_all()
         new_moment = {
             "id": _generate_id(),
-            "date": datetime.now().isoformat(timespec="seconds"),
-            "content": content,
+            "date": _write_datetime_utc(),
             "mood": mood,
             "mood_text": mood_text,
             "tags": tags or [],
@@ -107,9 +137,7 @@ def create_moment(
         }
         data.append(new_moment)
         _write_all(data)
-    result = {k: v for k, v in new_moment.items() if k != "liked_ips"}
-    return result
-
+    return _normalize_record_dates({k: v for k, v in new_moment.items() if k != "liked_ips"})
 
 def delete_moment(moment_id: int) -> bool:
     """删除说说"""
@@ -145,7 +173,7 @@ def update_moment(
             moment["tags"] = tags or []
             moment["images"] = images or []
             _write_all(data)
-            return {key: value for key, value in moment.items() if key != "liked_ips"}
+            return _normalize_record_dates({key: value for key, value in moment.items() if key != "liked_ips"})
     return None
 
 
@@ -176,20 +204,19 @@ def add_moment_comment(moment_id: int, nickname: str, content: str) -> dict | No
                     "id": _generate_id(),
                     "nickname": nickname,
                     "content": content,
-                    "date": datetime.now().isoformat(timespec="seconds"),
-                    "likes": 0,
+                    "date": _write_datetime_utc(),
                 }
                 m.setdefault("comments", []).append(comment)
                 _write_all(data)
-                return comment
+                return _normalize_record_dates(comment)
     return None
 
 
 def get_moment_comments(moment_id: int) -> list[dict] | None:
-    """获取说说评论；说说不存在时返回 None。"""
-    for m in _read_all():
-        if m.get("id") == moment_id:
-            return m.get("comments", [])
+    for moment in _read_all():
+        if moment.get("id") == moment_id:
+            normalized = _normalize_record_dates(moment)
+            return normalized.get("comments", [])
     return None
 
 
