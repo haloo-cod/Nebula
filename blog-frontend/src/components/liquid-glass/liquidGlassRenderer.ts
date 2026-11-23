@@ -92,6 +92,8 @@ export interface GlassInstance {
   backgroundUrl: string
   /** 是否应该渲染（纹理就绪 + 尺寸有效） */
   ready: boolean
+  /** 绘制前同步几何和动画，返回几何是否变化。 */
+  updateFrame: () => boolean
   /** 首次渲染完成的回调（组件用于设 visible=true） */
   onFirstRender: (() => void) | null
   /** 是否已执行过首次渲染回调 */
@@ -1085,6 +1087,7 @@ export function registerInstance(
   uniforms: GlassUniforms,
   backgroundUrl: string,
   onFirstRender: () => void,
+  updateFrame: () => boolean,
 ): number {
   ensureInitialized()
 
@@ -1097,6 +1100,7 @@ export function registerInstance(
     backgroundUrl,
     ready: false,
     onFirstRender,
+    updateFrame,
     hasRenderedOnce: false,
   })
   return id
@@ -1348,16 +1352,39 @@ function renderLoop() {
   frameCount++
   metrics.frameCount = frameCount
 
-  // 帧率节流：无 trail/无滚动时降为 30fps（跳帧）,减轻集显负载
-  // 首次渲染回调未完成的实例不受节流影响（确保淡入不延迟）
-  // 滚动期间 + 停止后 200ms 缓冲期内保持 60fps，消除拖拽感
+  // 在节流前采样：几何动画需要每个浏览器帧都更新背景位置。
+  const CULL_MARGIN = 100
+  const vpW = window.innerWidth * (window.devicePixelRatio || 1) * renderScale
+  const vpH = window.innerHeight * (window.devicePixelRatio || 1) * renderScale
+  let geometryActive = false
+  for (const inst of instances.values()) {
+    const [oldX, oldY] = inst.uniforms.canvasOffset
+    const [oldW, oldH] = inst.uniforms.glassSize
+    const changed = inst.updateFrame()
+    if (!changed || !inst.ready) continue
+    const [x, y] = inst.uniforms.canvasOffset
+    const [w, h] = inst.uniforms.glassSize
+    const wasNear =
+      oldX + oldW >= -CULL_MARGIN && oldY + oldH >= -CULL_MARGIN &&
+      oldX <= vpW + CULL_MARGIN && oldY <= vpH + CULL_MARGIN
+    const isNear =
+      x + w >= -CULL_MARGIN && y + h >= -CULL_MARGIN &&
+      x <= vpW + CULL_MARGIN && y <= vpH + CULL_MARGIN
+    if (wasNear || isNear) geometryActive = true
+  }
+
+  // 静止时隔帧；滚动、涟漪、首帧和几何变化时保持完整帧率。
   const SCROLL_BUFFER_MS = 200
   const scrollActive = performance.now() - lastScrollTime < SCROLL_BUFFER_MS
   const hasTrail = hasActiveTrails()
-  const hasPendingFirstRender = [...instances.values()].some(
-    (inst) => inst.ready && !inst.hasRenderedOnce,
-  )
-  const needsFullFps = hasTrail || hasPendingFirstRender || scrollActive
+  let hasPendingFirstRender = false
+  for (const inst of instances.values()) {
+    if (inst.ready && !inst.hasRenderedOnce) {
+      hasPendingFirstRender = true
+      break
+    }
+  }
+  const needsFullFps = hasTrail || hasPendingFirstRender || scrollActive || geometryActive
   if (!needsFullFps && frameCount % 2 !== 0) return
 
   if (typeof document === 'undefined' || !document.hidden) {
@@ -1370,12 +1397,6 @@ function renderLoop() {
   let drawDuration = 0
   let copyDuration = 0
 
-  // 视口剔除边距(px):实例 bbox 完全在视口外超过此边距才跳过,
-  // 避免刚滚入视口时出现空白闪烁。
-  const CULL_MARGIN = 100
-  const vpW = window.innerWidth * (window.devicePixelRatio || 1) * renderScale
-  const vpH = window.innerHeight * (window.devicePixelRatio || 1) * renderScale
-
   let requiredWidth = offscreenWidth
   let requiredHeight = offscreenHeight
   for (const inst of instances.values()) {
@@ -1383,12 +1404,12 @@ function renderLoop() {
     const [ox, oy] = inst.uniforms.canvasOffset
     const [gw, gh] = inst.uniforms.glassSize
     if (
-      ox + gw < -CULL_MARGIN ||
-      oy + gh < -CULL_MARGIN ||
-      ox > vpW + CULL_MARGIN ||
-      oy > vpH + CULL_MARGIN
-    )
-      continue
+      (inst.hasRenderedOnce || !geometryActive) &&
+      (ox + gw < -CULL_MARGIN ||
+        oy + gh < -CULL_MARGIN ||
+        ox > vpW + CULL_MARGIN ||
+        oy > vpH + CULL_MARGIN)
+    ) continue
     requiredWidth = Math.max(requiredWidth, Math.round(gw))
     requiredHeight = Math.max(requiredHeight, Math.round(gh))
   }
@@ -1407,13 +1428,12 @@ function renderLoop() {
     const [ox, oy] = inst.uniforms.canvasOffset
     const [gw, gh] = inst.uniforms.glassSize
     if (
-      ox + gw < -CULL_MARGIN ||
-      oy + gh < -CULL_MARGIN ||
-      ox > vpW + CULL_MARGIN ||
-      oy > vpH + CULL_MARGIN
-    ) {
-      continue
-    }
+      (inst.hasRenderedOnce || !geometryActive) &&
+      (ox + gw < -CULL_MARGIN ||
+        oy + gh < -CULL_MARGIN ||
+        ox > vpW + CULL_MARGIN ||
+        oy > vpH + CULL_MARGIN)
+    ) continue
 
     // 渲染到 offscreen(WebGL 绘制耗时)
     const drawStart = performance.now()
@@ -1436,9 +1456,7 @@ function renderLoop() {
       srcH > 0 &&
       srcY >= 0 &&
       srcW <= offscreenCanvas.width &&
-      srcY + srcH <= offscreenCanvas.height &&
-      canvas.width > 0 &&
-      canvas.height > 0,
+      srcY + srcH <= offscreenCanvas.height,
     )
     if (!sourceValid) {
       metrics.copyBoundsErrors++
@@ -1446,6 +1464,9 @@ function renderLoop() {
     }
 
     const copyStart = performance.now()
+    // 尺寸赋值会清空画布，因此必须与成功绘制后的拷贝在同一任务提交。
+    if (canvas.width !== srcW) canvas.width = srcW
+    if (canvas.height !== srcH) canvas.height = srcH
     ctx2d.clearRect(0, 0, canvas.width, canvas.height)
     ctx2d.drawImage(offscreenCanvas!, 0, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height)
     copyDuration += performance.now() - copyStart

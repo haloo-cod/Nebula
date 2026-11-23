@@ -17,7 +17,7 @@
         </div>
         <div class="about-divider"></div>
         <!-- 高度过渡容器：用 inline style 绑定动态高度 -->
-        <div class="tab-panel" :style="{ height: panelHeight }">
+        <div ref="panelRef" class="tab-panel" :style="{ height: panelHeight }" @transitionend="onPanelTransitionEnd">
           <div
             ref="introRef"
             class="tab-pane"
@@ -44,7 +44,7 @@
           <AboutTabs :active-tab="activeTab" @change="switchTab" />
         </div>
         <div class="about-divider"></div>
-        <div class="tab-panel" :style="{ height: panelHeight }">
+        <div ref="panelRefFallback" class="tab-panel" :style="{ height: panelHeight }" @transitionend="onPanelTransitionEnd">
           <div
             ref="introRefFallback"
             class="tab-pane"
@@ -67,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onUnmounted } from 'vue'
 import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import AboutHero from './AboutHero.vue'
@@ -82,6 +82,11 @@ const activeTab = ref<'intro' | 'activity'>('intro')
 
 // Tab 面板高度（带单位的字符串）
 const panelHeight = ref('auto')
+const panelRef = ref<HTMLElement | null>(null)
+const panelRefFallback = ref<HTMLElement | null>(null)
+let pendingFrame = 0
+let switchGeneration = 0
+let targetHeight: number | null = null
 
 // Tab 内容元素引用（LiquidGlass 模式）
 const introRef = ref<HTMLElement | null>(null)
@@ -101,39 +106,47 @@ function getActiveHeight(tab: 'intro' | 'activity'): number {
   return el.scrollHeight
 }
 
-/** 切换 Tab：先锁定当前高度，切换后平滑过渡到新高度 */
+/** 切换 Tab 时从当前可见高度继续过渡，快速切换以最后一次为准。 */
 function switchTab(tab: 'intro' | 'activity') {
   if (tab === activeTab.value) return
-
-  // 1. 锁定当前高度（从 auto 变为具体像素值，启动 transition 的起点）
-  const currentHeight = getActiveHeight(activeTab.value)
-  panelHeight.value = currentHeight + 'px'
-
-  // 2. 切换 Tab
+  const generation = ++switchGeneration
+  if (pendingFrame) cancelAnimationFrame(pendingFrame)
+  pendingFrame = 0
+  targetHeight = null
+  const panel = panelRef.value || panelRefFallback.value
+  const currentHeight = panel?.getBoundingClientRect().height ?? 0
+  panelHeight.value = panel && currentHeight > 0 ? `${currentHeight}px` : 'auto'
   activeTab.value = tab
 
-  // 3. 下一帧测量新 Tab 高度并设置（触发 CSS transition）
-  nextTick(() => {
+  void nextTick(() => {
+    if (generation !== switchGeneration) return
     const newHeight = getActiveHeight(tab)
-    // 用 requestAnimationFrame 确保浏览器已应用了锁定高度
-    requestAnimationFrame(() => {
-      panelHeight.value = newHeight + 'px'
+    if (!panel || currentHeight <= 0 || newHeight <= 0 || Math.abs(newHeight - currentHeight) < 0.5) {
+      panelHeight.value = 'auto'
+      return
+    }
+    // 先提交锁定高度，再启动目标高度的 CSS 过渡。
+    void panel.offsetHeight
+    pendingFrame = requestAnimationFrame(() => {
+      pendingFrame = 0
+      if (generation !== switchGeneration) return
+      targetHeight = newHeight
+      panelHeight.value = `${newHeight}px`
     })
   })
 }
 
-// 初始化：挂载后设置初始高度
-onMounted(() => {
-  nextTick(() => {
-    const h = getActiveHeight(activeTab.value)
-    if (h > 0) {
-      panelHeight.value = h + 'px'
-      // 短暂延迟后恢复 auto
-      requestAnimationFrame(() => {
-        panelHeight.value = 'auto'
-      })
-    }
-  })
+function onPanelTransitionEnd(event: TransitionEvent) {
+  const panel = panelRef.value || panelRefFallback.value
+  if (!panel || event.target !== panel || event.propertyName !== 'height' || targetHeight === null) return
+  if (Math.abs(panel.getBoundingClientRect().height - targetHeight) >= 1) return
+  targetHeight = null
+  panelHeight.value = 'auto'
+}
+
+onUnmounted(() => {
+  switchGeneration++
+  if (pendingFrame) cancelAnimationFrame(pendingFrame)
 })
 </script>
 

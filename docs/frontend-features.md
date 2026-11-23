@@ -1,6 +1,6 @@
 # 前端特色功能实现
 
-本文介绍项目中最具代表性的三个前端模块：基于 WebGL 的 Liquid Glass、基于 `epubjs` 的 EPUB 阅读器，以及首页响应式布局。
+本文介绍基于 WebGL 的 Liquid Glass、EPUB 阅读器、首页响应式布局和悬浮音乐播放器。
 
 ## 一、Liquid Glass
 
@@ -46,14 +46,13 @@ liquidGlassRenderer.ts
 
 `LiquidGlass.vue` 在挂载时完成以下工作：
 
-1. 创建并同步可见 canvas 尺寸；
-2. 根据桌面端或移动端预设初始化 uniforms；
-3. 调用 `registerInstance()` 将 canvas、2D context、uniforms 和背景 URL 注册到共享 renderer；
-4. 请求当前背景纹理；
-5. 通过 `ResizeObserver` 响应面板尺寸变化；
-6. 通过 pointer 事件维护鼠标轨迹和 ripple 状态。
+1. 获取可见 canvas 的 2D context，注册到共享 renderer；
+2. 根据桌面端或移动端预设初始化 uniforms，并请求当前背景纹理；
+3. 通过 pointer 事件维护鼠标轨迹和 ripple 状态。
 
-卸载时调用 `unregisterInstance()`，并移除 resize、context lost/restored 等回调，避免组件销毁后仍被 renderer 调度。
+共享 RAF 在绘制前测量每个实例的布局尺寸和页面位置。尺寸为零时暂停实例，恢复可见布局时重新同步纹理；尺寸变更时先绘制新的离屏帧，再在同一任务中调整可见 canvas 并复制，避免中间清空一帧。
+
+卸载时调用 `unregisterInstance()`，并移除 context lost/restored 和 pointer 回调，避免组件销毁后仍被 renderer 调度。
 
 主题或背景变化时，组件只更新实例参数并通知 renderer 重新绑定纹理，不会重新创建整套 WebGL 管线。
 
@@ -82,7 +81,7 @@ fragment shader 主要由以下几个阶段组成：
 - 首次渲染回调；
 - WebGL context 状态。
 
-空闲时渲染器会降低更新频率；滚动或 ripple trail 活跃时再提高到更高帧率。设备检测还会针对集成显卡降低 `renderScale`。
+空闲时渲染器隔帧绘制；面板位置或尺寸变化、滚动、首帧待绘制或 ripple trail 活跃时使用完整帧率，稳定后恢复隔帧。设备检测还会针对集成显卡降低 `renderScale`。
 
 `renderScale` 的含义是降低 WebGL canvas 的实际渲染分辨率，也就是减少采样和片元计算量。它不是关闭 WebGL，也不是把液态玻璃变成 CSS 毛玻璃。因此项目不会只依赖降采样来解决移动端性能问题：
 
@@ -225,4 +224,10 @@ EPUB 加载、metadata 读取、目录读取和章节显示都是异步操作。
 入场期间通过 `ResizeObserver` 跟踪上方面板尺寸，使用不包含动画位移的 `offsetTop` 测量标题布局位置。入场结束或离开路由时停止观察，离开路由时同时清理尚未执行的展示计时器。
 
 视口宽度不超过 768px 时，上方面板纵向堆叠，隐藏标题横条，下方面板与上方面板之间保留 16px 间距。液态玻璃和 CSS 毛玻璃共用这套布局。
+
+## 四、悬浮音乐播放器
+
+播放器默认以左下角圆形封面显示，点击展开液态玻璃面板。展开时默认显示当前歌曲歌词；列表按钮可切换播放列表，选择歌曲后返回歌词。歌词随播放时间和进度拖动定位，支持播放、切歌、循环模式、静音和音量调整。
+
+播放器复用站点亮暗主题文字变量，文字不额外添加阴影；关闭液态玻璃时使用 CSS 毛玻璃。歌词和音频来自现有 Meting 接口，无歌词时显示空状态。
 

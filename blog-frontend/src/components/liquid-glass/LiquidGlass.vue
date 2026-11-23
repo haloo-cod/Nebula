@@ -200,11 +200,13 @@ function isMobileViewport(): boolean {
 
 let instanceId = 0
 let ctx2d: CanvasRenderingContext2D | null = null
-let resizeObserver: ResizeObserver | null = null
 let renderedBackgroundUrl = ''
 // 抽屉等组件可能先以 v-show 隐藏挂载，此时首次测量尺寸为 0。
 // 记录尺寸有效状态，首次变为可见时重新触发纹理就绪流程。
 let hasValidLayout = false
+let lastLayoutWidth = 0
+let lastLayoutHeight = 0
+let lastPixelScale = 0
 
 // Trail points（鼠标涟漪轨迹）
 const TRAIL_MIN_DISTANCE = 14
@@ -296,12 +298,22 @@ function syncCanvasSize() {
   // 导致 canvas 在动画结束后尺寸不正确
   const w = container.offsetWidth
   const h = container.offsetHeight
-  if (w < 1 || h < 1) return
+  if (w < 1 || h < 1) {
+    if (hasValidLayout) markInstanceReady(instanceId, false)
+    hasValidLayout = false
+    return
+  }
 
   const dpr = window.devicePixelRatio || 1
   const scale = getRenderScale()
   const pw = Math.max(1, Math.round(w * dpr * scale))
   const ph = Math.max(1, Math.round(h * dpr * scale))
+  const [previousWidth, previousHeight] = uniforms.glassSize
+  const pixelScale = dpr * scale
+  if (w === lastLayoutWidth && h === lastLayoutHeight && pixelScale === lastPixelScale) return
+  lastLayoutWidth = w
+  lastLayoutHeight = h
+  lastPixelScale = pixelScale
   uniforms.edgeAaWidth = getEdgeAaWidth(dpr, scale)
 
   // 圆角和边缘高光必须与 canvas 尺寸使用同一套物理像素单位。
@@ -309,8 +321,6 @@ function syncCanvasSize() {
   const presets = isMobileViewport() ? mobileGlassPresets : glassPresets
   uniforms.highlightWidth = toCanvasPixels(presets[props.theme].highlightWidth)
 
-  canvas.width = pw
-  canvas.height = ph
   canvas.style.width = w + 'px'
   canvas.style.height = h + 'px'
 
@@ -322,9 +332,10 @@ function syncCanvasSize() {
   // canvasOffset 仍需要 getBoundingClientRect(计算视口相对位置)
   syncCanvasOffset()
 
-  // 清除 trail
-  trailPoints = []
-  lastTrailPoint = null
+  if (pw !== previousWidth || ph !== previousHeight) {
+    trailPoints = []
+    lastTrailPoint = null
+  }
 }
 
 function syncCanvasOffset() {
@@ -344,14 +355,6 @@ function syncCanvasOffset() {
   )
 }
 
-function refreshRenderer() {
-  syncCanvasSize()
-  const [gw, gh] = uniforms.glassSize
-  if (gw >= 1 && gh >= 1) {
-    hasValidLayout = true
-    void syncBackgroundWithTheme(props.theme)
-  }
-}
 
 // ============================================================================
 // Trail Points（鼠标涟漪）
@@ -409,7 +412,7 @@ function updateTrailUniforms() {
 // 背景纹理切换
 // ============================================================================
 
-async function syncBackgroundWithTheme(_theme: LiquidGlassTheme, forceReveal = false) {
+async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   const url = currentBgUl.value
   if (!url || !instanceId) return
   const syncToken = ++backgroundSyncToken
@@ -417,7 +420,7 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme, forceReveal = f
   // 先隐藏 canvas（允许 reveal 时）
   const keepVisible =
     visible.value && Boolean(renderedBackgroundUrl) && hasTexture(renderedBackgroundUrl)
-  if ((forceReveal || ui.themeTransitioning) && !keepVisible) {
+  if (ui.themeTransitioning && !keepVisible) {
     visible.value = false
     if (instanceId) {
       setInstanceFirstRenderCallback(instanceId, () => {
@@ -454,7 +457,7 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme, forceReveal = f
   // 更新实例的背景 URL
   if (instanceId) {
     // 如果不需要 reveal 动画（纹理已就绪），直接标记 ready
-    if (textureReady && uniforms.glassSize[0] >= 1 && uniforms.glassSize[1] >= 1) {
+    if (textureReady && hasValidLayout && uniforms.glassSize[0] >= 1 && uniforms.glassSize[1] >= 1) {
       setInstanceBackground(instanceId, url)
       renderedBackgroundUrl = url
       markInstanceReady(instanceId, true)
@@ -471,13 +474,31 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme, forceReveal = f
 // 生命周期
 // ============================================================================
 
-// 每帧更新 offset 和 trail（通过 RAF 轮询,渲染器内部每帧读取 uniforms）
-let frameId = 0
 let backgroundSyncToken = 0
-function frameUpdate() {
+
+/** 在共享渲染帧开始时同步布局、采样位置和涟漪。 */
+function updateFrame(): boolean {
+  const [oldX, oldY] = uniforms.canvasOffset
+  const [oldWidth, oldHeight] = uniforms.glassSize
+  const [oldViewportWidth, oldViewportHeight] = uniforms.resolution
+  const wasValid = hasValidLayout
+  syncCanvasSize()
+  if (!hasValidLayout && containerRef.value?.offsetWidth && containerRef.value.offsetHeight) {
+    hasValidLayout = true
+    void syncBackgroundWithTheme(props.theme)
+  }
+  if (!hasValidLayout) return false
   syncCanvasOffset()
   updateTrailUniforms()
-  frameId = requestAnimationFrame(frameUpdate)
+  return (
+    !wasValid ||
+    oldX !== uniforms.canvasOffset[0] ||
+    oldY !== uniforms.canvasOffset[1] ||
+    oldWidth !== uniforms.glassSize[0] ||
+    oldHeight !== uniforms.glassSize[1] ||
+    oldViewportWidth !== uniforms.resolution[0] ||
+    oldViewportHeight !== uniforms.resolution[1]
+  )
 }
 
 // Context lost/restored 回调
@@ -490,18 +511,6 @@ function handleContextRestored() {
   void syncBackgroundWithTheme(props.theme)
 }
 
-/** 在父组件重新显示面板前，重置首帧状态并等待新的有效绘制。 */
-function prepareReveal() {
-  if (!instanceId) return
-  visible.value = false
-  markInstanceReady(instanceId, false)
-  setInstanceFirstRenderCallback(instanceId, () => {
-    visible.value = true
-    emit('render-ready')
-  })
-  refreshRenderer()
-  void syncBackgroundWithTheme(props.theme, true)
-}
 
 onMounted(() => {
   const canvas = canvasRef.value
@@ -518,10 +527,17 @@ onMounted(() => {
   // 注册到共享渲染器
   const bgUrl = currentBgUl.value
   renderedBackgroundUrl = bgUrl
-  instanceId = registerInstance(canvas, ctx2d, uniforms, bgUrl, () => {
-    visible.value = true
-    emit('render-ready')
-  })
+  instanceId = registerInstance(
+    canvas,
+    ctx2d,
+    uniforms,
+    bgUrl,
+    () => {
+      visible.value = true
+      emit('render-ready')
+    },
+    updateFrame,
+  )
 
   // registerInstance 会初始化 WebGL 并检测 renderScale,因此尺寸和物理像素参数必须在注册后计算。
   initUniforms()
@@ -556,40 +572,16 @@ onMounted(() => {
     uniforms.texAspect = getTextureAspect(bgUrl)
     // 确保 canvas 尺寸有效后标记为就绪
     const [gw, gh] = uniforms.glassSize
-    if (textureReady && gw >= 1 && gh >= 1) {
+    if (textureReady && hasValidLayout && gw >= 1 && gh >= 1) {
       markInstanceReady(instanceId, true)
     }
   })()
-
-  // ResizeObserver：监听容器尺寸变化
-  resizeObserver = new ResizeObserver(() => {
-    syncCanvasSize()
-    const [gw, gh] = uniforms.glassSize
-    const valid = gw >= 1 && gh >= 1
-    if (!valid) {
-      hasValidLayout = false
-      markInstanceReady(instanceId, false)
-      return
-    }
-
-    // v-show 从隐藏切换为显示后，补跑一次背景纹理同步；否则实例会
-    // 永远停留在“尺寸为 0 时未 ready”的状态，canvas 也就不会 reveal。
-    if (!hasValidLayout) {
-      hasValidLayout = true
-      void syncBackgroundWithTheme(props.theme)
-    }
-  })
-  resizeObserver.observe(container)
-
-  // 启动每帧更新（offset + trail）
-  frameId = requestAnimationFrame(frameUpdate)
 
   // Pointer events（涟漪效果）
   container.addEventListener('pointerenter', addTrailPoint)
   container.addEventListener('pointermove', addTrailPoint)
   container.addEventListener('pointerleave', resetTrailPoint)
 
-  // 如果不需要 reveal 动画,且纹理已就绪,直接 skip firstRender 回调
 })
 
 // 背景图切换时重新加载纹理
@@ -611,18 +603,8 @@ onUnmounted(() => {
     instanceId = 0
   }
 
-  // 停止每帧更新
-  if (frameId) {
-    cancelAnimationFrame(frameId)
-    frameId = 0
-  }
-
   // 移除 context 回调
   offContextCallbacks(handleContextLost, handleContextRestored)
-
-  // 清理 ResizeObserver
-  resizeObserver?.disconnect()
-  resizeObserver = null
 
   // 清理 pointer events
   const container = containerRef.value
@@ -654,8 +636,6 @@ watch(
   },
 )
 
-// 暴露 syncCanvasSize 供父组件在需要时手动触发(如 Transition 动画结束后)
-defineExpose({ syncCanvasSize, refreshRenderer, prepareReveal })
 </script>
 
 <style scoped>

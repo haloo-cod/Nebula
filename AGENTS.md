@@ -184,7 +184,7 @@ git branch -d feat/backend-post-api
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **My_blog** (5914 symbols, 13169 relationships, 477 execution flows).
+This project is indexed by GitNexus as **Nebula** (7630 symbols, 18141 relationships, 594 execution flows).
 
 > Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 
@@ -208,10 +208,10 @@ This project is indexed by GitNexus as **My_blog** (5914 symbols, 13169 relation
 
 | Resource | Use for |
 | --- | --- |
-| `gitnexus://repo/My_blog/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/My_blog/clusters` | All functional areas |
-| `gitnexus://repo/My_blog/processes` | All execution flows |
-| `gitnexus://repo/My_blog/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/Nebula/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Nebula/clusters` | All functional areas |
+| `gitnexus://repo/Nebula/processes` | All execution flows |
+| `gitnexus://repo/Nebula/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
