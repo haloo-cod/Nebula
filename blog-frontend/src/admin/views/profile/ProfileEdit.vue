@@ -8,6 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import SvgIcon from '@/components/SvgIcon.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 个人资料（匹配后端 ProfileResponse） */
 interface ProfileData {
@@ -136,7 +137,12 @@ onMounted(() => loadProfile())
 </script>
 
 <template>
-  <div class="profile-edit-page" v-loading="loading">
+  <div class="admin-page" v-loading="loading">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="个人资料"
+      subtitle="配置前台个人卡片展示的昵称、头像、封面图与社交平台外链。"
+    />
     <!-- 基本信息 -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -231,18 +237,10 @@ onMounted(() => loadProfile())
 </template>
 
 <style scoped>
-.profile-edit-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.section-card {
-  border-radius: 12px;
-}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 24px;
+  gap: 0 20px;
 }
 .card-header-row {
   display: flex;
@@ -250,7 +248,7 @@ onMounted(() => loadProfile())
   align-items: center;
 }
 .link-text {
-  color: #409eff;
+  color: var(--admin-primary-color);
   text-decoration: none;
   font-size: 13px;
 }

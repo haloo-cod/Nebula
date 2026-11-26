@@ -8,6 +8,7 @@ import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 展览项目（匹配后端 GalleryListItem） */
 interface GalleryItem {
@@ -148,13 +149,17 @@ function previewSlug(title: string): string {
 </script>
 
 <template>
-  <div class="gallery-list-page">
-    <div class="page-header">
-      <span class="page-title">共 {{ pagination.total }} 个展览项目</span>
-      <el-button type="primary" @click="openCreate">
-        <el-icon><Plus /></el-icon>新建项目
-      </el-button>
-    </div>
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="CONTENT"
+      title="展览管理"
+      :count="`${pagination.total} 个`"
+      subtitle="管理正在构建或已归档的个人项目卡片与 Markdown 详情。"
+    >
+      <template #actions>
+        <el-button type="primary" :icon="Plus" @click="openCreate">新建项目</el-button>
+      </template>
+    </AdminPageHeader>
 
     <el-card shadow="never" class="table-card">
       <el-table :data="data as any" v-loading="loading" stripe style="width: 100%">
@@ -237,26 +242,9 @@ function previewSlug(title: string): string {
 </template>
 
 <style scoped>
-.gallery-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 24px;
+  gap: 0 20px;
 }
 </style>

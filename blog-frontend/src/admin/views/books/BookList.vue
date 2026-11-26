@@ -20,6 +20,7 @@ import type { BookSort } from '@/api/books'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 import { downloadWithProgress } from '@/utils/download'
 
 /** 图书列表项（匹配后端 BookListItem） */
@@ -519,8 +520,20 @@ onMounted(() => loadData())
 </script>
 
 <template>
-  <div class="book-list-page">
-    <div class="page-header">
+  <div class="admin-page book-list-page">
+    <AdminPageHeader
+      eyebrow="CONTENT"
+      title="图书管理"
+      :count="`${pagination.total} 本`"
+      subtitle="批量导入 EPUB 图书、管理封面提取与自定义展示排序。"
+    >
+      <template #actions>
+        <el-button :icon="Rank" @click="openSort">排序管理</el-button>
+        <el-button type="primary" :icon="Upload" @click="openUpload">上传图书</el-button>
+      </template>
+    </AdminPageHeader>
+
+    <div class="admin-toolbar">
       <div class="book-list-filters">
         <el-input
           v-model="keyword"
@@ -528,10 +541,11 @@ onMounted(() => loadData())
           clearable
           style="width: 240px"
           @keyup.enter="handleSearch"
+          @clear="handleSearch"
         />
         <el-select
           :model-value="listSort"
-          style="width: 130px"
+          style="width: 136px"
           aria-label="图书排序"
           @update:model-value="changeListSort"
         >
@@ -557,13 +571,9 @@ onMounted(() => loadData())
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <span v-if="downloading" class="download-status">
+        <span v-if="downloading" class="download-status admin-mono">
           {{ downloadStatus }} {{ downloadProgress }}%
         </span>
-        <el-button :icon="Rank" @click="openSort">排序管理</el-button>
-        <el-button type="primary" @click="openUpload"
-          ><el-icon><Upload /></el-icon>上传图书</el-button
-        >
       </div>
     </div>
 
@@ -932,51 +942,34 @@ onMounted(() => loadData())
 </template>
 
 <style scoped>
-.book-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.book-list-filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.archive-dialog-hint {
-  margin: 0;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 13px;
-}
-.archive-expire-suffix {
-  margin-left: 8px;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 13px;
-}
+.book-list-filters,
 .header-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }
+.archive-dialog-hint,
+.archive-expire-suffix,
 .download-status {
-  color: var(--admin-text-secondary, #909399);
-  font-size: 12px;
-  white-space: nowrap;
+  color: var(--admin-text-secondary);
+  font-size: 12.5px;
 }
-.table-card {
-  border-radius: 12px;
+.archive-dialog-hint {
+  margin: 0;
+}
+.archive-expire-suffix {
+  margin-left: 8px;
+}
+.download-status {
+  white-space: nowrap;
 }
 .book-cover {
   width: 40px;
   height: 56px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 5px;
+  border: 1px solid var(--admin-border-color);
 }
 .book-cover-placeholder {
   display: flex;
@@ -984,85 +977,73 @@ onMounted(() => loadData())
   justify-content: center;
   width: 40px;
   height: 56px;
-  border-radius: 4px;
-  background: var(--admin-fill-bg, var(--el-fill-color-light));
-  color: var(--admin-text-secondary, var(--el-text-color-secondary));
+  border: 1px solid var(--admin-border-color);
+  border-radius: 5px;
+  background: var(--admin-fill-bg);
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
-
-/* 移动端卡片列表（默认隐藏，窄屏替换表格） */
 .book-mobile-list {
   display: none;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
-
 .book-mobile-card {
   padding: 14px;
-  border: 1px solid var(--admin-border-color, #e4e7ed);
-  border-radius: 12px;
-  background: var(--admin-panel-bg, #ffffff);
+  border: 1px solid var(--admin-border-color);
+  border-radius: 10px;
+  background: var(--admin-panel-bg);
 }
-
 .book-mobile-head {
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
-
 .book-mobile-title-wrap {
   flex: 1;
   min-width: 0;
 }
-
 .book-mobile-title {
   overflow: hidden;
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .book-mobile-author {
   margin-top: 4px;
   overflow: hidden;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .book-mobile-desc {
   display: -webkit-box;
   margin: 10px 0 0;
   overflow: hidden;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
   line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-
 .book-mobile-meta {
   display: flex;
   justify-content: space-between;
   gap: 8px;
   margin-top: 10px;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 11px;
-}
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
+  color: var(--admin-text-muted);
+  font-size: 11.5px;
 }
 .file-picker-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 14px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
 }
 .storage-hint {
@@ -1087,7 +1068,7 @@ onMounted(() => loadData())
 }
 .upload-task {
   padding: 10px 0;
-  border-bottom: 1px solid var(--admin-border-color, #e4e7ed);
+  border-bottom: 1px solid var(--admin-border-color);
 }
 .task-main {
   display: flex;
@@ -1103,12 +1084,12 @@ onMounted(() => loadData())
 }
 .task-size,
 .batch-summary {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 .task-error {
   margin: 5px 0 0;
-  color: #f56c6c;
+  color: var(--admin-danger-color);
   font-size: 12px;
 }
 .batch-summary {
@@ -1128,15 +1109,16 @@ onMounted(() => loadData())
 .cover-preview {
   width: 72px;
   height: 100px;
-  border-radius: 5px;
+  border: 1px solid var(--admin-border-color);
+  border-radius: 6px;
   object-fit: cover;
 }
 .cover-preview--empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--admin-fill-bg, var(--el-fill-color-light));
-  color: var(--admin-text-secondary, var(--el-text-color-secondary));
+  background: var(--admin-fill-bg);
+  color: var(--admin-text-muted);
   font-size: 12px;
 }
 .cover-actions {
@@ -1158,19 +1140,19 @@ onMounted(() => loadData())
   padding: 8px;
   border: 2px solid transparent;
   border-radius: 8px;
-  background: var(--admin-fill-bg, var(--el-fill-color-light));
+  background: var(--admin-fill-bg);
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    transform 0.15s;
+    border-color 150ms ease,
+    transform 150ms ease;
 }
 .candidate-card:hover {
   transform: translateY(-2px);
 }
 .candidate-card--selected {
-  border-color: var(--el-color-primary);
+  border-color: var(--admin-primary-color);
 }
 .candidate-image-wrap {
   position: relative;
@@ -1178,9 +1160,9 @@ onMounted(() => loadData())
   align-items: center;
   justify-content: center;
   height: 190px;
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
-  background: var(--admin-panel-bg, var(--el-bg-color));
+  background: var(--admin-panel-bg);
 }
 .candidate-image {
   width: 100%;
@@ -1205,7 +1187,7 @@ onMounted(() => loadData())
 }
 .candidate-meta {
   margin-top: 3px;
-  color: var(--admin-text-secondary, var(--el-text-color-secondary));
+  color: var(--admin-text-secondary);
   font-size: 11px;
 }
 .sort-list {
@@ -1218,7 +1200,7 @@ onMounted(() => loadData())
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--admin-border-color, #e4e7ed);
+  border-bottom: 1px solid var(--admin-border-color);
   cursor: grab;
 }
 .sort-item:active {
@@ -1227,7 +1209,7 @@ onMounted(() => loadData())
 .drag-handle,
 .sort-index,
 .sort-author {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
 }
 .sort-index {
   width: 28px;
@@ -1236,7 +1218,7 @@ onMounted(() => loadData())
 .sort-cover {
   width: 32px;
   height: 44px;
-  border-radius: 3px;
+  border-radius: 4px;
   object-fit: cover;
 }
 .sort-title {
@@ -1255,36 +1237,18 @@ onMounted(() => loadData())
 }
 
 @media (max-width: 767px) {
-  .page-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .book-list-filters,
   .book-list-filters .el-input,
   .book-list-filters .el-select {
     width: 100% !important;
   }
 
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-actions > * {
-    flex: 1;
-  }
-
-  /* 窄屏隐藏表格，改用卡片列表 */
   .book-desktop-table {
     display: none;
   }
 
   .book-mobile-list {
     display: flex;
-  }
-
-  .pagination-wrap {
-    justify-content: center;
   }
 }
 </style>

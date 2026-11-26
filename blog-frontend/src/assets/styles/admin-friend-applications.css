@@ -34,7 +34,7 @@
 }
 
 .filter-label {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
 }
 
@@ -46,7 +46,7 @@
 }
 
 .total-text {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -58,13 +58,13 @@
 
 .site-name {
   display: inline-block;
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .link-text {
-  color: #409eff;
+  color: var(--admin-primary-color);
   font-size: 13px;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -95,21 +95,21 @@
 }
 
 .applicant-meta {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 
 .applicant-meta.is-deleted {
-  color: var(--el-color-warning, #e6a23c);
+  color: var(--el-color-warning);
 }
 
 .muted {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
 }
 
 .review-note {
   margin-top: 4px;
-  color: var(--el-color-danger, #f56c6c);
+  color: var(--el-color-danger);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -141,7 +141,7 @@
 }
 
 .detail-avatar-url {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
   overflow-wrap: anywhere;
   word-break: break-all;
@@ -157,13 +157,13 @@
   flex-direction: column;
   gap: 4px;
   margin-bottom: 14px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
 .reject-target strong {
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
 }
 
 .reject-form :deep(.el-form-item__error) {
@@ -185,9 +185,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--admin-border-color, #e4e4e7);
+  border: 1px solid var(--admin-border-color);
   border-radius: 10px;
-  background: var(--admin-fill-bg, #f7f8fa);
+  background: var(--admin-fill-bg);
 }
 
 .discussion-meta-main {
@@ -198,7 +198,7 @@
 }
 
 .discussion-site {
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -218,7 +218,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
 }
 
@@ -235,7 +235,7 @@
 }
 
 .discussion-list-title {
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   font-size: 14px;
   font-weight: 600;
 }
@@ -249,7 +249,7 @@
 
 .discussion-reply-row {
   padding-left: 16px;
-  border-left: 2px solid var(--admin-border-color, #e4e4e7);
+  border-left: 2px solid var(--admin-border-color);
 }
 
 @media (max-width: 767px) {

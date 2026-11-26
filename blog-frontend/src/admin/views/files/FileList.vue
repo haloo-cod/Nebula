@@ -12,6 +12,7 @@ import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import { downloadWithProgress } from '@/utils/download'
 import StorageExplorer from '@/admin/components/StorageExplorer.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 图床图片记录。 */
 interface UploadedImage {
@@ -388,17 +389,19 @@ onMounted(loadLibrary)
 </script>
 
 <template>
-  <div class="file-list-page">
-    <div class="page-header">
-      <div>
-        <h2>文件管理</h2>
-        <p>按目录查看本地与 R2 文件，或进入文件库上传和管理资源。</p>
-      </div>
-      <el-radio-group v-model="viewMode" aria-label="文件展示方式" @change="loadLibrary">
-        <el-radio-button value="folders">目录浏览</el-radio-button>
-        <el-radio-button value="library">文件库</el-radio-button>
-      </el-radio-group>
-    </div>
+  <div class="admin-page file-list-page">
+    <AdminPageHeader
+      eyebrow="STORAGE"
+      title="文件管理"
+      subtitle="按目录查看本地与 R2 文件，或进入文件库上传与管理静态资源。"
+    >
+      <template #actions>
+        <el-radio-group v-model="viewMode" aria-label="文件展示方式" @change="loadLibrary">
+          <el-radio-button value="folders">目录浏览</el-radio-button>
+          <el-radio-button value="library">文件库</el-radio-button>
+        </el-radio-group>
+      </template>
+    </AdminPageHeader>
 
     <StorageExplorer
       v-show="viewMode === 'folders'"

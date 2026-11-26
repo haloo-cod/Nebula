@@ -1,23 +1,27 @@
 .storage-explorer {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
-  min-height: 440px;
+  min-height: 460px;
   overflow: hidden;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border: 1px solid var(--admin-border-color);
+  border-radius: var(--admin-surface-radius);
   background: var(--admin-panel-bg);
+  box-shadow: var(--admin-shadow-card);
 }
 
 .storage-directory-pane {
   min-width: 0;
   padding: 16px 10px;
-  border-right: 1px solid var(--el-border-color-light);
+  border-right: 1px solid var(--admin-border-color);
+  background: var(--admin-panel-subtle);
 }
 
 .storage-directory-pane h3 {
-  margin: 0 8px 14px;
-  font-size: 14px;
-  color: var(--admin-text-color);
+  margin: 0 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
 }
 
 .storage-directory-pane .el-tree {

@@ -6,6 +6,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 酒馆帖子（admin 视图，含 is_visible 和 ip_hash） */
 interface TavernPost {
@@ -97,10 +98,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="tavern-list-page">
-    <div class="page-header">
-      <span class="page-title">共 {{ posts.length }} 条帖子</span>
-    </div>
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="COMMUNITY"
+      title="深夜酒馆"
+      :count="`${posts.length} 条`"
+      subtitle="管理酒馆页面背景图与访客留言的可见性状态。"
+    />
 
     <el-card shadow="never" class="config-card">
       <template #header><span>酒馆背景图</span></template>
@@ -155,33 +159,13 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.tavern-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.config-card {
-  border-radius: 12px;
-}
 .bg-config {
   display: flex;
   gap: 8px;
 }
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
 .ip-hash {
-  font-family: monospace;
+  font-family: var(--admin-font-mono);
   font-size: 12px;
-  color: #999;
+  color: var(--admin-text-muted);
 }
 </style>

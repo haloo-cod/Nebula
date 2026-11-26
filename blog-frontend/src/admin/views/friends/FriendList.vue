@@ -14,6 +14,7 @@ import {
   type FriendExchangeInfo,
 } from '@/api/friends'
 import FriendApplicationsPanel from './FriendApplicationsPanel.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 const loading = ref(false)
 const friends = ref<ApiFriendItem[]>([])
@@ -209,7 +210,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="friend-list-page">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="COMMUNITY"
+      title="友链管理"
+      :count="`${friends.length} 条`"
+      subtitle="维护正式友链列表、交换友链说明并处理访客友链申请。"
+    />
     <el-alert
       v-if="syncFailed"
       title="数据已保存，JSON 同步失败"
@@ -399,7 +406,7 @@ onUnmounted(() => {
 <style scoped>
 .rss-address-hint {
   margin-top: 6px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -409,34 +416,27 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 16px;
 }
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
+
 .exchange-form-actions {
   display: flex;
   justify-content: flex-end;
   padding-top: 4px;
 }
+
 .avatar-img {
   width: 32px;
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
+  border: 1px solid var(--admin-border-color);
 }
+
 .link-text {
-  color: #409eff;
+  color: var(--admin-primary-color);
   text-decoration: none;
   font-size: 13px;
 }
+
 .link-text:hover {
   text-decoration: underline;
 }

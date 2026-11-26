@@ -289,26 +289,27 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-width: 0;
   padding: 6px;
-  border: 1px solid var(--admin-border-color, #dcdfe6);
+  border: 1px solid var(--admin-border-color);
   border-radius: 8px;
   background: transparent;
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .image-option:hover,
 .image-option.selected {
-  border-color: var(--el-color-primary, #409eff);
+  border-color: var(--admin-primary-color);
 }
 .image-option.selected {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--el-color-primary, #409eff) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-primary-color) 22%, transparent);
 }
 .image-option img {
   width: 100%;
   height: 96px;
   object-fit: contain;
-  border-radius: 4px;
-  background: var(--admin-fill-bg, #f5f7fa);
+  border-radius: 5px;
+  background: var(--admin-fill-bg);
 }
 .image-name,
 .image-meta {
@@ -321,8 +322,9 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .image-meta {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 11px;
+  font-family: var(--admin-font-mono);
 }
 @media (max-width: 640px) {
   .picker-toolbar {
