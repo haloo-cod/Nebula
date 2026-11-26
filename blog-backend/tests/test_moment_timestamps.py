@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.schemas.moment import MomentCommentResponse, MomentListResponse, MomentResponse
 from app.services import moment as service
 from scripts.migrate_moment_timestamps import migrate, normalize_records, timestamp_from_id
 
@@ -81,3 +82,65 @@ def test_default_migration_uses_configured_data_dir(tmp_path, monkeypatch, capsy
 
     assert "mode=preview changed_dates=1 skipped_invalid_ids=0" in capsys.readouterr().out
     assert json.loads(path.read_text("utf-8"))[0]["date"] == "wrong"
+
+
+def test_create_moment_and_comment_persist_required_fields(tmp_path: Path, monkeypatch):
+    path = tmp_path / "moments.json"
+    lock_path = tmp_path / "moments.json.lock"
+    monkeypatch.setattr(service, "MOMENTS_FILE", path)
+    monkeypatch.setattr(service, "LOCK_FILE", lock_path)
+
+    created = service.create_moment(
+        content="终于修好了",
+        mood="😆",
+        mood_text="开心",
+        tags=["修复"],
+        images=["/uploads/images/2026/11/a.png"],
+    )
+    validated = MomentResponse.model_validate(created)
+    assert validated.content == "终于修好了"
+    assert validated.mood_text == "开心"
+
+    saved = json.loads(path.read_text("utf-8"))
+    assert saved[0]["content"] == "终于修好了"
+    assert saved[0]["date"] == created["date"]
+
+    comment = service.add_moment_comment(created["id"], "Starlit", "测试评论")
+    assert comment is not None
+    validated_comment = MomentCommentResponse.model_validate(comment)
+    assert validated_comment.content == "测试评论"
+    assert validated_comment.likes == 0
+
+    items, total = service.get_moments(page=1, page_size=5)
+    response = MomentListResponse(items=items, total=total)
+    assert response.total == 1
+    assert response.items[0].content == "终于修好了"
+    assert len(response.items[0].comments) == 1
+
+
+def test_get_moments_tolerates_legacy_record_missing_content(tmp_path: Path, monkeypatch):
+    path = tmp_path / "moments.json"
+    path.write_text(json.dumps([
+        {
+            "id": 1795634884322,
+            "date": "2026-11-25T19:28:04+00:00",
+            "mood": "😭",
+            "mood_text": "好累，感觉要猝了",
+            "tags": [],
+            "images": [],
+            "likes": 0,
+            "liked_ips": [],
+            "comments": [],
+        },
+    ], ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(service, "MOMENTS_FILE", path)
+
+    items, total = service.get_moments(page=1, page_size=5)
+    response = MomentListResponse(items=items, total=total)
+    assert response.total == 1
+    assert response.items[0].id == 1795634884322
+    assert response.items[0].content == ""
+
+    one = service.get_moment_by_id(1795634884322)
+    assert one is not None
+    assert MomentResponse.model_validate(one).content == ""

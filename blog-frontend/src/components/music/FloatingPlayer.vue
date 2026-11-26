@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible && currentSong" ref="panelRef" class="floating-player" :class="{ 'is-expanded': expanded }" @transitionend="onPanelTransitionEnd">
+  <div v-if="visible && currentSong" ref="panelRef" class="floating-player" :class="{ 'is-expanded': expanded }">
     <component
       :is="ui.liquidGlassEnabled ? LiquidGlass : PanelFallbackGlass"
       class="player-glass"
@@ -168,14 +168,17 @@ function scrollToCurrentLyric(behavior: ScrollBehavior = 'smooth') {
   }
 }
 
-function onPanelTransitionEnd(event: TransitionEvent) {
-  if (event.target === panelRef.value && event.propertyName === 'height') scrollToCurrentLyric('instant')
-}
-
-watch([currentLyricIndex, showPlaylist, expanded, lyrics], async () => {
-  await nextTick()
-  scrollToCurrentLyric()
-})
+watch(
+  [currentLyricIndex, showPlaylist, expanded, lyrics],
+  async ([, playlistOpen, isExpanded, nextLyrics], [, oldPlaylistOpen, wasExpanded, prevLyrics]) => {
+    await nextTick()
+    const shouldSnap =
+      (isExpanded && !wasExpanded) ||
+      (!playlistOpen && oldPlaylistOpen) ||
+      nextLyrics !== prevLyrics
+    scrollToCurrentLyric(shouldSnap ? 'instant' : 'smooth')
+  },
+)
 
 onMounted(() => {
   revealTimer = setTimeout(() => { visible.value = true }, 600)
