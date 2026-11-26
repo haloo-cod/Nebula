@@ -2,7 +2,9 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.utils.security import validate_password_length
 
 
 class UserAdminItem(BaseModel):
@@ -43,4 +45,9 @@ class UserAdminUpdate(BaseModel):
 class UserPasswordReset(BaseModel):
     """管理员重置用户密码。"""
 
-    password: str = Field(min_length=8, max_length=128)
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return validate_password_length(value)

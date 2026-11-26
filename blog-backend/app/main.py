@@ -15,7 +15,6 @@ from app.api.v1.router import router as v1_router
 from app.config import settings, validate_production_settings
 from app.database import engine, AsyncSessionLocal
 from app.middleware.cors import setup_cors
-from app.models import Base
 from app.models.user import User
 from app.models.analytics import AnalyticsEvent
 from app.models.rate_limit import RateLimitHit
@@ -24,6 +23,8 @@ from app.utils.security import hash_password
 from app.services.book_download import cleanup_expired_book_archives
 from app.services.post_download import cleanup_expired_post_archives
 from app.services.analytics import utc_now
+from app.services.friend import sync_friends_json
+from app.services.file import resolve_upload_path
 
 for _upload_subdir in ("images", "books", "files", "backgrounds"):
     (settings.UPLOAD_DIR / _upload_subdir).mkdir(parents=True, exist_ok=True)
@@ -31,7 +32,7 @@ for _upload_subdir in ("images", "books", "files", "backgrounds"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时建表 + 创建默认管理员"""
+    """应用生命周期：串行建表迁移后完成启动初始化。"""
     validate_production_settings()
     # 确保目录存在
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,13 +46,9 @@ async def lifespan(app: FastAPI):
     (settings.CONTENT_DIR / "gallery").mkdir(exist_ok=True)
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 建表
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        if settings.DATABASE_URL.startswith("sqlite"):
-            await conn.execute(text("PRAGMA journal_mode=WAL"))
-            await conn.execute(text("PRAGMA busy_timeout=5000"))
     await migrate_existing_schema(engine)
+    async with AsyncSessionLocal() as snapshot_session:
+        await sync_friends_json(snapshot_session)
     # 先完成旧数据库字段迁移，再查询归档任务进行过期清理。
     await cleanup_expired_book_archives()
     await cleanup_expired_post_archives()
@@ -148,7 +145,7 @@ async def serve_upload_file(
                 stream = r2.download_stream(image.r2_key)
                 return StreamingResponse(stream, media_type=image.mime_type or "application/octet-stream")
             else:
-                local_path = settings.UPLOAD_DIR / image.filename
+                local_path = resolve_upload_path(image.filename)
                 if not local_path.is_file():
                     raise HTTPException(status_code=404, detail="文件不存在")
                 return FileResponse(local_path, media_type=image.mime_type)
@@ -173,7 +170,7 @@ async def serve_upload_file(
                 stream = r2.download_stream(file_record.r2_key)
                 return StreamingResponse(stream, media_type=file_record.mime_type or "application/octet-stream")
             else:
-                local_path = settings.UPLOAD_DIR / file_record.filename
+                local_path = resolve_upload_path(file_record.filename)
                 if not local_path.is_file():
                     raise HTTPException(status_code=404, detail="文件不存在")
                 return FileResponse(local_path, media_type=file_record.mime_type)
@@ -194,17 +191,19 @@ async def serve_upload_file(
                     stream = r2.download_stream(background.r2_key)
                     return StreamingResponse(stream, media_type=background.mime_type or "video/mp4")
                 else:
-                    local_path = settings.UPLOAD_DIR / file_path
+                    local_path = resolve_upload_path(file_path)
                     if not local_path.is_file():
                         raise HTTPException(status_code=404, detail="文件不存在")
                     return FileResponse(local_path, media_type=background.mime_type or "video/mp4")
 
         # 4. 兜底：直接尝试本地文件
-        local_path = settings.UPLOAD_DIR / file_path
+        local_path = resolve_upload_path(file_path)
         if local_path.is_file():
             return FileResponse(local_path)
 
         raise HTTPException(status_code=404, detail="文件不存在")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="文件不存在") from exc
     finally:
         await db.close()
 

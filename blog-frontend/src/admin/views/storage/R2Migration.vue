@@ -19,6 +19,7 @@ import {
 } from '@/api/r2Migration'
 import { fetchImages } from '@/api/images'
 import { fetchFiles } from '@/api/files'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 图床图片记录（迁移面板只用到部分字段） */
 interface MigrationImage {
@@ -349,13 +350,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="r2-migration-page">
-    <div class="page-header">
-      <div>
-        <h2>R2 存储迁移</h2>
-        <p>将本地存储的图片、文件、背景视频和图书 EPUB 批量迁移到 Cloudflare R2 对象存储。</p>
-      </div>
-      <div class="header-actions">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="R2 存储迁移"
+      subtitle="将本地存储的图片、文件、背景视频和图书 EPUB 批量迁移到 Cloudflare R2 对象存储。"
+    >
+      <template #actions>
         <el-button
           :disabled="!status?.r2_enabled"
           :loading="backfilling"
@@ -364,8 +365,8 @@ onMounted(async () => {
           补写缓存头
         </el-button>
         <el-button :icon="Refresh" :loading="loading" @click="loadStatus">刷新状态</el-button>
-      </div>
-    </div>
+      </template>
+    </AdminPageHeader>
 
     <el-alert
       v-if="status && !status.r2_enabled"
@@ -378,14 +379,14 @@ onMounted(async () => {
 
     <!-- 迁移状态统计卡片 -->
     <div v-loading="loading" class="status-grid">
-      <el-card v-for="card in statusCards" :key="card.key" shadow="never" class="status-card">
+      <el-card v-for="card in statusCards" :key="card.key" shadow="never">
         <div class="status-card-title">{{ card.title }}</div>
         <el-progress
           :percentage="card.total ? Math.round((card.migrated / card.total) * 100) : 100"
-          :stroke-width="10"
+          :stroke-width="8"
           :status="card.pending === 0 ? 'success' : undefined"
         />
-        <div class="status-card-meta">
+        <div class="status-card-meta admin-mono">
           <span>已迁移 {{ card.migrated }} / {{ card.total }}</span>
           <span :class="{ pending: card.pending > 0 }">待迁移 {{ card.pending }}</span>
         </div>
@@ -393,7 +394,7 @@ onMounted(async () => {
     </div>
 
     <!-- 待迁移列表 -->
-    <el-card shadow="never" class="table-card">
+    <el-card shadow="never">
       <template #header>
         <div class="table-card-header">
           <el-tabs v-model="activeTab" @tab-change="handleTabChange">
@@ -420,7 +421,6 @@ onMounted(async () => {
         v-if="activeTab === 'images'"
         :data="pendingImages"
         v-loading="listLoading"
-        stripe
         @selection-change="(rows: MigrationImage[]) => (selectedImageIds = rows.map((r) => r.id))"
       >
         <el-table-column type="selection" width="50" />
@@ -432,13 +432,19 @@ onMounted(async () => {
         <el-table-column prop="original_name" label="文件名" min-width="200" show-overflow-tooltip />
         <el-table-column prop="mime_type" label="类型" min-width="120" show-overflow-tooltip />
         <el-table-column label="尺寸" width="120">
-          <template #default="{ row }">{{ row.width }} × {{ row.height }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.width }} × {{ row.height }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="大小" width="100">
-          <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ formatSize(row.file_size) }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="110">
-          <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.created_at?.slice(0, 10) }}</span>
+          </template>
         </el-table-column>
       </el-table>
 
@@ -446,17 +452,20 @@ onMounted(async () => {
         v-else-if="activeTab === 'files'"
         :data="pendingFiles"
         v-loading="listLoading"
-        stripe
         @selection-change="(rows: MigrationFile[]) => (selectedFileIds = rows.map((r) => r.id))"
       >
         <el-table-column type="selection" width="50" />
         <el-table-column prop="original_name" label="文件名" min-width="240" show-overflow-tooltip />
         <el-table-column prop="mime_type" label="类型" min-width="160" show-overflow-tooltip />
         <el-table-column label="大小" width="110">
-          <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ formatSize(row.file_size) }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="110">
-          <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.created_at?.slice(0, 10) }}</span>
+          </template>
         </el-table-column>
       </el-table>
 
@@ -464,13 +473,16 @@ onMounted(async () => {
         v-else-if="activeTab === 'backgrounds'"
         :data="pendingBackgrounds"
         v-loading="listLoading"
-        stripe
         @selection-change="
           (rows: MigrationBackground[]) => (selectedBackgroundIds = rows.map((r) => r.id))
         "
       >
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="id" label="ID" width="70">
+          <template #default="{ row }">
+            <span class="admin-mono">#{{ row.id }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="分组" width="130">
           <template #default="{ row }">
             {{ row.theme === 'dark' ? '暗色' : '亮色' }} ·
@@ -480,10 +492,14 @@ onMounted(async () => {
         <el-table-column prop="url" label="视频地址" min-width="240" show-overflow-tooltip />
         <el-table-column prop="mime_type" label="类型" min-width="140" show-overflow-tooltip />
         <el-table-column label="大小" width="110">
-          <template #default="{ row }">{{ formatSize(row.file_size ?? 0) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ formatSize(row.file_size ?? 0) }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="110">
-          <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.created_at?.slice(0, 10) }}</span>
+          </template>
         </el-table-column>
       </el-table>
 
@@ -491,7 +507,6 @@ onMounted(async () => {
         v-else
         :data="pendingBooks"
         v-loading="listLoading"
-        stripe
         @selection-change="(rows: MigrationBook[]) => (selectedBookIds = rows.map((r) => r.id))"
       >
         <el-table-column type="selection" width="50" />
@@ -502,9 +517,15 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column prop="title" label="书名" min-width="180" show-overflow-tooltip />
         <el-table-column prop="author" label="作者" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="slug" label="Slug" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="slug" label="Slug" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.slug }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="110">
-          <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+          <template #default="{ row }">
+            <span class="admin-mono">{{ row.created_at?.slice(0, 10) }}</span>
+          </template>
         </el-table-column>
       </el-table>
 
@@ -517,40 +538,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.r2-migration-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.page-header h2 {
-  margin: 0;
-  color: var(--admin-text-color);
-  font-size: 20px;
-}
-.page-header p {
-  margin: 4px 0 0;
-  color: var(--admin-text-secondary);
-  font-size: 13px;
-}
 .status-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
   min-height: 120px;
-}
-.status-card {
-  border-radius: 12px;
 }
 .status-card-title {
   margin-bottom: 12px;
@@ -566,9 +558,6 @@ onMounted(async () => {
 }
 .status-card-meta .pending {
   color: var(--el-color-warning);
-}
-.table-card {
-  border-radius: 12px;
 }
 .table-card-header {
   display: flex;
@@ -592,12 +581,14 @@ onMounted(async () => {
   width: 64px;
   height: 44px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border-color);
 }
 .book-preview {
   width: 36px;
   height: 50px;
   object-fit: cover;
-  border-radius: 3px;
+  border-radius: 4px;
+  border: 1px solid var(--admin-border-color);
 }
 </style>

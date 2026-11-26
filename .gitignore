@@ -25,6 +25,10 @@ dist/
 node_modules/
 coverage/
 
+# Python 脚本与测试缓存
+__pycache__/
+*.py[cod]
+
 # 本地数据库、事务文件与备份（数据独立管理）
 *.db
 *.sqlite

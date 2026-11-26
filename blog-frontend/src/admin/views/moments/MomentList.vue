@@ -10,6 +10,8 @@ import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import EmojiPicker from '@/admin/components/EmojiPicker.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
+import { formatMomentDate } from '@/utils/momentDate'
 
 /** 说说项（匹配后端 MomentResponse） */
 interface MomentItem {
@@ -111,8 +113,9 @@ async function removeComment(comment: MomentComment) {
     await api.delete(`/api/v1/moments/${selectedMoment.value.id}/comments/${comment.id}`, true)
     comments.value = comments.value.filter((item) => item.id !== comment.id)
     ElMessage.success('评论已删除')
-  } catch {
-    // 用户取消或删除失败
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除评论失败')
   }
 }
 
@@ -181,14 +184,17 @@ onMounted(() => loadData())
 </script>
 
 <template>
-  <div class="moment-list-page">
-    <!-- 顶部操作栏 -->
-    <div class="page-header">
-      <span class="page-title">共 {{ pagination.total }} 条说说</span>
-      <el-button type="primary" @click="openCreate">
-        <el-icon><Plus /></el-icon>发说说
-      </el-button>
-    </div>
+  <div class="admin-page moment-list-page">
+    <AdminPageHeader
+      eyebrow="CONTENT"
+      title="说说管理"
+      :count="`${pagination.total} 条`"
+      subtitle="记录日常随笔、心情标签与配图，管理说说下的读者评论。"
+    >
+      <template #actions>
+        <el-button type="primary" :icon="Plus" @click="openCreate">发说说</el-button>
+      </template>
+    </AdminPageHeader>
 
     <!-- 说说表格 -->
     <el-card shadow="never" class="table-card">
@@ -202,7 +208,7 @@ onMounted(() => loadData())
             </span>
             <span>{{ row.images.length }} 张图</span>
             <span>{{ row.likes }} 赞</span>
-            <span>{{ row.date.replace('T', ' ').slice(0, 16) }}</span>
+            <span>{{ formatMomentDate(row.date).slice(0, 16) }}</span>
           </div>
           <div class="moment-mobile-actions">
             <el-button type="primary" link size="small" @click="openComments(row)">评论</el-button>
@@ -243,7 +249,7 @@ onMounted(() => loadData())
         <el-table-column prop="likes" label="点赞" width="70" />
         <el-table-column prop="date" label="日期" width="170">
           <template #default="{ row }">
-            {{ row.date.replace('T', ' ').slice(0, 16) }}
+            {{ formatMomentDate(row.date).slice(0, 16) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
@@ -341,7 +347,7 @@ onMounted(() => loadData())
           <template #default="{ row }">{{ row.content }}</template>
         </el-table-column>
         <el-table-column label="时间" width="165">
-          <template #default="{ row }">{{ row.date.replace('T', ' ').slice(0, 16) }}</template>
+          <template #default="{ row }">{{ formatMomentDate(row.date).slice(0, 16) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="70" fixed="right">
           <template #default="{ row }">
@@ -364,30 +370,9 @@ onMounted(() => loadData())
 </template>
 
 <style scoped>
-.moment-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-
-.table-card {
-  border-radius: 12px;
-}
-
 .content-cell {
-  line-height: 1.5;
-  color: var(--admin-text-color, #303133);
+  line-height: 1.55;
+  color: var(--admin-text-color);
 }
 
 .image-picker-actions {
@@ -412,8 +397,9 @@ onMounted(() => loadData())
   min-height: 36px;
 }
 
-.mood-picker-hint {
-  color: var(--admin-text-secondary, #909399);
+.mood-picker-hint,
+.image-count {
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 
@@ -422,55 +408,21 @@ onMounted(() => loadData())
   margin-top: 12px;
 }
 
-.mood-text-input :deep(.el-input__wrapper) {
-  min-height: 38px;
-  border-radius: 9px;
-  background: var(--admin-input-bg, #fafafa);
-  box-shadow: 0 0 0 1px var(--admin-border-color, #dcdfe6) inset;
-  transition: box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.mood-text-input :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--el-color-primary-light-5) inset;
-}
-
-.mood-text-input :deep(.el-input__wrapper.is-focus) {
-  background: var(--admin-panel-bg, #ffffff);
-  box-shadow: 0 0 0 1px var(--el-color-primary) inset, 0 0 0 3px var(--el-color-primary-light-9);
-}
-
-.mood-text-input :deep(.el-input__count) {
-  color: var(--admin-text-secondary, #a8abb2);
-  font-size: 11px;
-}
-
-.image-count {
-  color: var(--admin-text-secondary, #909399);
-  font-size: 12px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-/* 移动端卡片列表（默认隐藏，窄屏替换表格） */
 .moment-mobile-list {
   display: none;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .moment-mobile-card {
   padding: 14px;
-  border: 1px solid var(--admin-border-color, #e4e7ed);
-  border-radius: 12px;
-  background: var(--admin-panel-bg, #ffffff);
+  border: 1px solid var(--admin-border-color);
+  border-radius: 10px;
+  background: var(--admin-panel-bg);
 }
 
 .moment-mobile-content {
-  color: var(--admin-text-color, #303133);
+  color: var(--admin-text-color);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -480,7 +432,7 @@ onMounted(() => loadData())
   flex-wrap: wrap;
   gap: 8px 14px;
   margin-top: 10px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 
@@ -489,29 +441,16 @@ onMounted(() => loadData())
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--admin-border-color, #e4e7ed);
+  border-top: 1px solid var(--admin-border-color);
 }
 
 @media (max-width: 767px) {
-  .page-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .page-header .el-button {
-    align-self: flex-start;
-  }
-
   .moment-desktop-table {
     display: none;
   }
 
   .moment-mobile-list {
     display: flex;
-  }
-
-  .pagination-wrap {
-    justify-content: center;
   }
 }
 </style>

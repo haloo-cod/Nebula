@@ -119,7 +119,10 @@ async def download_file(
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
 
-    path = get_file_path(record.filename)
+    try:
+        path = get_file_path(record.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在") from exc
     if not (
         (record.storage_backend == "r2" and record.r2_key and settings.R2_ENABLED)
         or path.is_file()
@@ -219,7 +222,10 @@ async def stream_file_media(
             return RedirectResponse(url, status_code=307)
         stream = r2.download_stream(record.r2_key)
         return StreamingResponse(stream, media_type=record.mime_type or "application/octet-stream")
-    path = get_file_path(record.filename)
+    try:
+        path = get_file_path(record.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在") from exc
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件已丢失")
     return DownloadResponse(

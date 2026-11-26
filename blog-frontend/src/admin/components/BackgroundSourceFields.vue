@@ -31,7 +31,7 @@ defineProps<{ disabled?: boolean; error?: string; batch?: boolean }>()
 <style scoped>
 .source-hint {
   font-size: 12px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   line-height: 1.6;
 }
 </style>

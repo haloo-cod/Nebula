@@ -1,66 +1,106 @@
 <script setup lang="ts">
 /**
  * 站点配置页
- * 未来扩展：站点名称、描述、SEO、公告等全局配置
- * 当前为占位页，待后端 SiteConfig API 完善后对接
+ * 规划中的全局站点参数配置入口（待后端 SiteConfig API 完整对接）。
  */
 import { Setting } from '@element-plus/icons-vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
+
+const plannedItems = [
+  { title: '站点品牌与副标题', desc: '统一配置博客名称、眉标与页脚文案' },
+  { title: 'SEO 与元信息', desc: '站点描述、关键词、默认社交分享图' },
+  { title: '全站公告与维护开关', desc: '按需展示顶部公告条或临时维护提示' },
+  { title: '评论与注册策略', desc: '集中控制评论审核、新用户注册及邮箱验证开关' },
+]
 </script>
 
 <template>
-  <div class="site-config-page">
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <span>站点配置</span>
-      </template>
-      <div class="placeholder-content">
-        <el-icon :size="48" color="#c0c4cc"><Setting /></el-icon>
-        <h3>站点配置功能开发中</h3>
-        <p>后续将支持以下配置项：</p>
-        <ul>
-          <li>站点名称 / 副标题</li>
-          <li>SEO 描述 / 关键词</li>
-          <li>公告信息</li>
-          <li>评论开关</li>
-          <li>注册开关（未来用户系统）</li>
-        </ul>
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="站点配置"
+      subtitle="全局站点开关与 SEO 参数设置入口（后端配置接口接入中）。"
+    />
+
+    <section class="admin-surface config-roadmap">
+      <div class="roadmap-head">
+        <span class="roadmap-icon"><el-icon :size="20"><Setting /></el-icon></span>
+        <div>
+          <h2>即将支持的配置项</h2>
+          <p>后端 SiteConfig API 就绪后，以下配置将支持实时保存与热生效。</p>
+        </div>
       </div>
-    </el-card>
+
+      <div class="roadmap-grid">
+        <div v-for="item in plannedItems" :key="item.title" class="roadmap-item">
+          <span class="admin-status-dot is-primary">{{ item.title }}</span>
+          <p>{{ item.desc }}</p>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.site-config-page {
+.config-roadmap {
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
-.section-card {
-  border-radius: 12px;
-}
-.placeholder-content {
+
+.roadmap-head {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 40px 0;
-  text-align: center;
+  gap: 14px;
 }
-.placeholder-content h3 {
-  margin: 16px 0 8px;
-  color: var(--admin-text-color, #303133);
+
+.roadmap-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--admin-border-color);
+  border-radius: 10px;
+  background: var(--admin-fill-bg);
+  color: var(--admin-primary-color);
+  flex-shrink: 0;
 }
-.placeholder-content p {
-  color: var(--admin-text-secondary, #909399);
-  margin-bottom: 12px;
+
+.roadmap-head h2 {
+  margin: 0 0 4px;
+  color: var(--admin-text-color);
+  font-size: 16px;
 }
-.placeholder-content ul {
-  list-style: none;
-  padding: 0;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 14px;
+
+.roadmap-head p {
+  margin: 0;
+  color: var(--admin-text-secondary);
+  font-size: 13px;
 }
-.placeholder-content li::before {
-  content: '• ';
-  color: #409eff;
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roadmap-item {
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border-color);
+  border-radius: 10px;
+  background: var(--admin-panel-subtle);
+}
+
+.roadmap-item p {
+  margin: 6px 0 0 13px;
+  color: var(--admin-text-secondary);
+  font-size: 12.5px;
+}
+
+@media (max-width: 640px) {
+  .roadmap-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

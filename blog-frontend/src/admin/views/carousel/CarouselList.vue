@@ -8,6 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 轮播项（匹配后端 CarouselSlideResponse） */
 interface CarouselSlide {
@@ -97,14 +98,20 @@ async function handleBatchDelete() {
     const results = await Promise.allSettled(
       selectedIds.value.map((id) => api.delete(`/api/v1/carousel/${id}`)),
     )
-    const failed = results.filter((result) => result.status === 'rejected').length
-    ElMessage[failed ? 'warning' : 'success'](
-      failed ? `删除完成，${failed} 张失败` : '批量删除成功',
-    )
+    const failed = results.filter((result) => result.status === 'rejected')
+    if (failed.length) {
+      const details = failed.map((result) =>
+        result.reason instanceof Error ? result.reason.message : '删除失败',
+      )
+      ElMessage.error(`${failed.length} 张轮播图删除失败：${[...new Set(details)].join('；')}`)
+    } else {
+      ElMessage.success('批量删除成功')
+    }
     selectedIds.value = []
     await loadSlides()
-  } catch {
-    // 用户取消删除
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '批量删除失败')
   } finally {
     deleting.value = false
   }
@@ -117,8 +124,9 @@ async function handleDelete(slide: CarouselSlide) {
     await api.delete(`/api/v1/carousel/${slide.id}`)
     ElMessage.success('删除成功')
     loadSlides()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除轮播图失败')
   }
 }
 
@@ -165,10 +173,14 @@ onMounted(() => loadSlides())
 </script>
 
 <template>
-  <div class="carousel-list-page">
-    <div class="page-header">
-      <span class="page-title">共 {{ slides.length }} 张轮播图</span>
-      <div class="upload-control">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="轮播管理"
+      :count="`${slides.length} 张`"
+      subtitle="拖拽卡片调整首页轮播图展示顺序，修改顺序后请及时保存。"
+    >
+      <template #actions>
         <el-button
           type="danger"
           plain
@@ -178,17 +190,19 @@ onMounted(() => loadSlides())
         >
           批量删除（{{ selectedIds.length }}）
         </el-button>
-        <el-button v-if="orderChanged" :loading="savingOrder" @click="saveOrder"
-          >保存排序</el-button
-        >
+        <el-button v-if="orderChanged" :loading="savingOrder" @click="saveOrder">
+          保存排序
+        </el-button>
         <el-button type="primary" :loading="uploading" @click="showImagePicker = true">
           <el-icon><Plus /></el-icon>添加轮播图
         </el-button>
-      </div>
-    </div>
+      </template>
+    </AdminPageHeader>
 
-    <el-card shadow="never" class="table-card">
-      <div class="batch-toolbar">已选择 {{ selectedIds.length }} 张</div>
+    <el-card shadow="never">
+      <div class="batch-toolbar">
+        已选择 <span class="admin-mono">{{ selectedIds.length }}</span> 张
+      </div>
       <div v-loading="loading" class="slide-grid">
         <div
           v-for="slide in slides"
@@ -210,7 +224,7 @@ onMounted(() => loadSlides())
           <div class="slide-overlay">
             <el-button type="danger" size="small" @click="handleDelete(slide)">移除</el-button>
           </div>
-          <span class="slide-order">{{ slide.sort_order }}</span>
+          <span class="slide-order admin-mono">#{{ slide.sort_order }}</span>
         </div>
         <div v-if="!loading && slides.length === 0" class="empty-state">暂无轮播图</div>
       </div>
@@ -226,33 +240,10 @@ onMounted(() => loadSlides())
 </template>
 
 <style scoped>
-.carousel-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
 .batch-toolbar {
   margin-bottom: 12px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
-}
-.upload-control {
-  display: flex;
-}
-.file-input {
-  display: none;
 }
 
 .slide-grid {
@@ -265,8 +256,13 @@ onMounted(() => loadSlides())
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border: 1px solid var(--admin-border-color);
+  background: var(--admin-fill-bg);
   cursor: grab;
+  transition: border-color 0.16s ease;
+}
+.slide-item:hover {
+  border-color: var(--admin-primary-color);
 }
 .slide-item:active {
   cursor: grabbing;
@@ -292,7 +288,7 @@ onMounted(() => loadSlides())
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.42);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -303,7 +299,7 @@ onMounted(() => loadSlides())
   position: absolute;
   top: 6px;
   left: 6px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
   color: #fff;
   font-size: 11px;
   padding: 2px 6px;
@@ -313,6 +309,6 @@ onMounted(() => loadSlides())
   grid-column: 1 / -1;
   text-align: center;
   padding: 60px 0;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
 }
 </style>

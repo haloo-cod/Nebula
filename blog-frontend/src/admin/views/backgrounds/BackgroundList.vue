@@ -15,6 +15,7 @@ import BackgroundSourceFields from '@/admin/components/BackgroundSourceFields.vu
 import type { ApiBgItem as BackgroundItem } from '@/api/backgrounds'
 import { backgroundSourceError, type BackgroundSource } from '@/utils/backgroundSource'
 import { useUIStore } from '@/stores/ui'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 const ui = useUIStore()
 const uploadSource = ref<BackgroundSource>({ source_text: '', source_url: '' })
@@ -424,14 +425,27 @@ onMounted(() => loadBackgrounds())
 </script>
 
 <template>
-  <div class="bg-list-page">
-    <div class="page-header">
-      <div class="filter-row">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="背景图"
+      :count="`${backgrounds.length} 张`"
+      subtitle="按明暗主题与设备端分组管理前台背景壁纸，选定单一分组后支持拖拽排序。"
+    >
+      <template #actions>
+        <el-button type="primary" @click="openUpload">
+          <el-icon><Plus /></el-icon>添加背景图
+        </el-button>
+      </template>
+    </AdminPageHeader>
+
+    <div class="admin-toolbar">
+      <div class="admin-toolbar-group">
         <el-select
           v-model="filterTheme"
           placeholder="主题"
           clearable
-          style="width: 100px"
+          style="width: 112px"
           @change="handleFilterChange"
         >
           <el-option label="暗色" value="dark" />
@@ -441,24 +455,19 @@ onMounted(() => loadBackgrounds())
           v-model="filterDevice"
           placeholder="设备"
           clearable
-          style="width: 100px"
+          style="width: 112px"
           @change="handleFilterChange"
         >
           <el-option label="桌面" value="desktop" />
           <el-option label="移动" value="mobile" />
         </el-select>
-        <span class="page-title">共 {{ backgrounds.length }} 张</span>
-      </div>
-      <el-button type="primary" @click="openUpload">
-        <el-icon><Plus /></el-icon>添加背景图
-      </el-button>
-    </div>
-
-    <el-card shadow="never" class="table-card">
-      <div class="batch-toolbar">
-        <span>已选择 {{ selectedIds.length }} 张</span>
         <span class="order-hint">
-          {{ canReorder ? '拖动卡片调整当前分组顺序' : '选择主题和设备后可调整顺序' }}
+          {{ canReorder ? '拖动卡片调整当前分组顺序' : '同时选择主题和设备后可拖拽排序' }}
+        </span>
+      </div>
+      <div class="admin-toolbar-group">
+        <span class="selected-count">
+          已选 <span class="admin-mono">{{ selectedIds.length }}</span> 张
         </span>
         <el-button
           type="primary"
@@ -466,17 +475,22 @@ onMounted(() => loadBackgrounds())
           :loading="savingOrder"
           :disabled="!canReorder || !orderChanged"
           @click="saveOrder"
-          >保存顺序</el-button
         >
+          保存顺序
+        </el-button>
         <el-button
           type="danger"
           plain
           :loading="deleting"
           :disabled="!selectedIds.length"
           @click="handleBatchDelete"
-          >批量删除</el-button
         >
+          批量删除
+        </el-button>
       </div>
+    </div>
+
+    <el-card shadow="never">
       <div v-loading="loading" class="bg-grid">
         <div
           v-for="bg in backgrounds"
@@ -648,40 +662,10 @@ onMounted(() => loadBackgrounds())
 </template>
 
 <style scoped>
-.bg-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
-.batch-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 13px;
-}
-.order-hint {
-  flex: 1;
-  margin-left: 12px;
-  color: var(--admin-text-secondary, #909399);
+.order-hint,
+.selected-count {
+  color: var(--admin-text-secondary);
+  font-size: 12.5px;
 }
 .image-picker {
   display: flex;
@@ -692,7 +676,7 @@ onMounted(() => loadBackgrounds())
 .selected-image-name {
   min-width: 0;
   overflow: hidden;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -707,7 +691,7 @@ onMounted(() => loadBackgrounds())
 .video-meta {
   display: block;
   margin-top: 6px;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 .storage-row {
@@ -717,7 +701,7 @@ onMounted(() => loadBackgrounds())
   margin-top: 10px;
 }
 .storage-hint {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 .bg-grid {
@@ -730,7 +714,12 @@ onMounted(() => loadBackgrounds())
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border: 1px solid var(--admin-border-color);
+  background: var(--admin-fill-bg);
+  transition: border-color 0.16s ease;
+}
+.bg-item:hover {
+  border-color: var(--admin-primary-color);
 }
 .bg-item.is-sortable {
   cursor: grab;
@@ -762,7 +751,8 @@ onMounted(() => loadBackgrounds())
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.42);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -773,7 +763,7 @@ onMounted(() => loadBackgrounds())
   position: absolute;
   bottom: 6px;
   left: 6px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
   color: #fff;
   font-size: 11px;
   padding: 2px 8px;
@@ -783,6 +773,6 @@ onMounted(() => loadBackgrounds())
   grid-column: 1 / -1;
   text-align: center;
   padding: 60px 0;
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
 }
 </style>

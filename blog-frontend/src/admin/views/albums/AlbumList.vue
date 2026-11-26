@@ -11,6 +11,7 @@ import { uploadImage } from '@/api/images'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 相册列表项 */
 interface AlbumItem {
@@ -133,8 +134,9 @@ async function deleteAlbum(album: AlbumItem) {
     await api.delete(`/api/v1/albums/${album.id}`)
     ElMessage.success('删除成功')
     loadAlbums()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除相册失败')
   }
 }
 
@@ -248,8 +250,9 @@ async function deletePhoto(photo: PhotoItem) {
     // 刷新
     const detail = await api.get<AlbumDetail>(`/api/v1/albums/${currentAlbum.value.id}`, true)
     currentAlbum.value = detail
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除照片失败')
   }
 }
 
@@ -257,15 +260,19 @@ onMounted(() => loadAlbums())
 </script>
 
 <template>
-  <div class="album-list-page">
+  <div class="admin-page">
     <!-- 相册列表视图 -->
     <template v-if="!currentAlbum">
-      <div class="page-header">
-        <span class="page-title">共 {{ albums.length }} 个相册</span>
-        <el-button type="primary" @click="openCreateAlbum">
-          <el-icon><Plus /></el-icon>新建相册
-        </el-button>
-      </div>
+      <AdminPageHeader
+        eyebrow="CONTENT"
+        title="相册管理"
+        :count="`${albums.length} 个`"
+        subtitle="维护前台摄影相册封面、版式方向与内部照片排序。"
+      >
+        <template #actions>
+          <el-button type="primary" :icon="Plus" @click="openCreateAlbum">新建相册</el-button>
+        </template>
+      </AdminPageHeader>
 
       <el-card shadow="never" class="table-card">
         <el-table :data="albums as any" v-loading="loading" stripe style="width: 100%">
@@ -408,25 +415,11 @@ onMounted(() => loadAlbums())
 </template>
 
 <style scoped>
-.album-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
 .upload-control {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .file-input {
   display: none;
@@ -437,18 +430,18 @@ onMounted(() => loadAlbums())
   gap: 8px;
   flex-wrap: wrap;
 }
-
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
   min-height: 200px;
 }
 .photo-item {
   position: relative;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--admin-border-color, #e4e7ed);
+  border: 1px solid var(--admin-border-color);
+  background: var(--admin-panel-bg);
 }
 .photo-thumb {
   width: 100%;
@@ -458,32 +451,26 @@ onMounted(() => loadAlbums())
 }
 .photo-actions {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 6px;
+  right: 6px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 150ms ease;
 }
 .photo-item:hover .photo-actions {
   opacity: 1;
-}
-.photo-caption {
-  display: block;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--admin-text-secondary, #909399);
-  background: var(--admin-fill-bg, #f5f7fa);
 }
 .photo-fields {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 8px;
-  background: var(--admin-fill-bg, #f5f7fa);
+  background: var(--admin-panel-subtle);
 }
 .empty-state {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 0;
-  color: #999;
+  padding: 56px 0;
+  color: var(--admin-text-muted);
+  font-size: 13px;
 }
 </style>

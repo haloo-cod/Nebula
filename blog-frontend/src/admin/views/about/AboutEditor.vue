@@ -8,11 +8,13 @@ import { ElMessage } from 'element-plus'
 import { RefreshRight } from '@element-plus/icons-vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
-import { api, BASE_URL, getToken, resolveUrl } from '@/api/client'
+import { api, resolveUrl } from '@/api/client'
+import { uploadEditorImages } from '@/utils/editorUpload'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
 import ImagePickerDialog, { type PickerImage } from '@/admin/components/ImagePickerDialog.vue'
 import EmojiPicker from '@/admin/components/EmojiPicker.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 关于页内容接口响应 */
 interface AboutContent {
@@ -89,26 +91,16 @@ function initVditor(content: string) {
     cache: { enable: false },
     value: content,
     upload: {
-      // 存储后端跟随全局选择器，通过 URL 查询参数传给后端
-      url: `${BASE_URL}/api/v1/images/upload?storage_backend=${storageBackend.value}`,
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      fieldName: 'file',
       max: 10 * 1024 * 1024,
       accept: 'image/*',
-      format(_files: File[], responseText: string): string {
-        try {
-          const response = JSON.parse(responseText) as { original_name: string; url: string }
-          return JSON.stringify({
-            msg: '',
-            code: 0,
-            data: {
-              errFiles: [],
-              succMap: { [response.original_name]: resolveUrl(response.url) },
-            },
-          })
-        } catch {
-          return JSON.stringify({ msg: '上传失败', code: 1, data: { errFiles: [], succMap: {} } })
-        }
+      handler(files) {
+        const editor = vditor
+        return uploadEditorImages(files, storageBackend.value, (markdown) => {
+          if (vditor === editor) editor?.insertMD(markdown)
+        }).catch((error: unknown) => {
+          if (vditor === editor) editor?.tip(error instanceof Error ? error.message : '图片上传失败')
+          return null
+        })
       },
     },
     preview: {
@@ -201,23 +193,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="about-editor-page">
-    <div class="page-header">
-      <div>
-        <h2>关于页内容</h2>
-        <p>使用 Markdown 编辑前台“关于 / 自我介绍”正文。</p>
-      </div>
-      <el-button
-        type="primary"
-        :loading="saving"
-        :disabled="loading || !editorReady || !!error"
-        @click="saveContent"
-      >
-        保存内容
-      </el-button>
-    </div>
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="关于页内容"
+      subtitle="使用 Markdown 编辑前台“关于 / 自我介绍”页面的独立封面与正文。"
+    >
+      <template #actions>
+        <el-button
+          type="primary"
+          :loading="saving"
+          :disabled="loading || !editorReady || !!error"
+          @click="saveContent"
+        >
+          保存内容
+        </el-button>
+      </template>
+    </AdminPageHeader>
 
-    <el-card shadow="never" class="cover-card">
+    <el-card shadow="never">
       <template #header>关于页封面图</template>
       <div class="cover-editor">
         <img
@@ -228,7 +222,7 @@ onBeforeUnmount(() => {
         />
         <div v-else class="cover-empty">未设置封面图</div>
         <div class="cover-actions">
-          <el-button type="primary" @click="showImagePicker = true">从媒体库选择</el-button>
+          <el-button type="primary" plain @click="showImagePicker = true">从媒体库选择</el-button>
           <el-button v-if="coverUrl" @click="coverUrl = ''">清空封面</el-button>
           <el-input v-model="coverUrl" placeholder="也可手动填写图片 URL" />
         </div>
@@ -273,39 +267,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.about-editor-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.page-header h2 {
-  margin: 0;
-  color: var(--admin-text-color);
-  font-size: 20px;
-}
-.page-header p {
-  margin: 4px 0 0;
-  color: var(--admin-text-secondary);
-  font-size: 13px;
-}
 .editor-card {
   min-height: 664px;
-  border-radius: 12px;
   overflow: visible !important;
 }
 .editor-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.cover-card {
-  border-radius: 12px;
 }
 .cover-editor {
   display: flex;
@@ -318,12 +287,15 @@ onBeforeUnmount(() => {
   height: 120px;
   border-radius: 8px;
   object-fit: cover;
+  border: 1px solid var(--admin-border-color);
 }
 .cover-empty {
   display: grid;
   place-items: center;
   color: var(--admin-text-secondary);
-  background: var(--admin-hover-bg);
+  background: var(--admin-fill-bg);
+  border-style: dashed;
+  font-size: 13px;
 }
 .cover-actions {
   display: flex;
@@ -340,6 +312,15 @@ onBeforeUnmount(() => {
 }
 .vditor-container {
   min-height: 620px;
+}
+.vditor-container :deep(.vditor) {
+  border-color: var(--admin-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.vditor-container :deep(.vditor-toolbar) {
+  background: var(--admin-panel-subtle);
+  border-bottom-color: var(--admin-border-color);
 }
 
 .vditor-container :deep(.vditor-toolbar [data-type='full-emoji'] svg) {
@@ -358,9 +339,6 @@ onBeforeUnmount(() => {
   z-index: 2000;
 }
 @media (max-width: 640px) {
-  .page-header {
-    align-items: flex-start;
-  }
   .cover-editor {
     flex-direction: column;
   }

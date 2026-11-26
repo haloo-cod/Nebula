@@ -15,6 +15,7 @@ from app.models.image import UploadedImage
 from app.models.album import Album, AlbumPhoto
 from app.models.background import Background
 from app.models.book import Book
+from app.models.post import Post
 from app.models.carousel import CarouselSlide
 from app.models.user import User
 from app.schemas.image import ImageListResponse, ImageResponse
@@ -96,6 +97,7 @@ async def list_images(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     storage_backend: str | None = Query(None, pattern="^(local|r2)$"),
+    keyword: str | None = Query(None, max_length=300),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -107,13 +109,21 @@ async def list_images(
     if storage_backend:
         count_stmt = count_stmt.where(UploadedImage.storage_backend == storage_backend)
         list_stmt = list_stmt.where(UploadedImage.storage_backend == storage_backend)
+    if keyword and keyword.strip():
+        term = keyword.strip()
+        matches = or_(
+            UploadedImage.original_name.icontains(term, autoescape=True),
+            UploadedImage.filename.icontains(term, autoescape=True),
+        )
+        count_stmt = count_stmt.where(matches)
+        list_stmt = list_stmt.where(matches)
 
     total_result = await db.execute(count_stmt)
     total = total_result.scalar() or 0
 
     result = await db.execute(
         list_stmt
-        .order_by(UploadedImage.created_at.desc())
+        .order_by(UploadedImage.created_at.desc(), UploadedImage.id.desc())
         .offset(offset)
         .limit(page_size)
     )
@@ -134,13 +144,18 @@ async def delete_image(
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="图片不存在")
 
-    # 图片可能被多个内容模块共用，删除前统一检查核心外键和图书封面 URL。
+    # 同时保护外键引用和按 URL 保存的封面、背景来源。
     references: list[str] = []
+    image_urls = {value for value in (image.url, image.filename, f"/uploads/{image.filename}") if value}
+    image_urls.add(f"{settings.FRONTEND_URL.rstrip('/')}/uploads/{image.filename}")
     checks = [
         (CarouselSlide, CarouselSlide.image_id == image_id, "首页轮播"),
-        (Background, Background.image_id == image_id, "背景图"),
+        (Background, or_(Background.image_id == image_id,
+                         Background.media_url.in_(image_urls),
+                         Background.poster_url.in_(image_urls)), "背景或视频封面"),
         (Album, Album.cover_image_id == image_id, "相册封面"),
         (AlbumPhoto, AlbumPhoto.image_id == image_id, "相册照片"),
+        (Post, Post.cover_url.in_(image_urls), "文章封面"),
     ]
     for model, condition, label in checks:
         count = (await db.execute(select(func.count()).select_from(model).where(condition))).scalar() or 0
@@ -149,7 +164,7 @@ async def delete_image(
     book_count = (
         await db.execute(
             select(func.count()).select_from(Book).where(
-                or_(Book.cover_url == image.url, Book.cover_url == image.filename, Book.cover_url == f"/uploads/{image.filename}")
+                Book.cover_url.in_(image_urls)
             )
         )
     ).scalar() or 0

@@ -5,7 +5,7 @@
 
 import { api } from './client'
 
-/** 评论条目（含嵌套回复） */
+/** 评论条目；根节点 children 平铺全部后代，回复保留实际目标。 */
 export interface CommentItem {
   id: number
   author: string
@@ -14,6 +14,8 @@ export interface CommentItem {
   avatar_color: string
   avatar_url: string
   user_id: number | null
+  parent_id?: number | null
+  reply_to_author?: string
   can_delete: boolean
   children: CommentItem[]
 }

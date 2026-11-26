@@ -2,7 +2,11 @@
   <main class="project-page" data-background-credit-boundary>
     <RouterLink to="/gallery" class="back-link">返回展览</RouterLink>
 
-    <article v-if="project" class="project-doc glass-strong">
+    <section v-if="loading" class="project-doc glass-strong doc-state">文档加载中...</section>
+    <section v-else-if="loadError" class="project-doc glass-strong doc-state" role="alert">
+      {{ loadError }}
+    </section>
+    <article v-else-if="project" class="project-doc glass-strong">
       <header class="project-header">
         <span class="project-kicker">{{ project.year }} / {{ project.status }}</span>
         <h1>{{ project.title }}</h1>
@@ -12,8 +16,7 @@
         </div>
       </header>
 
-      <div v-if="loading" class="doc-state">文档加载中...</div>
-      <div v-else class="markdown-body" v-html="html"></div>
+      <div class="markdown-body" v-html="html"></div>
     </article>
 
     <section v-else class="project-doc glass-strong not-found">
@@ -25,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getGalleryProject, renderGalleryProject } from '@/data/gallery'
 import { fetchGalleryProject } from '@/api/gallery'
@@ -35,13 +38,24 @@ import type { GalleryProject } from '@/types'
 const route = useRoute()
 const html = ref('')
 const loading = ref(true)
-const project = ref<GalleryProject | null>(getGalleryProject(String(route.params.slug)))
+const project = ref<GalleryProject | null>(null)
+const loadError = ref('')
+let loadRequest = 0
+let disposed = false
 
 async function loadProject(slug: string) {
+  const request = ++loadRequest
+  const isCurrent = () => !disposed && request === loadRequest
   loading.value = true
+  loadError.value = ''
+  project.value = null
+  html.value = ''
   try {
     // 优先从后端 API 获取
     const detail = await fetchGalleryProject(slug)
+    if (!isCurrent()) return
+    const rendered = detail.content_md ? await renderMarkdown(detail.content_md) : ''
+    if (!isCurrent()) return
     project.value = {
       slug: detail.slug,
       title: detail.title,
@@ -52,13 +66,23 @@ async function loadProject(slug: string) {
       featured: detail.is_featured,
       content: detail.content_md,
     }
-    html.value = detail.content_md ? await renderMarkdown(detail.content_md) : ''
+    html.value = rendered
   } catch {
+    if (!isCurrent()) return
     // 后端不可用时 fallback 到本地 glob
-    project.value = getGalleryProject(slug)
-    html.value = (await renderGalleryProject(slug)) || ''
+    try {
+      const fallback = getGalleryProject(slug)
+      if (!fallback) return
+      const rendered = (await renderGalleryProject(slug)) || ''
+      if (!isCurrent()) return
+      project.value = fallback
+      html.value = rendered
+    } catch {
+      if (isCurrent()) loadError.value = '项目文档加载失败，请稍后重试'
+    }
+  } finally {
+    if (isCurrent()) loading.value = false
   }
-  loading.value = false
 }
 
 void loadProject(String(route.params.slug))
@@ -68,6 +92,11 @@ watch(
     void loadProject(String(slug))
   },
 )
+
+onUnmounted(() => {
+  disposed = true
+  loadRequest += 1
+})
 </script>
 
 <style scoped>

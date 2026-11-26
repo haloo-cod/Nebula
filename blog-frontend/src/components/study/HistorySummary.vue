@@ -31,6 +31,7 @@ import LiquidGlass from '@/components/liquid-glass/LiquidGlass.vue'
 import PanelFallbackGlass from '@/components/panels/PanelFallbackGlass.vue'
 import HistorySummaryContent from './HistorySummaryContent.vue'
 import { useUIStore } from '@/stores/ui'
+import { getLogicalDate } from '@/utils/studyDate'
 import type { StudyHistoryRecord } from '@/types'
 
 const props = defineProps<{
@@ -40,7 +41,7 @@ const props = defineProps<{
 const ui = useUIStore()
 
 const todayRecord = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getLogicalDate()
   return props.history.find((r) => r.date === today)
 })
 

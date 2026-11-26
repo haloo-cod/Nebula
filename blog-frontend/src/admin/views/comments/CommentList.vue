@@ -6,6 +6,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 评论项（匹配后端 CommentItem） */
 interface CommentItem {
@@ -121,8 +122,9 @@ async function deleteComment(comment: CommentItem) {
     await api.delete(`/api/v1/comments/${comment.id}`)
     ElMessage.success('删除成功')
     loadComments()
-  } catch {
-    // 用户取消
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除评论失败')
   }
 }
 
@@ -156,21 +158,26 @@ onMounted(() => loadComments())
 </script>
 
 <template>
-  <div class="comment-list-page">
-    <!-- 顶部筛选栏 -->
-    <div class="page-header">
-      <div class="filter-row">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="COMMUNITY"
+      title="评论管理"
+      :count="`${total} 条`"
+      subtitle="按固定页面或博文维度浏览评论树并处理异常留言。"
+    />
+
+    <div class="admin-toolbar">
+      <div class="admin-toolbar-group">
         <el-radio-group v-model="sourceType" @change="handleSourceChange" size="default">
           <el-radio-button value="page">固定页面</el-radio-button>
           <el-radio-button value="post">博文评论</el-radio-button>
         </el-radio-group>
 
-        <!-- 固定页面选择器 -->
         <el-select
           v-if="sourceType === 'page'"
           v-model="selectedPage"
           @change="handleSelectionChange"
-          style="width: 140px; margin-left: 12px"
+          style="width: 148px"
         >
           <el-option
             v-for="opt in pageOptions"
@@ -180,7 +187,6 @@ onMounted(() => loadComments())
           />
         </el-select>
 
-        <!-- 博文选择器（支持搜索） -->
         <el-select
           v-if="sourceType === 'post'"
           v-model="selectedPostSlug"
@@ -193,7 +199,7 @@ onMounted(() => loadComments())
           placeholder="选择文章"
           @change="handleSelectionChange"
           :loading="loadingPosts"
-          style="width: 300px; margin-left: 12px"
+          style="width: 300px"
         >
           <el-option
             v-for="post in filteredPosts"
@@ -203,8 +209,6 @@ onMounted(() => loadComments())
           />
         </el-select>
       </div>
-
-      <span class="total-text">共 {{ total }} 条评论</span>
     </div>
 
     <!-- 评论表格 -->
@@ -250,34 +254,6 @@ onMounted(() => loadComments())
 </template>
 
 <style scoped>
-.comment-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.filter-row {
-  display: flex;
-  align-items: center;
-}
-
-.total-text {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-
-.table-card {
-  border-radius: 12px;
-}
-
 .author-cell {
   display: flex;
   align-items: center;
@@ -292,14 +268,14 @@ onMounted(() => loadComments())
 }
 
 .indent-mark {
-  color: #c0c4cc;
-  font-family: monospace;
+  color: var(--admin-text-muted);
+  font-family: var(--admin-font-mono);
 }
 
 .empty-state {
   text-align: center;
   padding: 40px 0;
-  color: var(--admin-text-secondary, #909399);
-  font-size: 14px;
+  color: var(--admin-text-muted);
+  font-size: 13px;
 }
 </style>

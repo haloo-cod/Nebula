@@ -3,7 +3,7 @@
  * 统一封装图片上传（支持选择存储后端）与列表查询
  */
 
-import { BASE_URL, getToken } from './client'
+import { api } from './client'
 
 /** 存储后端类型 */
 export type StorageBackend = 'local' | 'r2'
@@ -40,21 +40,11 @@ export async function uploadImage(
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch(
-    `${BASE_URL}/api/v1/images/upload?storage_backend=${storageBackend}`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-      body: formData,
-      credentials: 'include',
-    },
+  return api.post<UploadedImage>(
+    `/api/v1/images/upload?storage_backend=${storageBackend}`,
+    formData,
+    true,
   )
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { detail?: string }
-    throw new Error(body.detail || `图片上传失败 (${response.status})`)
-  }
-  return (await response.json()) as UploadedImage
 }
 
 /**
@@ -79,6 +69,5 @@ export async function fetchImages(
     page_size: String(pageSize),
   })
   if (storageBackend) params.set('storage_backend', storageBackend)
-  const { api } = await import('./client')
   return api.get<ImageListResponse>(`/api/v1/images?${params}`, true)
 }

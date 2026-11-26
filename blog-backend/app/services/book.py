@@ -18,6 +18,7 @@ from ebooklib import epub, ITEM_COVER, ITEM_IMAGE
 from PIL import Image
 
 from app.config import settings
+from app.services.file import resolve_upload_path
 
 BOOKS_DIR = settings.UPLOAD_DIR / "books"
 BOOK_COVERS_DIR = settings.UPLOAD_DIR / "images" / "book-covers"
@@ -65,7 +66,7 @@ def read_epub_metadata(file_path: str) -> dict[str, str]:
     用 ebooklib 从 EPUB 提取 title / author / description
     file_path 是相对于 UPLOAD_DIR 的路径，如 'books/xxx.epub'
     """
-    full_path = settings.UPLOAD_DIR / file_path
+    full_path = resolve_upload_path(file_path)
     meta: dict[str, str] = {"title": "", "author": "", "description": ""}
 
     if not full_path.exists():
@@ -96,7 +97,7 @@ def extract_cover_image(file_path: str, slug: str, force: bool = False) -> str:
     file_path 是相对于 UPLOAD_DIR 的路径，如 'books/xxx.epub'
     使用固定命名 {slug}_cover.{ext}，避免重复生成。
     """
-    full_path = settings.UPLOAD_DIR / file_path
+    full_path = resolve_upload_path(file_path)
     if not full_path.exists():
         return ""
 
@@ -116,7 +117,7 @@ def extract_cover_image(file_path: str, slug: str, force: bool = False) -> str:
 def list_cover_candidates(file_path: str) -> list[dict[str, object]]:
     """列出 EPUB manifest 中可作为封面的位图资源。"""
 
-    full_path = settings.UPLOAD_DIR / file_path
+    full_path = resolve_upload_path(file_path)
     if not full_path.exists():
         return []
     book = epub.read_epub(str(full_path))
@@ -165,7 +166,7 @@ def list_cover_candidates(file_path: str) -> list[dict[str, object]]:
 def get_cover_candidate(file_path: str, item_name: str):
     """按 manifest 名称读取当前 EPUB 中的封面候选，找不到时返回 None。"""
 
-    full_path = settings.UPLOAD_DIR / file_path
+    full_path = resolve_upload_path(file_path)
     if not full_path.exists():
         return None
     book = epub.read_epub(str(full_path))

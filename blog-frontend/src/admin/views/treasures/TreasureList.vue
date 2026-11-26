@@ -10,6 +10,7 @@ import { api } from '@/api/client'
 import { deleteUploadedFile, fetchFiles, uploadFile, type UploadedFile } from '@/api/files'
 import { useStorageBackend } from '@/admin/composables/useStorageBackend'
 import StorageBackendSelect from '@/admin/components/StorageBackendSelect.vue'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 藏宝阁项（匹配后端 TreasureResponse） */
 interface TreasureItem {
@@ -217,8 +218,9 @@ async function removeUploadedFile(file: UploadedFile) {
     uploadedFiles.value = uploadedFiles.value.filter((item) => item.id !== file.id)
     if (form.value.download_file === file.url) form.value.download_file = ''
     ElMessage.success('文件已删除')
-  } catch {
-    // 用户取消
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除文件失败')
   }
 }
 
@@ -307,8 +309,9 @@ async function handleDelete(item: TreasureItem) {
     await api.delete(`/api/v1/treasures/${item.id}`)
     ElMessage.success('删除成功')
     loadData()
-  } catch {
-    /* 取消 */
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除资源失败')
   }
 }
 
@@ -321,23 +324,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="treasure-list-page">
-    <div class="page-header">
-      <div class="filter-row">
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="CONTENT"
+      title="藏宝阁"
+      :count="`${treasures.length} 项`"
+      subtitle="管理收藏的开源项目、效率工具与关联下载资源包。"
+    >
+      <template #actions>
+        <el-button type="primary" :icon="Plus" @click="openCreate">新增资源</el-button>
+      </template>
+    </AdminPageHeader>
+
+    <div class="admin-toolbar">
+      <div class="admin-toolbar-group">
         <el-select
           v-model="filterCategory"
           placeholder="全部分类"
           clearable
-          style="width: 140px"
+          style="width: 160px"
           @change="handleCategoryChange"
         >
           <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
         </el-select>
-        <span class="page-title">共 {{ treasures.length }} 项</span>
       </div>
-      <el-button type="primary" @click="openCreate">
-        <el-icon><Plus /></el-icon>新增资源
-      </el-button>
     </div>
 
     <el-card shadow="never" class="table-card">
@@ -526,30 +536,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.treasure-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.page-title {
-  font-size: 14px;
-  color: var(--admin-text-secondary, #909399);
-}
-.table-card {
-  border-radius: 12px;
-}
-
-/* 弹窗内容过长时只滚动表单，底部操作区始终留在视口内。 */
 :deep(.el-dialog) {
   display: flex;
   flex-direction: column;
@@ -568,12 +554,12 @@ onMounted(() => {
 }
 
 .icon-cell {
-  font-size: 20px;
+  font-size: 18px;
 }
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 24px;
+  gap: 0 20px;
 }
 .download-file-field {
   display: flex;
@@ -584,6 +570,7 @@ onMounted(() => {
 .file-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .file-input {
@@ -602,7 +589,7 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 .selected-file {
-  color: var(--admin-text-secondary, #909399);
+  color: var(--admin-text-secondary);
   font-size: 12px;
 }
 .selected-file span {

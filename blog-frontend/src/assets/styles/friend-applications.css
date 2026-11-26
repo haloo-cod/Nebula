@@ -1,0 +1,506 @@
+/* 友链申请区：沿用友链页 16px 圆角、1.5rem 内边距与 4rem 区块间距。 */
+.friend-applications {
+  /* 暗色主题沿用友链页的浅蓝点缀。 */
+  --fa-accent: rgba(160, 205, 255, 0.95);
+  --fa-accent-soft: rgba(160, 205, 255, 0.12);
+  --fa-accent-border: rgba(160, 205, 255, 0.35);
+  --fa-input-background: rgba(255, 255, 255, 0.08);
+  --fa-input-border: rgba(255, 255, 255, 0.15);
+  --fa-error: rgba(255, 154, 154, 0.95);
+  --fa-error-soft: rgba(255, 110, 110, 0.1);
+  --fa-error-border: rgba(255, 140, 140, 0.35);
+  --fa-success: rgba(150, 235, 190, 0.95);
+  --fa-pending: rgba(255, 209, 102, 0.95);
+  --fa-pending-soft: rgba(255, 209, 102, 0.12);
+  --fa-pending-border: rgba(255, 209, 102, 0.32);
+  --fa-approved: rgba(140, 218, 214, 0.95);
+  --fa-approved-soft: rgba(140, 218, 214, 0.12);
+  --fa-approved-border: rgba(140, 218, 214, 0.32);
+  --fa-rejected: rgba(255, 154, 154, 0.95);
+  --fa-rejected-soft: rgba(255, 110, 110, 0.1);
+  --fa-rejected-border: rgba(255, 140, 140, 0.32);
+
+  position: relative;
+  margin-top: 4rem;
+  scroll-margin-top: 6rem;
+}
+
+/* 亮色主题参考现有友链页的青绿色点缀。 */
+[data-theme='light'] .friend-applications {
+  --fa-accent: rgba(14, 116, 110, 0.95);
+  --fa-accent-soft: rgba(14, 116, 110, 0.1);
+  --fa-accent-border: rgba(14, 116, 110, 0.32);
+  --fa-input-background: rgba(255, 255, 255, 0.5);
+  --fa-input-border: rgba(0, 0, 0, 0.12);
+  --fa-error: #b42318;
+  --fa-error-soft: rgba(180, 35, 24, 0.08);
+  --fa-error-border: rgba(180, 35, 24, 0.3);
+  --fa-success: #0f7b4f;
+  --fa-pending: #8a5a00;
+  --fa-pending-soft: rgba(180, 120, 0, 0.1);
+  --fa-pending-border: rgba(180, 120, 0, 0.28);
+  --fa-approved: #0e746e;
+  --fa-approved-soft: rgba(14, 116, 110, 0.1);
+  --fa-approved-border: rgba(14, 116, 110, 0.28);
+  --fa-rejected: #b42318;
+  --fa-rejected-soft: rgba(180, 35, 24, 0.08);
+  --fa-rejected-border: rgba(180, 35, 24, 0.28);
+}
+
+.friend-applications__glass {
+  display: block;
+  width: 100%;
+}
+
+.friend-applications__panel {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 1.5rem;
+}
+
+.friend-applications__header {
+  margin-bottom: 1.5rem;
+}
+
+.friend-applications__title {
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* ============ 登录提示 ============ */
+.friend-applications__login {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 0.75rem;
+  background: var(--glass-bg-subtle);
+}
+
+.friend-applications__login p {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* ============ 表单 ============ */
+.friend-applications__fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.friend-applications__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.friend-applications__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.friend-applications__field--wide {
+  grid-column: 1 / -1;
+}
+
+.friend-applications__label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.friend-applications__required {
+  color: var(--fa-error);
+}
+
+/* 小范围使用与访客统计 metric-card 同类的半透明底、细边框和 6px 模糊。 */
+.friend-applications__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.62rem 0.75rem;
+  border: 1px solid var(--fa-input-border);
+  border-radius: 0.5rem;
+  background: var(--fa-input-background);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.friend-applications__input::placeholder {
+  color: var(--text-muted);
+}
+
+.friend-applications__input:focus {
+  outline: none;
+  border-color: var(--fa-accent-border);
+  box-shadow: 0 0 0 3px var(--fa-accent-soft);
+}
+
+.friend-applications__input:focus-visible {
+  outline: 2px solid var(--fa-accent);
+  outline-offset: 2px;
+}
+
+.friend-applications__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.friend-applications__field.is-invalid .friend-applications__input {
+  border-color: var(--fa-error-border);
+}
+
+.friend-applications__field-error {
+  color: var(--fa-error);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.friend-applications__form-error {
+  margin-top: 1rem;
+}
+
+.friend-applications__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+}
+
+.friend-applications__success {
+  color: var(--fa-success);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* ============ 通用按钮 ============ */
+.friend-applications__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--fa-accent-border);
+  border-radius: 0.55rem;
+  background: var(--fa-accent-soft);
+  color: var(--fa-accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.friend-applications__button:hover:not(:disabled) {
+  background: var(--fa-accent-border);
+}
+
+.friend-applications__button:focus-visible {
+  outline: 2px solid var(--fa-accent);
+  outline-offset: 2px;
+}
+
+.friend-applications__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.friend-applications__button--ghost {
+  border-color: var(--glass-border-subtle);
+  background: var(--glass-bg-subtle);
+  color: var(--text-secondary);
+}
+
+.friend-applications__button--ghost:hover:not(:disabled) {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+}
+
+/* ============ 状态提示 ============ */
+.friend-applications__state {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--glass-border-subtle);
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.friend-applications__alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--fa-error-border);
+  border-radius: 0.5rem;
+  background: var(--fa-error-soft);
+  color: var(--fa-error);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.friend-applications__alert span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ============ 区块 ============ */
+.friend-applications__block {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--glass-border-subtle);
+}
+
+.friend-applications__block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.friend-applications__block-title {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* ============ 我的申请 ============ */
+.friend-applications__my-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.friend-applications__my-item {
+  min-width: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 0.6rem;
+  background: var(--glass-bg-subtle);
+}
+
+.friend-applications__my-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.friend-applications__my-name {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.friend-applications__meta {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.friend-applications__reason {
+  margin-top: 0.35rem;
+  color: var(--fa-error);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.friend-applications__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.friend-applications__status--pending {
+  border-color: var(--fa-pending-border);
+  background: var(--fa-pending-soft);
+  color: var(--fa-pending);
+}
+
+.friend-applications__status--approved {
+  border-color: var(--fa-approved-border);
+  background: var(--fa-approved-soft);
+  color: var(--fa-approved);
+}
+
+.friend-applications__status--rejected {
+  border-color: var(--fa-rejected-border);
+  background: var(--fa-rejected-soft);
+  color: var(--fa-rejected);
+}
+
+/* ============ 已通过申请 ============ */
+.friend-applications__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.friend-application-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 0.75rem;
+  background: var(--glass-bg-subtle);
+}
+
+.friend-application-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.friend-application-card__avatar {
+  box-sizing: border-box;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  border: 1px solid var(--fa-input-border);
+  border-radius: 50%;
+  background: var(--glass-bg);
+  object-fit: cover;
+}
+
+.friend-application-card__avatar--fallback {
+  display: grid;
+  place-items: center;
+  color: var(--fa-accent);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.friend-application-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.friend-application-card__name {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.friend-application-card__name:hover {
+  color: var(--fa-accent);
+}
+
+.friend-application-card__url {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.friend-application-card__url:hover {
+  color: var(--fa-accent);
+}
+
+.friend-application-card__rss {
+  width: fit-content;
+  color: var(--fa-accent);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.friend-application-card__rss:hover {
+  text-decoration: underline;
+}
+
+.friend-application-card__toggle {
+  align-self: flex-start;
+  margin-top: 0.9rem;
+}
+
+.friend-application-card__discussion {
+  min-width: 0;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--glass-border-subtle);
+}
+
+/* ============ 分页 ============ */
+.friend-applications__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 767px) {
+  .friend-applications__panel {
+    padding: 1.25rem;
+  }
+
+  .friend-applications__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .friend-applications__field--wide {
+    grid-column: auto;
+  }
+
+  .friend-applications__cards {
+    grid-template-columns: 1fr;
+  }
+
+  .friend-applications__login {
+    align-items: flex-start;
+  }
+}

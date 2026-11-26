@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.utils.security import decode_access_token
+from app.utils.security import decode_user_token
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -22,16 +22,11 @@ async def get_optional_current_user(
     if not credentials:
         return None
 
-    payload = decode_access_token(credentials.credentials)
-    if payload is None or payload.get("type") != "access":
+    payload = decode_user_token(credentials.credentials)
+    if payload is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的访问 Token")
 
-    subject: str | None = payload.get("sub")
-    if not subject:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token 格式错误")
-
-    condition = User.id == int(subject) if subject.isdigit() else User.username == subject
-    result = await db.execute(select(User).where(condition))
+    result = await db.execute(select(User).where(User.auth_id == payload["sub"]))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")

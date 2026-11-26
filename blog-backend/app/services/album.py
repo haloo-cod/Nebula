@@ -157,8 +157,10 @@ async def update_album(
     description: str | None = None,
     orientation: str | None = None,
     cover_image_id: int | None = None,
+    *,
+    update_cover: bool = False,
 ) -> dict | None:
-    """更新相册信息"""
+    """更新相册信息；update_cover 区分封面字段省略与显式清空。"""
     result = await db.execute(select(Album).where(Album.id == album_id))
     album = result.scalar_one_or_none()
     if not album:
@@ -170,13 +172,14 @@ async def update_album(
         album.description = description
     if orientation is not None:
         album.orientation = orientation
-    if cover_image_id is not None:
-        # 验证图片存在
-        img_result = await db.execute(
-            select(UploadedImage).where(UploadedImage.id == cover_image_id)
-        )
-        if not img_result.scalar_one_or_none():
-            raise ValueError(f"图片 ID {cover_image_id} 不存在")
+    if update_cover:
+        if cover_image_id is not None:
+            # 显式清空只解除封面关联，不删除图片；非空 ID 仍需验证存在。
+            img_result = await db.execute(
+                select(UploadedImage).where(UploadedImage.id == cover_image_id)
+            )
+            if not img_result.scalar_one_or_none():
+                raise ValueError(f"图片 ID {cover_image_id} 不存在")
         album.cover_image_id = cover_image_id
 
     await db.commit()

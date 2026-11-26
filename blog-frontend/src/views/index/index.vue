@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="home-root" :class="{ 'home-locked': !showUIElements }">
-    <!-- 面板区域（简介 + 占位） -->
-    <div v-if="showUIElements" class="home-panels" data-background-credit-boundary>
+    <!-- 上方面板：个人简介 + 访客统计 -->
+    <div ref="homePanelsRef" class="home-panels" data-background-credit-boundary>
       <div class="home-panels-inner">
         <div class="left-panel-glass">
           <LiquidGlass
@@ -18,6 +18,7 @@
               :name="profileName"
               :bio="profileBio"
               :links="profileLinks"
+              :rss-url="profileRssUrl"
             />
           </LiquidGlass>
           <PanelFallbackGlass v-else static-blur>
@@ -26,6 +27,7 @@
               :name="profileName"
               :bio="profileBio"
               :links="profileLinks"
+              :rss-url="profileRssUrl"
             />
           </PanelFallbackGlass>
         </div>
@@ -49,8 +51,17 @@
     </div>
 
     <!-- 玻璃横条（标题） -->
-    <div class="title-container" :class="containerClass">
-      <div class="title-glass" data-background-credit-boundary :class="{ 'title-glass--visible': showUIElements }">
+    <div
+      ref="titleContainerRef"
+      class="title-container"
+      :class="containerClass"
+      :style="{ '--home-title-top': `${titleFlowTop}px` }"
+    >
+      <div
+        class="title-glass"
+        data-background-credit-boundary
+        :class="{ 'title-glass--visible': showUIElements }"
+      >
         <h1 class="typewriter-title" translate="no">
           {{ typewriterDone ? fullTitle : displayed }}<span class="caret caret-blink">|</span>
         </h1>
@@ -168,6 +179,7 @@ import {
   socialLinks as fallbackLinks,
 } from '@/data/profile'
 import { fetchProfile } from '@/api/profile'
+import { fetchFriendExchangeInfo, resolveFriendRssUrl } from '@/api/friends'
 import type { SocialLink } from '@/types'
 
 const ui = useUIStore()
@@ -177,6 +189,7 @@ const profileAvatar = ref(fallbackAvatar)
 const profileName = ref(fallbackProfile.name)
 const profileBio = ref(fallbackProfile.bio)
 const profileLinks = ref<SocialLink[]>(fallbackLinks)
+const profileRssUrl = ref('')
 const fullTitle = "Starlitn'blog"
 const isMobile = ref(window.innerWidth < 768)
 const showContentDirectly = history.state?.showContent === true
@@ -191,6 +204,12 @@ const { displayed, done: typewriterDone } = useTypewriter(fullTitle, {
 })
 
 const showUIElements = ref(instant)
+// 上方面板提前占位，入场和展示阶段始终使用同一套标题布局坐标。
+const homePanelsRef = ref<HTMLElement | null>(null)
+const titleContainerRef = ref<HTMLElement | null>(null)
+const titleFlowTop = ref(0)
+let titleLayoutObserver: ResizeObserver | null = null
+let revealTimer: ReturnType<typeof setTimeout> | null = null
 
 if (!instant) {
   ui.showNavbar = false
@@ -201,11 +220,26 @@ watch(typewriterDone, (val) => {
   if (instant) {
     showUIElements.value = true
   } else {
-    setTimeout(() => {
+    revealTimer = setTimeout(() => {
+      titleLayoutObserver?.disconnect()
+      titleLayoutObserver = null
+      revealTimer = null
       showUIElements.value = true
       ui.showNavbar = true
     }, 850)
   }
+})
+
+onMounted(() => {
+  if (instant || !homePanelsRef.value) return
+
+  // offsetTop 不包含 transform，避免把当前动画位移当作布局位置反复叠加。
+  const updateTitleFlowTop = () => {
+    titleFlowTop.value = titleContainerRef.value?.offsetTop ?? 0
+  }
+  updateTitleFlowTop()
+  titleLayoutObserver = new ResizeObserver(updateTitleFlowTop)
+  titleLayoutObserver.observe(homePanelsRef.value)
 })
 
 onMounted(async () => {
@@ -222,7 +256,19 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (revealTimer !== null) clearTimeout(revealTimer)
+  titleLayoutObserver?.disconnect()
   ui.showNavbar = true
+})
+
+onMounted(async () => {
+  // 与个人资料独立加载，避免其中一个接口失败遮蔽另一个接口的内容。
+  try {
+    const info = await fetchFriendExchangeInfo()
+    profileRssUrl.value = resolveFriendRssUrl(info.rss_url)
+  } catch {
+    // 未成功获取配置时不展示可能过期的 RSS 地址，个人资料保持正常。
+  }
 })
 
 const containerClass = computed(() => {
@@ -240,6 +286,7 @@ const containerClass = computed(() => {
   position: relative;
   width: 100%;
   min-height: 100vh;
+  padding: 90px 0 16px;
 }
 
 .home-locked {
@@ -248,31 +295,33 @@ const containerClass = computed(() => {
 }
 
 /* ============================================
-   标题容器 — 阶段 1: 偏上静止 → 阶段 2: 下滑定住
+   标题容器 — 阶段 1: 居中打字 → 阶段 2: 纵向归位
    ============================================ */
 .title-container {
-  position: absolute;
-  top: 50vh;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   z-index: 20;
   width: 100%;
   display: flex;
   justify-content: center;
 }
 
+/* 提前保留面板空间；标题只改变纵向位移，材质淡入时不再切换定位方式。 */
+.home-locked .home-panels {
+  visibility: hidden;
+}
+
 .title-container--initial {
-  transform: translate(-50%, calc(-50% - 50px));
+  transform: translateY(calc(50vh - var(--home-title-top, 0px) - 50% - 50px));
 }
 
 .title-container--sliding {
-  transform: translate(-50%, -50%);
+  transform: translateY(0);
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
 }
 
 .title-container--centered {
-  transform: translate(-50%, -50%);
+  transform: none;
 }
 
 /* ============================================
@@ -366,18 +415,14 @@ const containerClass = computed(() => {
 }
 
 /* ============================================
-   双面板 — 阶段 3: 横条下方,简介 + 日历
+   上方面板 — 个人简介 + 访客统计
    ============================================ */
 .home-panels {
-  position: absolute;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  top: 90px;
+  position: relative;
+  margin: 0 auto 10px;
   z-index: 15;
   width: 85%;
   max-width: 1100px;
-  max-height: calc(50vh - 130px);
   display: flex;
   flex-direction: column;
 }
@@ -422,13 +467,12 @@ const containerClass = computed(() => {
 }
 
 @media (max-width: 768px) {
+  .home-root {
+    padding: 0;
+  }
+
   .home-panels {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
     width: 92%;
-    max-height: none;
     margin: 70px auto 0;
     display: block;
   }
@@ -456,11 +500,8 @@ const containerClass = computed(() => {
    下方面板区域
    ============================================ */
 .home-bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  top: calc(50vh + 40px);
+  position: relative;
+  margin: 10px auto 0;
   z-index: 15;
   width: 85%;
   max-width: 1100px;
@@ -517,10 +558,6 @@ const containerClass = computed(() => {
 
 @media (max-width: 768px) {
   .home-bottom {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
     width: 92%;
     margin: 16px auto 2rem;
   }

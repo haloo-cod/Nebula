@@ -5,6 +5,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshRight } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
 import { useAdminTable } from '@/admin/composables/useAdminTable'
+import { getPasswordError } from '@/utils/password'
+import AdminPageHeader from '@/admin/components/AdminPageHeader.vue'
 
 /** 用户列表项。 */
 interface UserItem {
@@ -98,11 +100,13 @@ function openPassword(user: UserItem) {
 /** 重置密码并撤销用户旧会话。 */
 async function resetPassword() {
   if (!editingUser.value) return
-  if (
-    passwordForm.value.password.length < 8 ||
-    passwordForm.value.password !== passwordForm.value.confirm
-  ) {
-    ElMessage.warning('请输入至少 8 位且两次一致的新密码')
+  const passwordError = getPasswordError(passwordForm.value.password)
+  if (passwordError) {
+    ElMessage.warning(passwordError)
+    return
+  }
+  if (passwordForm.value.password !== passwordForm.value.confirm) {
+    ElMessage.warning('两次输入的密码不一致')
     return
   }
   resetting.value = true
@@ -129,8 +133,9 @@ async function revokeSessions(user: UserItem) {
     })
     await api.post(`/api/v1/users/${user.id}/revoke-sessions`, undefined, true)
     ElMessage.success('登录会话已撤销')
-  } catch {
-    // 取消操作不提示
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '撤销登录会话失败')
   }
 }
 
@@ -145,8 +150,9 @@ async function deleteUser(user: UserItem) {
     await api.delete(`/api/v1/users/${user.id}`, true)
     ElMessage.success('用户已删除')
     await loadData()
-  } catch {
-    // 取消操作不提示
+  } catch (err: unknown) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error(err instanceof Error ? err.message : '删除用户失败')
   }
 }
 
@@ -165,20 +171,33 @@ onMounted(() => loadData())
 </script>
 
 <template>
-  <div class="user-list-page">
-    <div class="page-header">
-      <el-input
-        v-model="keyword"
-        clearable
-        placeholder="搜索用户名、邮箱或昵称..."
-        style="width: 300px"
-        @keyup.enter="handleSearch"
-      />
-      <el-button :icon="RefreshRight" @click="loadData">刷新</el-button>
+  <div class="admin-page">
+    <AdminPageHeader
+      eyebrow="SYSTEM"
+      title="用户管理"
+      :count="`${pagination.total} 位`"
+      subtitle="检索注册账户、调整角色权限与执行密码重置或会话撤销。"
+    >
+      <template #actions>
+        <el-button :icon="RefreshRight" :loading="loading" @click="loadData">刷新</el-button>
+      </template>
+    </AdminPageHeader>
+
+    <div class="admin-toolbar">
+      <div class="admin-toolbar-group">
+        <el-input
+          v-model="keyword"
+          clearable
+          placeholder="搜索用户名、邮箱或昵称..."
+          style="width: 280px"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        />
+      </div>
     </div>
 
-    <el-card shadow="never" class="table-card">
-      <el-table :data="userRows" v-loading="loading" stripe style="width: 100%">
+    <el-card shadow="never">
+      <el-table :data="userRows" v-loading="loading" style="width: 100%">
         <el-table-column label="用户" min-width="190">
           <template #default="{ row }">
             <div class="user-cell">
@@ -193,7 +212,7 @@ onMounted(() => loadData())
               }}</span>
               <div>
                 <strong>{{ asUser(row).display_name }}</strong
-                ><small>@{{ asUser(row).username }}</small>
+                ><small class="admin-mono">@{{ asUser(row).username }}</small>
               </div>
             </div>
           </template>
@@ -204,23 +223,28 @@ onMounted(() => loadData())
         >
         <el-table-column label="状态" width="170">
           <template #default="{ row }">
-            <el-tag :type="asUser(row).is_active ? 'success' : 'danger'" size="small">{{
-              asUser(row).is_active ? '正常' : '已禁用'
-            }}</el-tag>
+            <span
+              class="admin-status-dot"
+              :class="asUser(row).is_active ? 'is-success' : 'is-danger'"
+            >
+              {{ asUser(row).is_active ? '正常' : '已禁用' }}
+            </span>
             <el-tag v-if="asUser(row).is_admin" type="warning" size="small">管理员</el-tag>
-            <el-tag v-if="asUser(row).email_verified" type="info" size="small">邮箱已验证</el-tag>
+            <el-tag v-if="asUser(row).email_verified" type="info" size="small">已验证</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="最后登录" width="170"
-          ><template #default="{ row }">{{
-            asUser(row).last_login_at?.slice(0, 16).replace('T', ' ') || '从未登录'
-          }}</template></el-table-column
-        >
-        <el-table-column label="注册时间" width="110"
-          ><template #default="{ row }">{{
-            asUser(row).created_at?.slice(0, 10)
-          }}</template></el-table-column
-        >
+        <el-table-column label="最后登录" width="170">
+          <template #default="{ row }">
+            <span class="admin-mono">
+              {{ asUser(row).last_login_at?.slice(0, 16).replace('T', ' ') || '从未登录' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="注册时间" width="110">
+          <template #default="{ row }">
+            <span class="admin-mono">{{ asUser(row).created_at?.slice(0, 10) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="openEdit(asUser(row))"
@@ -270,7 +294,7 @@ onMounted(() => loadData())
 
     <el-dialog v-model="showPasswordDialog" title="重置密码" width="420px">
       <el-form label-position="top"
-        ><el-form-item label="新密码"
+        ><el-form-item label="新密码（至少 8 个字符，最多 72 个 UTF-8 字节）"
           ><el-input v-model="passwordForm.password" type="password" show-password /></el-form-item
         ><el-form-item label="确认密码"
           ><el-input v-model="passwordForm.confirm" type="password" show-password /></el-form-item
@@ -286,19 +310,6 @@ onMounted(() => loadData())
 </template>
 
 <style scoped>
-.user-list-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.table-card {
-  border-radius: 12px;
-}
 .user-cell {
   display: flex;
   align-items: center;
@@ -318,6 +329,7 @@ onMounted(() => loadData())
   height: 34px;
   border-radius: 50%;
   object-fit: cover;
+  border: 1px solid var(--admin-border-color);
 }
 .avatar--fallback {
   display: grid;
@@ -331,7 +343,8 @@ onMounted(() => loadData())
   justify-content: flex-end;
   margin-top: 16px;
 }
+.admin-status-dot + .el-tag,
 .el-tag + .el-tag {
-  margin-left: 4px;
+  margin-left: 6px;
 }
 </style>

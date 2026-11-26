@@ -24,6 +24,8 @@ export interface Song {
   cover: string
   src: string
   lrc: string
+  /** 接口返回的歌词资源地址。 */
+  lrcUrl: string
 }
 
 /** 播放模式 */
@@ -48,8 +50,8 @@ const isPlaying = ref(false)
 const progress = ref(0)
 const currentTime = ref(0)
 const duration = ref(0)
-const currentLyric = ref('')
 const isLoading = ref(true)
+const lyricsLoading = ref(false)
 const volume = ref(0.8)
 const isMuted = ref(false)
 const playModeVal = ref<PlayMode>('loop')
@@ -57,6 +59,7 @@ const lyrics: Ref<{ time: number; text: string }[]> = ref([])
 const lrcCache = new Map<string, string>()
 let audioEl: HTMLAudioElement | null = null
 let loadPromise: Promise<void> | null = null
+let lyricRequest = 0
 
 // =============================================================================
 // LRC 歌词解析
@@ -121,6 +124,7 @@ async function fetchPlaylist(): Promise<Song[]> {
       cover: track.pic, // 直接作为 img src,API 返回 raw 图片
       src: track.url, // 直接作为 audio src,API 返回 raw MP3
       lrc: '',
+      lrcUrl: track.lrc || track.url.replace(/type=url/, 'type=lrc'),
     }),
   )
 }
@@ -140,11 +144,6 @@ function ensureAudio(): HTMLAudioElement {
       currentTime.value = ct
       duration.value = dur
       progress.value = dur > 0 ? (ct / dur) * 100 : 0
-      const l = lyrics.value
-      if (l.length > 0) {
-        const active = [...l].reverse().find((x) => ct >= x.time)
-        if (active) currentLyric.value = active.text
-      }
     }
     audioEl.onended = () => {
       if (playModeVal.value === 'single') {
@@ -172,32 +171,26 @@ function destroyAudio() {
 
 /** 拉取单首歌词(LRC 文本) */
 async function fetchLyrics(song: Song) {
-  if (song.lrc) {
-    lyrics.value = parseLrc(song.lrc)
-    return
-  }
-  if (lrcCache.has(song.id)) {
-    lyrics.value = parseLrc(lrcCache.get(song.id)!)
-    return
-  }
-  if (!song.src) return
-  // 从 playlist API 返回的 lrc 字段是歌词 API URL
+  const request = ++lyricRequest
+  lyrics.value = []
+  lyricsLoading.value = true
   try {
-    // 需要从歌曲 meta 里获取 lrc URL(playlist API 已返回,但我们的 Song 未存)
-    // 这里通过替换 url type 来获取:把 type=url 换成 type=lrc
-    const lrcUrl = song.src.replace(/type=url/, 'type=lrc')
-    const res = await fetch(lrcUrl)
-    if (!res.ok) throw new Error(`lrc ${res.status}`)
-    const lrcText = await res.text()
-    if (lrcText && !lrcText.startsWith('{')) {
-      lrcCache.set(song.id, lrcText)
-      song.lrc = lrcText
-      lyrics.value = parseLrc(lrcText)
-    } else {
-      lyrics.value = []
+    let text = song.lrc || lrcCache.get(song.id)
+    if (!text && song.lrcUrl) {
+      const res = await fetch(song.lrcUrl)
+      if (!res.ok) throw new Error(`lrc ${res.status}`)
+      const response = await res.text()
+      if (response && !response.startsWith('{')) {
+        text = response
+        lrcCache.set(song.id, text)
+        song.lrc = text
+      }
     }
+    if (request === lyricRequest) lyrics.value = text ? parseLrc(text) : []
   } catch {
-    lyrics.value = []
+    if (request === lyricRequest) lyrics.value = []
+  } finally {
+    if (request === lyricRequest) lyricsLoading.value = false
   }
 }
 
@@ -206,8 +199,10 @@ function play(index: number) {
   const song = playlist.value[index]
   if (!song || !song.src) return
 
-  lyrics.value = []
-  currentLyric.value = ''
+  currentTime.value = 0
+  duration.value = 0
+  progress.value = 0
+  void fetchLyrics(song)
 
   const audio = ensureAudio()
   audio.src = song.src
@@ -215,7 +210,6 @@ function play(index: number) {
     .play()
     .then(() => {
       isPlaying.value = true
-      fetchLyrics(song)
     })
     .catch(() => {
       isPlaying.value = false
@@ -270,6 +264,7 @@ function handleSeek(value: number) {
   progress.value = value
   if (audioEl?.duration) {
     audioEl.currentTime = (value / 100) * audioEl.duration
+    currentTime.value = audioEl.currentTime
   }
 }
 
@@ -295,6 +290,13 @@ function toggleMode() {
 // =============================================================================
 
 const currentSong = computed<Song | undefined>(() => playlist.value[currentIndex.value])
+const currentLyricIndex = computed(() => {
+  for (let i = lyrics.value.length - 1; i >= 0; i--) {
+    if (currentTime.value >= lyrics.value[i].time) return i
+  }
+  return -1
+})
+const currentLyric = computed(() => lyrics.value[currentLyricIndex.value]?.text ?? '')
 
 export function useMusic() {
   if (!loadPromise) {
@@ -303,6 +305,7 @@ export function useMusic() {
       try {
         const songs = await fetchPlaylist()
         playlist.value = songs
+        if (songs[0]) void fetchLyrics(songs[0])
         console.log(`[music] 歌单加载完成: ${songs.length} 首`)
       } catch (e) {
         console.warn('[music] 歌单加载失败:', e)
@@ -321,6 +324,9 @@ export function useMusic() {
     currentTime,
     duration,
     currentLyric,
+    lyrics,
+    lyricsLoading,
+    currentLyricIndex,
     isLoading,
     volume,
     isMuted,

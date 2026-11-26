@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_optional_current_user, require_admin
@@ -254,8 +254,18 @@ async def list_posts(
         query = query.where(Post.category == category)
         count_query = count_query.where(Post.category == category)
 
-    # 置顶优先，再按日期倒序
-    query = query.order_by(Post.is_pinned.desc(), Post.date.desc())
+    # 历史日期包含 YYYY-M-D，按年月日数值比较，避免字符串将 9 月排在 10 月前。
+    month_day = func.substr(Post.date, 6)
+    month_separator = func.instr(month_day, "-")
+    query = query.order_by(
+        Post.is_pinned.desc(),
+        cast(func.substr(Post.date, 1, 4), Integer).desc(),
+        cast(func.substr(month_day, 1, month_separator - 1), Integer).desc(),
+        cast(func.substr(month_day, month_separator + 1), Integer).desc(),
+        # 同一天按创建时间、ID 倒序，确保新文章靠前且分页顺序稳定。
+        Post.created_at.desc(),
+        Post.id.desc(),
+    )
     offset = (page - 1) * page_size
     query = query.offset(offset).limit(page_size)
 
