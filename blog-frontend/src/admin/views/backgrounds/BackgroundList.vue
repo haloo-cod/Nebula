@@ -3,7 +3,7 @@
  * 背景图管理 — 列表页
  * 按 theme(dark/light) + device(desktop/mobile) 分组管理背景图
  */
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { api, resolveUrl } from '@/api/client'
@@ -68,6 +68,9 @@ async function loadBackgrounds() {
     )
     if (request !== listRequest) return
     backgrounds.value = res.items
+    // 列表刷新或筛选后移除已不可见的选中项，避免跨组误删。
+    const visibleIds = new Set(res.items.map((item) => item.id))
+    selectedIds.value = selectedIds.value.filter((id) => visibleIds.has(id))
     orderChanged.value = false
   } catch {
     if (request === listRequest) ElMessage.error('加载背景图失败')
@@ -127,7 +130,7 @@ function handleDragStart(event: DragEvent, item: BackgroundItem) {
   }
 }
 
-/** 将拖动中的卡片插入目标卡片之前。 */
+/** 将拖动中的卡片移动到目标卡片的位置。 */
 function handleDrop(event: DragEvent, target: BackgroundItem) {
   event.preventDefault()
   if (!canReorder.value || draggedId.value === null || draggedId.value === target.id) return
@@ -135,8 +138,7 @@ function handleDrop(event: DragEvent, target: BackgroundItem) {
   const toIndex = backgrounds.value.findIndex((item) => item.id === target.id)
   if (fromIndex < 0 || toIndex < 0) return
   const [moved] = backgrounds.value.splice(fromIndex, 1)
-  const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex
-  backgrounds.value.splice(insertIndex, 0, moved)
+  backgrounds.value.splice(toIndex, 0, moved)
   orderChanged.value = true
   draggedId.value = null
 }
@@ -168,22 +170,35 @@ async function saveOrder() {
   }
 }
 
+/** 清理本地视频选择并释放预览 ObjectURL。 */
+function clearVideoFile() {
+  if (videoPreview.value) {
+    URL.revokeObjectURL(videoPreview.value)
+  }
+  videoFile.value = null
+  videoPreview.value = ''
+  videoStatus.value = 'idle'
+  if (videoInput.value) videoInput.value.value = ''
+}
+
 /** 筛选变化 */
 function handleFilterChange() {
+  selectedIds.value = []
   loadBackgrounds()
 }
 
 /** 打开上传弹窗 */
 function openUpload() {
-  uploadForm.value = { theme: 'dark', device: 'desktop' }
+  uploadForm.value = {
+    theme: filterTheme.value || 'dark',
+    device: filterDevice.value || 'desktop',
+  }
   uploadSource.value = { source_text: '', source_url: '' }
   sourceError.value = ''
   mediaType.value = 'image'
   externalUrl.value = ''
   posterUrl.value = ''
-  videoFile.value = null
-  videoPreview.value = ''
-  videoStatus.value = 'idle'
+  clearVideoFile()
   selectedLibraryFileId.value = null
   void loadLibraryFiles()
   selectedImage.value = null
@@ -223,6 +238,7 @@ function handleVideoFileChange(event: Event) {
     ElMessage.error('视频文件不能超过 50MB')
     return
   }
+  if (videoPreview.value) URL.revokeObjectURL(videoPreview.value)
   videoFile.value = file
   videoStatus.value = 'idle'
   videoPreview.value = URL.createObjectURL(file)
@@ -265,6 +281,7 @@ async function handleUpload() {
       let mediaUrl = externalUrl.value.trim()
       let mimeType = ''
       let fileSize = 0
+      let uploadedStorageBackend: 'local' | 'r2' = 'local'
       const libraryFile = libraryFiles.value.find((file) => file.id === selectedLibraryFileId.value)
       if (selectedLibraryFileId.value) {
         // Use the selected id directly so a delayed file-library refresh cannot produce an empty URL.
@@ -277,14 +294,16 @@ async function handleUpload() {
       if (videoFile.value) {
         const form = new FormData()
         form.append('file', videoFile.value)
-        const uploaded = await api.post<{ url: string; mime_type: string; file_size: number }>(
-          `/api/v1/backgrounds/video-upload?storage_backend=${storageBackend.value}`,
-          form,
-          true,
-        )
+        const uploaded = await api.post<{
+          url: string
+          mime_type: string
+          file_size: number
+          storage_backend?: 'local' | 'r2'
+        }>(`/api/v1/backgrounds/video-upload?storage_backend=${storageBackend.value}`, form, true)
         mediaUrl = uploaded.url
         mimeType = uploaded.mime_type
         fileSize = uploaded.file_size
+        uploadedStorageBackend = uploaded.storage_backend === 'r2' ? 'r2' : 'local'
       }
       if (!mediaUrl) {
         throw new Error('视频来源地址为空，请重新选择文件管理视频、本地视频或外部 URL')
@@ -300,14 +319,16 @@ async function handleUpload() {
           poster_url: posterUrl.value.trim(),
           mime_type: mimeType,
           file_size: fileSize,
+          storage_backend: uploadedStorageBackend,
           theme: uploadForm.value.theme,
           device: uploadForm.value.device,
-          sort_order: backgrounds.value.length,
+          sort_order: nextSortOrder(),
         },
         true,
       )
       ElMessage.success('视频背景添加成功')
       showUploadDialog.value = false
+      clearVideoFile()
       await refreshBackgrounds()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '视频背景添加失败'
@@ -332,6 +353,7 @@ async function handleUpload() {
   uploading.value = true
   try {
     const images = selectedImages.value.length ? selectedImages.value : [selectedImage.value!]
+    const baseOrder = nextSortOrder()
     const results = await Promise.allSettled(
       images.map((image, index) =>
         api.post(
@@ -341,7 +363,7 @@ async function handleUpload() {
             image_id: image.id,
             theme: uploadForm.value.theme,
             device: uploadForm.value.device,
-            sort_order: backgrounds.value.length + index,
+            sort_order: baseOrder + index,
           },
           true,
         ),
@@ -400,6 +422,15 @@ async function handleBatchDelete() {
   }
 }
 
+/** 计算目标主题+设备分组的下一个排序序号，避免插到已有顺序中间。 */
+function nextSortOrder(): number {
+  const matching = backgrounds.value.filter(
+    (item) => item.theme === uploadForm.value.theme && item.device === uploadForm.value.device,
+  )
+  if (!matching.length) return backgrounds.value.length
+  return Math.max(...matching.map((item) => item.sort_order)) + 1
+}
+
 /** 删除背景图记录 */
 async function handleDelete(item: BackgroundItem) {
   try {
@@ -407,6 +438,7 @@ async function handleDelete(item: BackgroundItem) {
       type: 'warning',
     })
     await api.delete(`/api/v1/backgrounds/${item.id}`)
+    selectedIds.value = selectedIds.value.filter((id) => id !== item.id)
     ElMessage.success('删除成功')
     await refreshBackgrounds()
   } catch (error: unknown) {
@@ -422,6 +454,7 @@ function formatLabel(theme: string, device: string): string {
 }
 
 onMounted(() => loadBackgrounds())
+onUnmounted(() => clearVideoFile())
 </script>
 
 <template>
@@ -505,7 +538,7 @@ onMounted(() => loadBackgrounds())
         >
           <video
             v-if="bg.media_type === 'video'"
-            :src="resolveUrl(bg.url)"
+            :src="resolveUrl(bg.url) || undefined"
             :poster="bg.poster_url ? resolveUrl(bg.poster_url) : undefined"
             muted
             loop
@@ -513,7 +546,7 @@ onMounted(() => loadBackgrounds())
             playsinline
             class="bg-img"
           />
-          <img v-else :src="resolveUrl(bg.url)" alt="" class="bg-img" />
+          <img v-else-if="bg.url" :src="resolveUrl(bg.url)" alt="" class="bg-img" />
           <el-checkbox
             class="bg-check"
             :model-value="selectedIds.includes(bg.id)"
@@ -535,7 +568,7 @@ onMounted(() => loadBackgrounds())
     </el-card>
 
     <!-- 上传弹窗 -->
-    <el-dialog v-model="showUploadDialog" title="添加背景图" width="400px">
+    <el-dialog v-model="showUploadDialog" title="添加背景图" width="400px" @closed="clearVideoFile">
       <el-form label-position="top">
         <el-form-item label="主题">
           <el-radio-group v-model="uploadForm.theme">
@@ -585,7 +618,10 @@ onMounted(() => loadBackgrounds())
           <el-button plain style="margin-top: 8px" @click="videoInput?.click()"
             >选择本地视频（≤50MB）</el-button
           >
-          <span v-if="videoFile" class="selected-image-name">{{ videoFile.name }}</span>
+          <div v-if="videoFile" class="video-selected-row">
+            <span class="selected-image-name">{{ videoFile.name }}</span>
+            <el-button link type="danger" size="small" @click="clearVideoFile">清除</el-button>
+          </div>
           <video
             v-if="videoPreview"
             :src="videoPreview"
@@ -680,6 +716,14 @@ onMounted(() => loadBackgrounds())
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.video-selected-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  width: 100%;
 }
 .video-preview {
   width: 100%;
