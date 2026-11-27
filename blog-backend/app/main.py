@@ -178,9 +178,12 @@ async def serve_upload_file(
         # 3. 尝试从 Background 查找（视频）
         if file_path.startswith("backgrounds/"):
             result = await db.execute(
-                select(Background).where(Background.media_url == f"/uploads/{file_path}")
+                select(Background)
+                .where(Background.media_url == f"/uploads/{file_path}")
+                .order_by(Background.id.asc())
+                .limit(1)
             )
-            background = result.scalar_one_or_none()
+            background = result.scalars().first()
             if background:
                 if background.storage_backend == "r2" and background.r2_key and settings.R2_ENABLED:
                     from app.services.r2_storage import get_r2_client

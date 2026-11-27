@@ -3,11 +3,13 @@
 """
 
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, field_validator
 
 
 class BackgroundSourceUpdate(BaseModel):
     """背景来源字段，创建和编辑共用校验。编辑时必须同时提交两项。"""
+
     source_text: str = Field(max_length=120)
     source_url: str = Field(max_length=2048)
 
@@ -29,6 +31,7 @@ class BackgroundSourceUpdate(BaseModel):
 
 class BackgroundCreate(BackgroundSourceUpdate):
     """创建背景图记录（管理员）"""
+
     image_id: int | None = None
     media_type: str = "image"
     media_url: str = ""
@@ -40,6 +43,7 @@ class BackgroundCreate(BackgroundSourceUpdate):
     sort_order: int = 0
     source_text: str = Field(default="", max_length=120)
     source_url: str = Field(default="", max_length=2048)
+    storage_backend: Literal["local", "r2"] = "local"
 
     @field_validator("theme")
     @classmethod
@@ -65,6 +69,7 @@ class BackgroundCreate(BackgroundSourceUpdate):
 
 class BackgroundResponse(BaseModel):
     """背景图响应"""
+
     id: int
     media_type: str = "image"
     poster_url: str = ""
@@ -84,12 +89,14 @@ class BackgroundResponse(BaseModel):
 
 class BackgroundListResponse(BaseModel):
     """背景图列表响应"""
+
     items: list[BackgroundResponse]
     total: int
 
 
 class BackgroundReorderRequest(BaseModel):
     """批量调整同一主题和设备分组的排序。"""
+
     ids: list[int]  # 按顺序排列的背景图 ID 列表
     theme: str
     device: str

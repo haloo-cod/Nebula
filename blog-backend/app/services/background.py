@@ -81,6 +81,7 @@ async def create_background(
     file_size: int = 0,
     source_text: str = "",
     source_url: str = "",
+    storage_backend: str = "local",
 ) -> dict:
     """
     创建背景图记录
@@ -91,6 +92,22 @@ async def create_background(
         raise ValueError("video background requires media_url")
     if media_type == "image" and bool(image_id) == bool(media_url):
         raise ValueError("image background requires image_id or media_url")
+    if storage_backend not in ("local", "r2"):
+        raise ValueError("storage_backend 必须为 'local' 或 'r2'")
+
+    resolved_backend = "local"
+    r2_key: str | None = None
+    if storage_backend == "r2":
+        if not settings.R2_ENABLED:
+            raise ValueError("R2 未启用，无法保存为 r2 存储")
+        if media_type != "video":
+            raise ValueError("仅本地上传的视频背景支持保存为 r2 存储")
+        local_path = _local_background_path(media_url)
+        if local_path is None:
+            raise ValueError("仅本站上传的视频背景支持 r2 存储标记")
+        resolved_backend = "r2"
+        r2_key = f"backgrounds/{local_path.name}"
+
     image = None
     if image_id is not None:
         img_result = await db.execute(
@@ -112,6 +129,8 @@ async def create_background(
         theme=theme,
         device=device,
         sort_order=sort_order,
+        storage_backend=resolved_backend,
+        r2_key=r2_key,
         created_at=utc_now(),
         updated_at=utc_now(),
     )
@@ -132,6 +151,7 @@ async def create_background(
         "device": bg.device,
         "sort_order": bg.sort_order,
         "created_at": bg.created_at,
+        "storage_backend": bg.storage_backend,
     }
 
 

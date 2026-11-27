@@ -57,9 +57,12 @@ async def read_background_video(
     """
     if settings.R2_ENABLED:
         result = await db.execute(
-            select(Background).where(Background.media_url == f"/api/v1/backgrounds/media/{filename}")
+            select(Background)
+            .where(Background.media_url == f"/api/v1/backgrounds/media/{filename}")
+            .order_by(Background.id.asc())
+            .limit(1)
         )
-        background = result.scalar_one_or_none()
+        background = result.scalars().first()
         if background and background.storage_backend == "r2" and background.r2_key:
             from app.services.r2_storage import get_r2_client
 
@@ -121,6 +124,7 @@ async def read_background_video(
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
     return StreamingResponse(iterator(), status_code=status_code, headers=headers, media_type=mime)
 
+
 @router.post("/video-upload")
 async def upload_background_video(
     storage_backend: str = Query("local", pattern="^(local|r2)$"),
@@ -148,7 +152,7 @@ async def upload_background_video(
             from app.services.r2_storage import get_r2_client
 
             get_r2_client().upload_local_file(
-                str(relative), target, content_type=file.content_type
+                relative.as_posix(), target, content_type=file.content_type
             )
     except Exception:
         target.unlink(missing_ok=True)
@@ -196,6 +200,7 @@ async def add_background(
             file_size=data.file_size,
             source_text=data.source_text,
             source_url=data.source_url,
+            storage_backend=data.storage_backend,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
