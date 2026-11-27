@@ -393,7 +393,7 @@ function resetTrailPoint() {
   lastTrailPoint = null
 }
 
-/** 每帧更新 trail uniforms（由 ResizeObserver 触发的渲染器轮询周期内自动调用） */
+/** 每帧更新 trail uniforms（由共享渲染器在每帧 updateFrame 中统一调用） */
 function updateTrailUniforms() {
   const now = performance.now()
   const duration = Math.max(1, props.rippleDuration)
@@ -413,7 +413,8 @@ function updateTrailUniforms() {
 // ============================================================================
 
 async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
-  const url = currentBgUl.value
+  const background = currentBackground.value
+  const url = background.src.trim()
   if (!url || !instanceId) return
   const syncToken = ++backgroundSyncToken
 
@@ -435,38 +436,39 @@ async function syncBackgroundWithTheme(_theme: LiquidGlassTheme) {
   if (ui.themeTransitioning && !keepVisible) markInstanceReady(instanceId, false)
   if (!textureReady) {
     try {
-      if (isVideoBackground(currentBackground.value)) {
+      if (isVideoBackground(background)) {
         textureReady = await preloadVideoTexture(url)
-      } else if (!isVideoBackground(currentBackground.value)) {
+      } else {
         const image = await loadImage(url)
         textureReady = uploadTexture(url, image)
       }
     } catch (e) {
+      // 已切走或组件已卸载时忽略过期请求的失败日志，避免误报。
+      if (!instanceId || syncToken !== backgroundSyncToken || currentBgUl.value.trim() !== url) {
+        return
+      }
       console.warn('[LiquidGlass] Failed to load background:', e, {
         url,
-        mediaType: currentBackground.value.mediaType,
+        mediaType: background.mediaType,
       })
     }
   }
 
-  if (syncToken !== backgroundSyncToken || currentBgUl.value !== url) return
+  if (!instanceId || syncToken !== backgroundSyncToken || currentBgUl.value.trim() !== url) return
 
   // 更新纹理宽高比(cover 模式 UV 校正用)
   uniforms.texAspect = getTextureAspect(url)
 
   // 更新实例的背景 URL
-  if (instanceId) {
-    // 如果不需要 reveal 动画（纹理已就绪），直接标记 ready
-    if (textureReady && hasValidLayout && uniforms.glassSize[0] >= 1 && uniforms.glassSize[1] >= 1) {
-      setInstanceBackground(instanceId, url)
-      renderedBackgroundUrl = url
-      markInstanceReady(instanceId, true)
-    } else {
-      console.warn('[LiquidGlass] Background texture is not ready', {
-        url,
-        mediaType: currentBackground.value.mediaType,
-      })
-    }
+  if (textureReady && hasValidLayout && uniforms.glassSize[0] >= 1 && uniforms.glassSize[1] >= 1) {
+    setInstanceBackground(instanceId, url)
+    renderedBackgroundUrl = url
+    markInstanceReady(instanceId, true)
+  } else if (!textureReady) {
+    console.warn('[LiquidGlass] Background texture is not ready', {
+      url,
+      mediaType: background.mediaType,
+    })
   }
 }
 
@@ -525,7 +527,8 @@ onMounted(() => {
   }
 
   // 注册到共享渲染器
-  const bgUrl = currentBgUl.value
+  const initialBackground = currentBackground.value
+  const bgUrl = initialBackground.src.trim()
   renderedBackgroundUrl = bgUrl
   instanceId = registerInstance(
     canvas,
@@ -547,35 +550,50 @@ onMounted(() => {
   onContextLost(handleContextLost)
   onContextRestored(handleContextRestored)
 
-  // 加载纹理并标记实例为就绪
-  void (async () => {
-    const initialSyncToken = ++backgroundSyncToken
-    let textureReady = hasTexture(bgUrl)
-    markInstanceReady(instanceId, false)
-    if (!textureReady) {
-      try {
-        if (isVideoBackground(currentBackground.value)) {
-          textureReady = await preloadVideoTexture(bgUrl)
-        } else if (!isVideoBackground(currentBackground.value)) {
-          const image = await loadImage(bgUrl)
-          textureReady = uploadTexture(bgUrl, image)
+  // 加载纹理并标记实例为就绪（背景列表尚未返回时为空串，等待 watch 触发 syncBackgroundWithTheme）
+  if (bgUrl) {
+    void (async () => {
+      const initialSyncToken = ++backgroundSyncToken
+      let textureReady = hasTexture(bgUrl)
+      markInstanceReady(instanceId, false)
+      if (!textureReady) {
+        try {
+          if (isVideoBackground(initialBackground)) {
+            textureReady = await preloadVideoTexture(bgUrl)
+          } else {
+            const image = await loadImage(bgUrl)
+            textureReady = uploadTexture(bgUrl, image)
+          }
+        } catch (e) {
+          if (
+            !instanceId ||
+            initialSyncToken !== backgroundSyncToken ||
+            currentBgUl.value.trim() !== bgUrl
+          ) {
+            return
+          }
+          console.warn('[LiquidGlass] Failed to load background:', e, {
+            url: bgUrl,
+            mediaType: initialBackground.mediaType,
+          })
         }
-      } catch (e) {
-        console.warn('[LiquidGlass] Failed to load background:', e, {
-          url: bgUrl,
-          mediaType: currentBackground.value.mediaType,
-        })
       }
-    }
-    // 更新纹理宽高比(cover 模式 UV 校正用)
-    if (initialSyncToken !== backgroundSyncToken || currentBgUl.value !== bgUrl) return
-    uniforms.texAspect = getTextureAspect(bgUrl)
-    // 确保 canvas 尺寸有效后标记为就绪
-    const [gw, gh] = uniforms.glassSize
-    if (textureReady && hasValidLayout && gw >= 1 && gh >= 1) {
-      markInstanceReady(instanceId, true)
-    }
-  })()
+      // 更新纹理宽高比(cover 模式 UV 校正用)
+      if (
+        !instanceId ||
+        initialSyncToken !== backgroundSyncToken ||
+        currentBgUl.value.trim() !== bgUrl
+      ) {
+        return
+      }
+      uniforms.texAspect = getTextureAspect(bgUrl)
+      // 确保 canvas 尺寸有效后标记为就绪
+      const [gw, gh] = uniforms.glassSize
+      if (textureReady && hasValidLayout && gw >= 1 && gh >= 1) {
+        markInstanceReady(instanceId, true)
+      }
+    })()
+  }
 
   // Pointer events（涟漪效果）
   container.addEventListener('pointerenter', addTrailPoint)
@@ -584,11 +602,18 @@ onMounted(() => {
 
 })
 
-// 背景图切换时重新加载纹理
+// 背景图切换时重新加载纹理；背景被清空时取消在途加载并隐藏旧纹理画布
 watch([currentBgUl, () => currentBackground.value.mediaType], ([newUrl]) => {
-  if (newUrl && instanceId) {
-    void syncBackgroundWithTheme(props.theme)
+  if (!instanceId) return
+  if (!newUrl.trim()) {
+    backgroundSyncToken += 1
+    renderedBackgroundUrl = ''
+    setInstanceBackground(instanceId, '')
+    markInstanceReady(instanceId, false)
+    visible.value = false
+    return
   }
+  void syncBackgroundWithTheme(props.theme)
 })
 
 onBeforeUnmount(() => {

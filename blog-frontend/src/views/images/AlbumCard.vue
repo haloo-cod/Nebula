@@ -30,7 +30,7 @@
         <PanelFallbackGlass
           v-else
           class="unit-glass unit-glass--fallback"
-          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+          :style="ui.currentBgUrl ? { backgroundImage: `url(${ui.currentBgUrl})` } : undefined"
         >
           <div class="unit-bezel">
             <div class="unit-mat">
@@ -75,7 +75,7 @@
         <PanelFallbackGlass
           v-else
           class="unit-glass unit-glass--fallback"
-          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+          :style="ui.currentBgUrl ? { backgroundImage: `url(${ui.currentBgUrl})` } : undefined"
         >
           <div class="unit-bezel">
             <div class="unit-mat">
@@ -124,7 +124,7 @@
         <PanelFallbackGlass
           v-else
           class="unit-glass unit-glass--fallback"
-          :style="{ backgroundImage: `url(${ui.currentBgUrl})` }"
+          :style="ui.currentBgUrl ? { backgroundImage: `url(${ui.currentBgUrl})` } : undefined"
         >
           <div class="unit-bezel">
             <div class="unit-mat">

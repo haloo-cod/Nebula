@@ -726,11 +726,15 @@ function loadImageFallback(corsUrl: string): Promise<HTMLImageElement> {
  *  升到 2 迫使浏览器重新取回带查询串的新重定向；视频路径沿用 2 保持一致。）
  */
 export function withCorsCacheKey(url: string): string {
-  return url + (url.includes('?') ? '&' : '?') + '_cors=2'
+  const normalized = url.trim()
+  if (!normalized) return ''
+  return normalized + (normalized.includes('?') ? '&' : '?') + '_cors=2'
 }
 
 function withFullVideoCacheKey(url: string): string {
-  return url + (url.includes('?') ? '&' : '?') + '_cors=2&video=full'
+  const normalized = url.trim()
+  if (!normalized) return ''
+  return normalized + (normalized.includes('?') ? '&' : '?') + '_cors=2&video=full'
 }
 
 /**
@@ -746,9 +750,13 @@ function withFullVideoCacheKey(url: string): string {
 const videoSourceCache = new Map<string, Promise<string>>()
 
 export function resolveVideoSource(url: string): Promise<string> {
-  const cached = videoSourceCache.get(url)
+  const normalized = url.trim()
+  if (!normalized) {
+    return Promise.reject(new Error('Empty video URL'))
+  }
+  const cached = videoSourceCache.get(normalized)
   if (cached) return cached
-  const promise = fetch(withFullVideoCacheKey(url), { mode: 'cors' })
+  const promise = fetch(withFullVideoCacheKey(normalized), { mode: 'cors' })
     .then((res) => {
       if (res.status !== 200) throw new Error(`video fetch failed: ${res.status}`)
       return res.blob()
@@ -756,10 +764,12 @@ export function resolveVideoSource(url: string): Promise<string> {
     .then((blob) => URL.createObjectURL(blob))
     // 失败不缓存：下次切换可重试（网络恢复/缓存清理后）。
     .catch((error) => {
-      videoSourceCache.delete(url)
+      if (videoSourceCache.get(normalized) === promise) {
+        videoSourceCache.delete(normalized)
+      }
       throw error
     })
-  videoSourceCache.set(url, promise)
+  videoSourceCache.set(normalized, promise)
   return promise
 }
 
@@ -772,10 +782,14 @@ export function resolveVideoSource(url: string): Promise<string> {
  * 经 withCorsCacheKey 加 _cors=2 参数与 no-cors 缓存 key 隔离（详见该函数注释）。
  */
 export function loadImage(url: string): Promise<ImageSource> {
-  const cached = imageCache.get(url)
+  const normalized = url.trim()
+  if (!normalized) {
+    return Promise.reject(new Error('Empty image URL'))
+  }
+  const cached = imageCache.get(normalized)
   if (cached) return cached
 
-  const corsUrl = withCorsCacheKey(url)
+  const corsUrl = withCorsCacheKey(normalized)
 
   let loader: Promise<ImageSource>
 
@@ -784,15 +798,26 @@ export function loadImage(url: string): Promise<ImageSource> {
     // 指定 imageOrientation:'flipY' 让 bitmap 上下翻转,
     // 这样 uploadTexture 时对 ImageBitmap 不设 UNPACK_FLIP_Y 就能得到正确的 WebGL 纹理朝向。
     loader = fetch(corsUrl, { mode: 'cors' })
-      .then((res) => res.blob())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Image fetch failed: ${res.status}`)
+        return res.blob()
+      })
       .then((blob) => createImageBitmap(blob, { imageOrientation: 'flipY' }))
       .catch(() => loadImageFallback(corsUrl)) // 任意环节失败则回退
   } else {
     loader = loadImageFallback(corsUrl)
   }
 
-  imageCache.set(url, loader)
-  return loader
+  // 失败时逐出缓存，避免瞬时网络波动或切背景中断永久毒化该 URL。
+  const trackedLoader = loader.catch((error) => {
+    if (imageCache.get(normalized) === trackedLoader) {
+      imageCache.delete(normalized)
+    }
+    throw error
+  })
+
+  imageCache.set(normalized, trackedLoader)
+  return trackedLoader
 }
 
 /**
@@ -1498,26 +1523,29 @@ function renderLoop() {
 
 /** 预热背景纹理：加载图片并上传到 GPU */
 export async function preloadTexture(url: string): Promise<boolean> {
+  const normalized = url.trim()
+  if (!normalized) return false
   try {
-    const image = await loadImage(url)
+    const image = await loadImage(normalized)
     ensureInitialized()
-    return uploadTexture(url, image)
+    return uploadTexture(normalized, image)
   } catch {
     return false
   }
 }
 
 export async function preloadVideoTexture(url: string): Promise<boolean> {
-  if (typeof document === 'undefined' || typeof window === 'undefined') return false
-  if (hasTexture(url)) return true
-  const pending = videoPreloadPromises.get(url)
+  const normalized = url.trim()
+  if (!normalized || typeof document === 'undefined' || typeof window === 'undefined') return false
+  if (hasTexture(normalized)) return true
+  const pending = videoPreloadPromises.get(normalized)
   if (pending) return pending
-  const promise = preloadVideoTextureInternal(url)
-  videoPreloadPromises.set(url, promise)
+  const promise = preloadVideoTextureInternal(normalized)
+  videoPreloadPromises.set(normalized, promise)
   try {
     return await promise
   } finally {
-    videoPreloadPromises.delete(url)
+    videoPreloadPromises.delete(normalized)
   }
 }
 

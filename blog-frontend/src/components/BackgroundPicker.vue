@@ -12,7 +12,7 @@
       </button>
       <video
         v-if="currentIsVideo"
-        :src="previewVideoSrc"
+        :src="previewVideoSrc || undefined"
         muted
         loop
         autoplay
@@ -20,7 +20,7 @@
         crossorigin="anonymous"
         class="picker-preview"
       />
-      <img v-else :src="currentSrc" alt="当前背景" class="picker-preview" />
+      <img v-else-if="currentSrc" :src="currentSrc" alt="当前背景" class="picker-preview" />
       <button
         class="picker-arrow picker-arrow--right"
         type="button"
@@ -61,7 +61,7 @@
       >
         <video
           v-if="isVideoBackground(item)"
-          :src="thumbVideoSrc(item)"
+          :src="thumbVideoSrc(item) || undefined"
           muted
           loop
           autoplay
@@ -69,7 +69,7 @@
           crossorigin="anonymous"
           class="picker-thumb-img"
         />
-        <img v-else :src="item.src" alt="" class="picker-thumb-img" />
+        <img v-else-if="item.src" :src="item.src" alt="" class="picker-thumb-img" />
       </button>
     </div>
   </div>
@@ -109,7 +109,7 @@ const currentItem = computed(
 )
 const currentIsVideo = computed(() => isVideoBackground(currentItem.value))
 const previewVideoSrc = computed(() =>
-  currentIsVideo.value ? withCorsCacheKey(currentSrc.value) : '',
+  currentIsVideo.value && currentSrc.value ? withCorsCacheKey(currentSrc.value) : '',
 )
 // 缩略图可能包含多个视频，逐个生成对应的 CORS 缓存键。
 function thumbVideoSrc(item: { src?: string }): string {
@@ -134,11 +134,13 @@ function select(index: number) {
 
 function prev() {
   const len = group.value.length
+  if (!len) return
   select((currentIndex.value - 1 + len) % len)
 }
 
 function next() {
   const len = group.value.length
+  if (!len) return
   select((currentIndex.value + 1) % len)
 }
 </script>

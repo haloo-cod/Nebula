@@ -28,7 +28,9 @@ const props = withDefaults(
 
 const ui = useUIStore()
 const staticBlurStyle = computed(() =>
-  props.staticBlur ? { '--panel-background': `url(${ui.currentBgUrl})` } : undefined,
+  props.staticBlur && ui.currentBgUrl
+    ? { '--panel-background': `url(${ui.currentBgUrl})` }
+    : undefined,
 )
 </script>
 

@@ -8,10 +8,11 @@
     ></div>
     <video
       v-else
+      :key="displayedBackground.src"
       ref="videoRef"
       class="bg-video"
-      :src="videoSrc"
-      :poster="displayedBackground.posterUrl"
+      :src="videoSrc || undefined"
+      :poster="displayedBackground.posterUrl || undefined"
       muted
       loop
       autoplay
@@ -116,6 +117,11 @@ let switchToken = 0
 async function switchBackground(next: BackgroundItem) {
   const token = ++switchToken
   if (next.src === displayedBackground.value.src) return
+  if (!next.src.trim()) {
+    displayedBackground.value = next
+    videoFailed.value = false
+    return
+  }
 
   // 先在后台确认资源可用，准备完成前继续显示旧背景，避免切换瞬间黑屏。
   if (isVideoBackground(next)) {
